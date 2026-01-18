@@ -72,6 +72,7 @@
     
     <script>
         let adminKey = '';
+        let currentTaId = null;
         
         function authenticate() {
             adminKey = document.getElementById('admin-key').value;
@@ -170,11 +171,19 @@
                     
                     <div class="upload-section">
                         <h3>Upload Documents</h3>
-                        <form id="upload-form" onsubmit="uploadDocument(event, '${ta.id}')">
-                            <input type="file" id="doc-file" required accept=".pdf,.docx,.doc,.xlsx,.xls,.txt,.pptx,.ppt">
-                            <button type="submit" class="btn btn-primary">Upload</button>
-                        </form>
-                        <p id="upload-status"></p>
+                        <div class="drop-zone" id="drop-zone" onclick="document.getElementById('doc-files').click()">
+                            <input type="file" id="doc-files" multiple accept=".pdf,.docx,.doc,.xlsx,.xls,.txt,.pptx,.ppt" style="display:none" onchange="handleFileSelect(event, '${ta.id}')">
+                            <div class="drop-zone-content">
+                                <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="17 8 12 3 7 8"></polyline>
+                                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                                </svg>
+                                <p class="drop-text">Drag & drop files here or click to browse</p>
+                                <p class="drop-hint">PDF, DOCX, XLSX, TXT, PPTX supported</p>
+                            </div>
+                        </div>
+                        <div id="upload-progress" class="upload-progress"></div>
                     </div>
                     
                     <div class="documents-section">
@@ -195,6 +204,8 @@
                         <button onclick="updatePrompt('${ta.id}')" class="btn btn-secondary">Update Prompt</button>
                     </div>
                 `;
+                currentTaId = ta.id;
+                setTimeout(setupDropZone, 0);
             });
         }
         
@@ -242,29 +253,95 @@
             });
         }
         
-        function uploadDocument(e, taId) {
-            e.preventDefault();
-            const file = document.getElementById('doc-file').files[0];
-            const formData = new FormData();
-            formData.append('file', file);
+        function setupDropZone() {
+            const dropZone = document.getElementById('drop-zone');
+            if (!dropZone) return;
             
-            document.getElementById('upload-status').textContent = 'Uploading...';
-            
-            fetch(`/admin/api/tas/${taId}/upload`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${adminKey}` },
-                body: formData
-            })
-            .then(res => res.json())
-            .then(result => {
-                if (result.error) {
-                    document.getElementById('upload-status').textContent = `Error: ${result.error}`;
-                } else {
-                    document.getElementById('upload-status').textContent = 'Uploaded successfully!';
-                    document.getElementById('upload-form').reset();
-                    showTADetail(taId);
-                }
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, preventDefaults, false);
             });
+            
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, () => dropZone.classList.add('drop-zone-active'), false);
+            });
+            
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, () => dropZone.classList.remove('drop-zone-active'), false);
+            });
+            
+            dropZone.addEventListener('drop', (e) => {
+                const files = e.dataTransfer.files;
+                if (files.length > 0 && currentTaId) {
+                    uploadFiles(files, currentTaId);
+                }
+            }, false);
+        }
+        
+        function handleFileSelect(e, taId) {
+            const files = e.target.files;
+            if (files.length > 0) {
+                uploadFiles(files, taId);
+            }
+        }
+        
+        async function uploadFiles(files, taId) {
+            const progressContainer = document.getElementById('upload-progress');
+            progressContainer.innerHTML = '';
+            
+            const fileArray = Array.from(files);
+            let successCount = 0;
+            let errorCount = 0;
+            
+            for (let i = 0; i < fileArray.length; i++) {
+                const file = fileArray[i];
+                const fileId = `file-${i}`;
+                
+                progressContainer.innerHTML += `
+                    <div class="upload-item" id="${fileId}">
+                        <span class="upload-filename">${file.name}</span>
+                        <span class="upload-status uploading">Uploading...</span>
+                    </div>
+                `;
+                
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                try {
+                    const res = await fetch(`/admin/api/tas/${taId}/upload`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${adminKey}` },
+                        body: formData
+                    });
+                    const result = await res.json();
+                    
+                    const statusEl = document.querySelector(`#${fileId} .upload-status`);
+                    if (result.error) {
+                        statusEl.textContent = result.error;
+                        statusEl.className = 'upload-status error';
+                        errorCount++;
+                    } else {
+                        statusEl.textContent = 'Done';
+                        statusEl.className = 'upload-status success';
+                        successCount++;
+                    }
+                } catch (err) {
+                    const statusEl = document.querySelector(`#${fileId} .upload-status`);
+                    statusEl.textContent = 'Failed';
+                    statusEl.className = 'upload-status error';
+                    errorCount++;
+                }
+            }
+            
+            document.getElementById('doc-files').value = '';
+            
+            if (successCount > 0) {
+                setTimeout(() => showTADetail(taId), 1000);
+            }
         }
         
         function deleteDocument(taId, docId) {
