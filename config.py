@@ -9,6 +9,8 @@ class Config:
     LLM_MODEL = "gpt-4o"
     
     ADMIN_SECRET_KEY = os.getenv("ADMIN_SECRET_KEY", "maize-admin-2024")
+    ADMIN_USERNAME = os.getenv("admin_id", "")
+    ADMIN_PASSWORD = os.getenv("admin_pw", "")
     
     DATABASE_URL = os.getenv("DATABASE_URL")
     

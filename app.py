@@ -38,16 +38,64 @@ def favicon():
 def landing():
     return render_template('landing.html')
 
+def admin_required(f):
+    from functools import wraps
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('admin_logged_in'):
+            return redirect(url_for('admin_login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
 @app.route('/admin')
+@admin_required
 def admin_panel():
     return render_template('admin.html')
 
-@app.route('/admin/api/tas', methods=['GET'])
-def list_tas():
-    auth = request.headers.get('Authorization', '')
-    if auth != f"Bearer {Config.ADMIN_SECRET_KEY}":
-        return jsonify({"error": "Unauthorized"}), 401
+@app.route('/admin/login', methods=['GET', 'POST'])
+def admin_login():
+    if session.get('admin_logged_in'):
+        return redirect(url_for('admin_panel'))
     
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        
+        if not username or not password:
+            return render_template('admin_login.html', error='Please enter both username and password')
+        
+        valid_username = Config.ADMIN_USERNAME
+        valid_password = Config.ADMIN_PASSWORD
+        
+        if not valid_username or not valid_password:
+            return render_template('admin_login.html', error='Admin credentials not configured')
+        
+        if username == valid_username and password == valid_password:
+            session['admin_logged_in'] = True
+            session.permanent = True
+            return redirect(url_for('admin_panel'))
+        else:
+            return render_template('admin_login.html', error='Invalid username or password')
+    
+    return render_template('admin_login.html')
+
+@app.route('/admin/logout')
+def admin_logout():
+    session.pop('admin_logged_in', None)
+    return redirect(url_for('admin_login'))
+
+def admin_api_required(f):
+    from functools import wraps
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('admin_logged_in'):
+            return jsonify({"error": "Unauthorized"}), 401
+        return f(*args, **kwargs)
+    return decorated_function
+
+@app.route('/admin/api/tas', methods=['GET'])
+@admin_api_required
+def list_tas():
     tas = TeachingAssistant.query.filter_by(is_active=True).all()
     return jsonify([{
         "id": ta.id,
@@ -61,11 +109,8 @@ def list_tas():
     } for ta in tas])
 
 @app.route('/admin/api/tas', methods=['POST'])
+@admin_api_required
 def create_ta():
-    auth = request.headers.get('Authorization', '')
-    if auth != f"Bearer {Config.ADMIN_SECRET_KEY}":
-        return jsonify({"error": "Unauthorized"}), 401
-    
     data = request.json
     ta_id = secrets.token_urlsafe(12)
     slug = data.get("slug", "").strip().lower().replace(" ", "-")
@@ -98,11 +143,8 @@ def create_ta():
     })
 
 @app.route('/admin/api/tas/<ta_id>', methods=['GET'])
+@admin_api_required
 def get_ta(ta_id):
-    auth = request.headers.get('Authorization', '')
-    if auth != f"Bearer {Config.ADMIN_SECRET_KEY}":
-        return jsonify({"error": "Unauthorized"}), 401
-    
     ta = TeachingAssistant.query.get(ta_id)
     if not ta:
         return jsonify({"error": "TA not found"}), 404
@@ -129,11 +171,8 @@ def get_ta(ta_id):
     })
 
 @app.route('/admin/api/tas/<ta_id>', methods=['PUT'])
+@admin_api_required
 def update_ta(ta_id):
-    auth = request.headers.get('Authorization', '')
-    if auth != f"Bearer {Config.ADMIN_SECRET_KEY}":
-        return jsonify({"error": "Unauthorized"}), 401
-    
     ta = TeachingAssistant.query.get(ta_id)
     if not ta:
         return jsonify({"error": "TA not found"}), 404
@@ -164,11 +203,8 @@ def update_ta(ta_id):
     return jsonify({"success": True, "slug": ta.slug})
 
 @app.route('/admin/api/tas/<ta_id>', methods=['DELETE'])
+@admin_api_required
 def delete_ta(ta_id):
-    auth = request.headers.get('Authorization', '')
-    if auth != f"Bearer {Config.ADMIN_SECRET_KEY}":
-        return jsonify({"error": "Unauthorized"}), 401
-    
     ta = TeachingAssistant.query.get(ta_id)
     if not ta:
         return jsonify({"error": "TA not found"}), 404
@@ -178,11 +214,8 @@ def delete_ta(ta_id):
     return jsonify({"success": True})
 
 @app.route('/admin/api/tas/<ta_id>/upload', methods=['POST'])
+@admin_api_required
 def upload_document(ta_id):
-    auth = request.headers.get('Authorization', '')
-    if auth != f"Bearer {Config.ADMIN_SECRET_KEY}":
-        return jsonify({"error": "Unauthorized"}), 401
-    
     ta = TeachingAssistant.query.get(ta_id)
     if not ta:
         return jsonify({"error": "TA not found"}), 404
@@ -230,11 +263,8 @@ def upload_document(ta_id):
     })
 
 @app.route('/admin/api/tas/<ta_id>/documents/<int:doc_id>', methods=['DELETE'])
+@admin_api_required
 def delete_document(ta_id, doc_id):
-    auth = request.headers.get('Authorization', '')
-    if auth != f"Bearer {Config.ADMIN_SECRET_KEY}":
-        return jsonify({"error": "Unauthorized"}), 401
-    
     doc = Document.query.filter_by(id=doc_id, ta_id=ta_id).first()
     if not doc:
         return jsonify({"error": "Document not found"}), 404
@@ -252,11 +282,8 @@ def delete_document(ta_id, doc_id):
     return jsonify({"success": True})
 
 @app.route('/admin/api/tas/<ta_id>/reindex', methods=['POST'])
+@admin_api_required
 def reindex_ta(ta_id):
-    auth = request.headers.get('Authorization', '')
-    if auth != f"Bearer {Config.ADMIN_SECRET_KEY}":
-        return jsonify({"error": "Unauthorized"}), 401
-    
     ta = TeachingAssistant.query.get(ta_id)
     if not ta:
         return jsonify({"error": "TA not found"}), 404

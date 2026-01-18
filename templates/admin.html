@@ -10,19 +10,10 @@
     <div class="admin-container">
         <header class="admin-header">
             <h1><a href="/">Maize</a> Admin Panel</h1>
+            <a href="/admin/logout" class="btn btn-secondary btn-sm">Logout</a>
         </header>
         
-        <div id="auth-section" class="auth-section">
-            <h2>Administrator Login</h2>
-            <div class="form-group">
-                <label for="admin-key">Admin Key:</label>
-                <input type="password" id="admin-key" placeholder="Enter admin secret key">
-            </div>
-            <button onclick="authenticate()" class="btn btn-primary">Login</button>
-            <p id="auth-error" class="error-message" style="display: none;"></p>
-        </div>
-        
-        <main id="admin-main" class="admin-main" style="display: none;">
+        <main id="admin-main" class="admin-main">
             <section class="ta-list-section">
                 <div class="section-header">
                     <h2>Teaching Assistants</h2>
@@ -71,41 +62,10 @@
     </div>
     
     <script>
-        let adminKey = '';
         let currentTaId = null;
         
-        function authenticate() {
-            adminKey = document.getElementById('admin-key').value;
-            if (!adminKey) {
-                showError('Please enter the admin key');
-                return;
-            }
-            
-            fetch('/admin/api/tas', {
-                headers: { 'Authorization': `Bearer ${adminKey}` }
-            })
-            .then(res => {
-                if (res.ok) {
-                    document.getElementById('auth-section').style.display = 'none';
-                    document.getElementById('admin-main').style.display = 'block';
-                    loadTAs();
-                } else {
-                    showError('Invalid admin key');
-                }
-            })
-            .catch(err => showError('Authentication failed'));
-        }
-        
-        function showError(msg) {
-            const el = document.getElementById('auth-error');
-            el.textContent = msg;
-            el.style.display = 'block';
-        }
-        
         function loadTAs() {
-            fetch('/admin/api/tas', {
-                headers: { 'Authorization': `Bearer ${adminKey}` }
-            })
+            fetch('/admin/api/tas')
             .then(res => res.json())
             .then(tas => {
                 const list = document.getElementById('ta-list');
@@ -131,9 +91,7 @@
         }
         
         function showTADetail(taId) {
-            fetch(`/admin/api/tas/${taId}`, {
-                headers: { 'Authorization': `Bearer ${adminKey}` }
-            })
+            fetch(`/admin/api/tas/${taId}`)
             .then(res => res.json())
             .then(ta => {
                 document.getElementById('ta-list-section') && 
@@ -236,7 +194,6 @@
             fetch('/admin/api/tas', {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${adminKey}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(data)
@@ -314,7 +271,6 @@
                 try {
                     const res = await fetch(`/admin/api/tas/${taId}/upload`, {
                         method: 'POST',
-                        headers: { 'Authorization': `Bearer ${adminKey}` },
                         body: formData
                     });
                     const result = await res.json();
@@ -348,8 +304,7 @@
             if (!confirm('Delete this document?')) return;
             
             fetch(`/admin/api/tas/${taId}/documents/${docId}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${adminKey}` }
+                method: 'DELETE'
             })
             .then(() => showTADetail(taId));
         }
@@ -362,8 +317,7 @@
             btn.textContent = 'Indexing...';
             
             fetch(`/admin/api/tas/${taId}/reindex`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${adminKey}` }
+                method: 'POST'
             })
             .then(res => res.json())
             .then(result => {
@@ -384,8 +338,7 @@
             if (!confirm('Delete this teaching assistant? This cannot be undone.')) return;
             
             fetch(`/admin/api/tas/${taId}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${adminKey}` }
+                method: 'DELETE'
             })
             .then(() => {
                 hideDetail();
@@ -398,7 +351,6 @@
             fetch(`/admin/api/tas/${taId}`, {
                 method: 'PUT',
                 headers: {
-                    'Authorization': `Bearer ${adminKey}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ system_prompt: prompt })
@@ -433,7 +385,6 @@
             fetch(`/admin/api/tas/${taId}`, {
                 method: 'PUT',
                 headers: {
-                    'Authorization': `Bearer ${adminKey}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ slug: newSlug })
@@ -454,6 +405,8 @@
                 statusEl.style.color = '#ef4444';
             });
         }
+        
+        loadTAs();
     </script>
 </body>
 </html>
