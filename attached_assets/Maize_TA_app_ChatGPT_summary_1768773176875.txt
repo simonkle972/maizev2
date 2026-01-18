@@ -1,0 +1,171 @@
+TEACHING ASSISTANT APP — PURPOSE & KEY LEARNINGS
+===============================================
+
+SECTION 1 — HIGH-LEVEL PURPOSE AND FUNCTIONALITY
+------------------------------------------------
+
+1.1 Purpose for Students
+
+The app is intended to function as a course-specific teaching assistant that helps students:
+
+- Understand course material (lectures, readings, assignments)
+- Ask questions in natural language
+- Get explanations that resemble how a knowledgeable TA or instructor would respond
+- Receive help with:
+  - Structured questions (e.g., “Homework 3, Problem 1c”)
+  - Conceptual questions (e.g., “Why are high beta stocks riskier?”)
+  - Coverage questions (e.g., “What was covered in Lecture 5?”)
+
+From a student’s perspective:
+- The app should “know the course”
+- It should not require the student to know how materials are organized
+- It should not force answers to come verbatim from documents
+- It should help explain, not just retrieve text
+
+1.2 Purpose for Admins / Instructors
+
+The app is intended to give an instructor or course admin the ability to:
+
+- Create a TA instance per course
+- Upload course materials (PDFs, notes, assignments, solutions, etc.)
+- Control availability and limits (e.g., usage, demos, visibility)
+- Reindex or update course materials as needed
+- Observe usage and quality via logging and diagnostics
+
+From an admin/instructor perspective:
+- The app should not require heavy manual tuning per course
+- It should be robust to imperfect or messy documents
+- It should fail transparently rather than silently degrading
+- It should be maintainable across multiple courses with different structures
+
+The admin experience is operational, not pedagogical — correctness and stability matter more than cleverness.
+
+------------------------------------------------
+SECTION 2 — KEY LEARNINGS FROM DEVELOPMENT
+------------------------------------------------
+
+These lessons are distilled from extended experimentation, debugging, and iteration across multiple TAs and document sets.
+
+2.1 Success with a Single, Well-Defined Course Does Not Generalize Automatically
+
+The earliest version of the app worked well when:
+- There was a single TA
+- Documents were homogeneous
+- Course structure was consistent and predictable
+- Query patterns were narrow
+
+When additional TAs and messier documents were introduced:
+- Assumptions baked into the original design no longer held
+- Logic that worked well in one course failed silently in others
+- Generalization required more than incremental patches
+
+Lesson:
+A strong single-course prototype is not a sufficient foundation for a multi-course system without architectural rethinking.
+
+2.2 Normalization of User Language Was a Genuine Breakthrough
+
+One of the most effective ideas implemented was the normalization of instructional units:
+
+Examples:
+- “Lecture 5”, “Week 5”, “Class 5”, “Module 5” → instructional_unit_number = 5
+- The label (lecture/week/etc.) was preserved separately
+
+Why this worked:
+- Users naturally vary their phrasing
+- Normalizing the numeric reference while preserving semantic labels enabled flexibility without loss of meaning
+
+Lesson:
+Separating “what the user means” from “how the user says it” is extremely powerful and generalizable.
+
+2.3 Structured Queries Do Not Imply Localized Answers
+
+Many structured queries (e.g., specific problems or sub-parts) do not have their explanations located:
+- In the same document
+- In the same section
+- Or even explicitly written anywhere
+
+In many cases:
+- The best explanation comes from general course concepts
+- Or from reasoning rather than retrieval
+- Or from examples in unrelated parts of the material
+
+Lesson:
+Correctly identifying *what* the student is asking about does not imply *where* the answer must come from.
+
+2.4 Chunks Are a Technical Artifact, Not a Semantic Unit
+
+Chunking is necessary for indexing and retrieval, but:
+
+- Chunks do not reliably correspond to:
+  - Problem statements
+  - Concept boundaries
+  - Pedagogical units
+- Treating chunks as meaningful “content blocks” leads to incoherent aggregation
+- Selecting or concatenating chunks based solely on metadata often produces noise
+
+Lesson:
+Chunk-level operations must be treated as an implementation detail, not a conceptual one.
+
+2.5 Adding Layers Did Not Linearly Improve Quality
+
+Over time, many layers were added:
+- Regex parsing
+- LLM-assisted structuring
+- Structure graphs
+- Boosting and filtering
+- Grounding logic
+- Multiple fallback paths
+- Feature flags at different scopes
+
+Each layer was introduced to solve a real problem, but collectively:
+- The system became difficult to reason about
+- Debugging relied heavily on logs rather than understanding
+- Small changes had unpredictable downstream effects
+- Answer quality did not reliably improve
+
+Lesson:
+Complexity accumulated faster than understanding, making iteration increasingly expensive.
+
+2.6 Silent Failure Is More Dangerous Than Explicit Failure
+
+Many failures manifested as:
+- “I couldn’t find specific content…”
+- Incorrect but confident answers
+- Regressions that were only visible via detailed logs
+
+Without strong invariants or explicit failure modes:
+- It was difficult to know whether the system was working as intended
+- Quality issues often appeared indistinguishable from data issues
+
+Lesson:
+Systems should fail loudly when assumptions are violated, especially in educational contexts.
+
+2.7 Tooling Limitations Amplified Complexity
+
+Development occurred across:
+- Multiple LLMs
+- A growing codebase
+- Limited shared global understanding (human or machine)
+- Heavy reliance on prompt-driven iteration
+
+This made it difficult to:
+- Make architecture-wide decisions confidently
+- Ensure changes aligned with original intent
+- Avoid local optimizations that harmed global behavior
+
+Lesson:
+Without a stable, shared mental model of the system, complexity compounds rapidly.
+
+------------------------------------------------
+SECTION 3 — SUMMARY
+
+The core idea of a course-aware teaching assistant remains valid and compelling.
+
+However, the experience so far suggests that:
+- Incremental layering on an early prototype is not sufficient
+- Generalization requires explicit architectural resets
+- Clarity of purpose must precede technical design
+- Simpler, more principled systems may outperform more elaborate ones
+
+This document captures the *why* and the *what*, not the *how*.
+The technical implementation details are intentionally deferred.

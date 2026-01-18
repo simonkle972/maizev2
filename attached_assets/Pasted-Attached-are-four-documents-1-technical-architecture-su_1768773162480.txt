@@ -1,0 +1,33 @@
+Attached are four documents:
+1. technical_architecture_summary.txt (created by replit)
+2. Rebuild_specification.txt (created by replit, use this for guidance on basic architecture)
+3. Maize TA app ChatGPT summary (created by ChatGPT)
+4. Maize_synthesis.txt (created by ChatGPT)
+These documents tell a story of a prior web app project that ended up in a dead end. But the idea lives on.
+Analyze the attachments closely. Based on all the learnings in these materials, please generate a plan (plan mode only, no build yet) to re-build an MVP of this app called "Maize" that will serve as our new version. Ask any questions you may have. Happy to provide more information if available and even sample documents.
+We will then build it.
+
+Some precursory Q and A: 
+Initial page architecture: 
+- admin interface at /admin (allows for TA creation and management)
+- Basic landing page for app at / path
+- New TAs get their own subpath which the admin can choose during creation (e.g. /financecourse) 
+Scope for MVP: very much built for multiple TAs with creation in the admin back-end. We want to immediately build to allow for and work well with multiple course TAs
+
+Documents supported and kept in mind: ANY and all documents a course could contain. Lectures (PDFs, slides), Assignments (homework, problem sets), Solutions, Readings, past Exams likely covers 90% of what is possible but could be amended by edge cases.
+Importantly, the app also needs to handle not only PDF but also spreadsheets, docx files and other common LLM-readable file formats
+
+Metadata Extraction Strategy: Cost is not a major consideration for now. Making it work is. Therefore I would prefer Full LLM extraction if you think that is most reliable. One note here: Persistence of extracted data is crucial. The documents I gave you likely mention this in various places. We don't want to have to constantly re-index/re-extract data across publishing cycles even if no changes were made to those flows in the code.
+
+Query Types Priority: ALL of those query types are in scope. In the prior version of the app we already achieved solid results for each in isolation. The real challenge is to make them all work at the same time.
+
+Sample materials: I am attaching some docs from various courses. I will not attach any query logs so as to avoid you accidentially ingesting any technical artifacts (like logged fields or where they may have come from) into this new build.
+
+Attached samples (and context)
+* hw3.pdf (a homework assignment for a course about finance "The Investor")
+* Class_3_2025_after_class.pdf (lecture slides from a random week of an accounting class)
+* MGT404_2025_ProblemSet2.pdf (homework assignment from an economics course)
+* ss#1.pdf (a self-study problem set from a course on linear optimization models and managerial decision making)
+* final_2024.pdf (a past final exam from a course about finance "The Investor")
+* MGT402_sample_final_1.pdf (a sample final from an accounting course)
+

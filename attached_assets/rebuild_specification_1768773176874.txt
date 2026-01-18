@@ -1,0 +1,790 @@
+# AI Teaching Assistant - Rebuild Specification
+
+## CRITICAL: Technology Stack Requirements
+
+**This application MUST be built with:**
+- **Backend:** Python 3.11+ with Flask
+- **Database:** PostgreSQL (via Replit's built-in database)
+- **Vector Store:** ChromaDB (local, persistent)
+- **Embeddings:** OpenAI `text-embedding-3-small`
+- **LLM:** OpenAI GPT-4o
+- **File Storage:** Replit Object Storage (for documents and index artifacts)
+- **Session Storage:** Replit Database (key-value store for sessions)
+
+**DO NOT use:** JavaScript/Node.js for backend, SQLite, in-memory storage for production data.
+
+---
+
+# Part 1: Foundation Setup (Build This First)
+
+## 1.1 Project Structure
+
+```
+project/
+├── app.py                 # Main Flask app, routes
+├── config.py              # Configuration and environment variables
+├── requirements.txt       # Python dependencies
+├── static/                # CSS, JavaScript
+├── templates/             # Jinja2 HTML templates
+├── src/
+│   ├── __init__.py
+│   ├── document_processor.py   # Document ingestion and chunking
+│   ├── retriever.py            # Vector search and retrieval
+│   ├── query_analyzer.py       # Query understanding
+│   ├── response_generator.py   # LLM response generation
+│   └── storage.py              # Object Storage and DB helpers
+├── data/
+│   └── courses/           # Per-TA document storage (synced to Object Storage)
+│       └── <ta_id>/
+│           └── docs/      # Uploaded documents
+└── docs/                  # Documentation
+```
+
+## 1.2 Required Dependencies (requirements.txt)
+
+```
+flask>=3.0.0
+gunicorn>=21.0.0
+python-dotenv>=1.0.0
+openai>=1.0.0
+chromadb>=0.4.0
+llama-index>=0.10.0
+llama-index-embeddings-openai>=0.1.0
+llama-index-vector-stores-chroma>=0.1.0
+google-api-python-client>=2.0.0
+google-auth>=2.0.0
+replit>=0.0.1
+werkzeug>=3.0.0
+```
+
+## 1.3 Environment Variables Required
+
+```
+OPENAI_API_KEY=<required - for embeddings and LLM>
+ADMIN_SECRET_KEY=<required - for admin panel authentication>
+REPLIT_DB_URL=<auto-provided by Replit>
+```
+
+## 1.4 Configuration (config.py)
+
+```python
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+class Config:
+    # OpenAI
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+    EMBEDDING_MODEL = "text-embedding-3-small"
+    LLM_MODEL = "gpt-4o"
+    
+    # Admin
+    ADMIN_SECRET_KEY = os.getenv("ADMIN_SECRET_KEY")
+    
+    # Retrieval settings
+    TOP_K_RETRIEVAL = 20  # Number of chunks to retrieve
+    TOP_K_RERANK = 8      # Number of chunks after reranking
+    CHUNK_SIZE = 512      # Characters per chunk
+    CHUNK_OVERLAP = 50    # Overlap between chunks
+    
+    # Session
+    SESSION_TTL_HOURS = 24
+    MAX_CONVERSATION_TURNS = 10
+```
+
+---
+
+# Part 2: Core Backend Implementation
+
+## 2.1 Flask App Setup (app.py)
+
+```python
+import os
+import logging
+from flask import Flask, request, jsonify, render_template, session
+from config import Config
+
+# Configure logging FIRST
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s | %(levelname)s | %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+app = Flask(__name__)
+app.secret_key = os.urandom(24)
+
+# Initialize OpenAI client
+from openai import OpenAI
+openai_client = OpenAI(api_key=Config.OPENAI_API_KEY)
+
+# Health check route
+@app.route('/health')
+def health():
+    return jsonify({"status": "healthy"})
+
+# Main chat route (per TA)
+@app.route('/<ta_id>')
+def ta_chat(ta_id):
+    # Load TA config, render chat interface
+    ta_config = load_ta_config(ta_id)
+    if not ta_config:
+        return "TA not found", 404
+    return render_template('chat.html', ta=ta_config)
+
+# API endpoint for chat
+@app.route('/<ta_id>/api/chat', methods=['POST'])
+def chat_api(ta_id):
+    data = request.json
+    query = data.get('query', '')
+    session_id = data.get('session_id', '')
+    
+    # Process query and generate response
+    # (Implementation details below)
+    
+    return jsonify({
+        "response": response_text,
+        "session_id": session_id
+    })
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
+```
+
+## 2.2 OpenAI Integration
+
+### Embeddings
+
+```python
+from openai import OpenAI
+from config import Config
+
+client = OpenAI(api_key=Config.OPENAI_API_KEY)
+
+def get_embedding(text: str) -> list[float]:
+    """Get embedding vector for text."""
+    response = client.embeddings.create(
+        model=Config.EMBEDDING_MODEL,
+        input=text
+    )
+    return response.data[0].embedding
+```
+
+### LLM Response Generation
+
+```python
+def generate_response(query: str, context: str, system_prompt: str) -> str:
+    """Generate LLM response with context."""
+    response = client.chat.completions.create(
+        model=Config.LLM_MODEL,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {query}"}
+        ],
+        temperature=0.7,
+        max_tokens=1000
+    )
+    return response.choices[0].message.content
+```
+
+## 2.3 Document Storage and Management
+
+### Object Storage Integration
+
+```python
+from replit.object_storage import Client as ObjectStorageClient
+
+storage_client = ObjectStorageClient()
+
+def upload_document(ta_id: str, filename: str, content: bytes) -> str:
+    """Upload document to Object Storage."""
+    key = f"courses/{ta_id}/docs/{filename}"
+    storage_client.upload_from_bytes(key, content)
+    return key
+
+def download_document(ta_id: str, filename: str) -> bytes:
+    """Download document from Object Storage."""
+    key = f"courses/{ta_id}/docs/{filename}"
+    return storage_client.download_as_bytes(key)
+
+def list_documents(ta_id: str) -> list[str]:
+    """List all documents for a TA."""
+    prefix = f"courses/{ta_id}/docs/"
+    objects = storage_client.list(prefix=prefix)
+    return [obj.key.replace(prefix, '') for obj in objects]
+
+def delete_document(ta_id: str, filename: str) -> bool:
+    """Delete document from Object Storage."""
+    key = f"courses/{ta_id}/docs/{filename}"
+    storage_client.delete(key)
+    return True
+```
+
+### Local File Handling for Processing
+
+```python
+import os
+import tempfile
+
+def download_docs_for_processing(ta_id: str) -> str:
+    """Download all docs to temp directory for indexing."""
+    temp_dir = tempfile.mkdtemp()
+    docs_dir = os.path.join(temp_dir, "docs")
+    os.makedirs(docs_dir)
+    
+    for filename in list_documents(ta_id):
+        content = download_document(ta_id, filename)
+        filepath = os.path.join(docs_dir, filename)
+        with open(filepath, 'wb') as f:
+            f.write(content)
+    
+    return docs_dir
+```
+
+## 2.4 TA Configuration Storage
+
+### Using Replit Database for TA Metadata
+
+```python
+from replit import db
+
+def save_ta_config(ta_id: str, config: dict) -> None:
+    """Save TA configuration to Replit Database."""
+    db[f"ta:{ta_id}"] = config
+
+def load_ta_config(ta_id: str) -> dict:
+    """Load TA configuration from Replit Database."""
+    key = f"ta:{ta_id}"
+    if key in db:
+        return db[key]
+    return None
+
+def list_all_tas() -> list[dict]:
+    """List all TA configurations."""
+    tas = []
+    for key in db.keys():
+        if key.startswith("ta:"):
+            ta_id = key.replace("ta:", "")
+            tas.append({"id": ta_id, **db[key]})
+    return tas
+
+def delete_ta_config(ta_id: str) -> None:
+    """Delete TA configuration."""
+    key = f"ta:{ta_id}"
+    if key in db:
+        del db[key]
+```
+
+### TA Config Schema
+
+```python
+ta_config = {
+    "name": "Course 101 TA",
+    "course_name": "Introduction to Economics",
+    "system_prompt": "You are a helpful teaching assistant...",
+    "created_at": "2024-01-15T10:00:00Z",
+    "is_indexed": False,
+    "document_count": 0,
+}
+```
+
+## 2.5 Document Processing and Indexing
+
+### Basic Chunking
+
+```python
+from llama_index.core import SimpleDirectoryReader, VectorStoreIndex
+from llama_index.core.node_parser import SentenceSplitter
+from llama_index.embeddings.openai import OpenAIEmbedding
+from llama_index.vector_stores.chroma import ChromaVectorStore
+import chromadb
+
+def process_documents(ta_id: str, docs_dir: str) -> VectorStoreIndex:
+    """Process documents and create vector index."""
+    
+    # Load documents
+    reader = SimpleDirectoryReader(docs_dir)
+    documents = reader.load_data()
+    
+    # Create chunker
+    splitter = SentenceSplitter(
+        chunk_size=Config.CHUNK_SIZE,
+        chunk_overlap=Config.CHUNK_OVERLAP
+    )
+    
+    # Create nodes (chunks)
+    nodes = splitter.get_nodes_from_documents(documents)
+    
+    # Add basic metadata to each node
+    for node in nodes:
+        node.metadata['ta_id'] = ta_id
+        node.metadata['file_name'] = node.metadata.get('file_name', 'unknown')
+    
+    # Create ChromaDB collection
+    chroma_client = chromadb.PersistentClient(path=f"./chroma_db/{ta_id}")
+    collection = chroma_client.get_or_create_collection(f"ta_{ta_id}")
+    vector_store = ChromaVectorStore(chroma_collection=collection)
+    
+    # Create index
+    embed_model = OpenAIEmbedding(model=Config.EMBEDDING_MODEL)
+    index = VectorStoreIndex(
+        nodes=nodes,
+        vector_store=vector_store,
+        embed_model=embed_model
+    )
+    
+    return index
+```
+
+### Index Persistence to Object Storage
+
+```python
+import shutil
+import json
+
+def save_index_to_storage(ta_id: str) -> None:
+    """Save ChromaDB index to Object Storage for persistence."""
+    local_path = f"./chroma_db/{ta_id}"
+    
+    # Create zip of the index directory
+    shutil.make_archive(f"/tmp/{ta_id}_index", 'zip', local_path)
+    
+    # Upload to Object Storage
+    with open(f"/tmp/{ta_id}_index.zip", 'rb') as f:
+        storage_client.upload_from_bytes(f"indices/{ta_id}/index.zip", f.read())
+    
+    # Save manifest
+    manifest = {
+        "ta_id": ta_id,
+        "indexed_at": datetime.utcnow().isoformat(),
+        "version": "1.0"
+    }
+    storage_client.upload_from_bytes(
+        f"indices/{ta_id}/manifest.json",
+        json.dumps(manifest).encode()
+    )
+
+def load_index_from_storage(ta_id: str) -> bool:
+    """Load ChromaDB index from Object Storage."""
+    try:
+        # Download index zip
+        content = storage_client.download_as_bytes(f"indices/{ta_id}/index.zip")
+        
+        # Extract to local path
+        local_path = f"./chroma_db/{ta_id}"
+        os.makedirs(local_path, exist_ok=True)
+        
+        with open(f"/tmp/{ta_id}_index.zip", 'wb') as f:
+            f.write(content)
+        
+        shutil.unpack_archive(f"/tmp/{ta_id}_index.zip", local_path)
+        return True
+    except Exception as e:
+        logger.error(f"Failed to load index for {ta_id}: {e}")
+        return False
+```
+
+## 2.6 Basic Retrieval
+
+### Simple Vector Retrieval (START HERE)
+
+```python
+def retrieve_context(ta_id: str, query: str, top_k: int = 8) -> list[dict]:
+    """Retrieve relevant chunks for a query."""
+    
+    # Load or get cached index
+    index = get_or_load_index(ta_id)
+    
+    # Create retriever
+    retriever = index.as_retriever(similarity_top_k=top_k)
+    
+    # Retrieve nodes
+    nodes = retriever.retrieve(query)
+    
+    # Format results
+    results = []
+    for node in nodes:
+        results.append({
+            "text": node.node.text,
+            "score": node.score,
+            "file_name": node.node.metadata.get('file_name', 'unknown'),
+            "metadata": node.node.metadata
+        })
+    
+    return results
+```
+
+## 2.7 Session Management
+
+```python
+import secrets
+from datetime import datetime, timedelta
+
+def create_session(ta_id: str) -> str:
+    """Create a new chat session."""
+    session_id = secrets.token_urlsafe(16)
+    session_data = {
+        "ta_id": ta_id,
+        "created_at": datetime.utcnow().isoformat(),
+        "history": []
+    }
+    db[f"session:{session_id}"] = session_data
+    return session_id
+
+def get_session(session_id: str) -> dict:
+    """Get session data."""
+    key = f"session:{session_id}"
+    if key in db:
+        return db[key]
+    return None
+
+def add_to_history(session_id: str, query: str, response: str) -> None:
+    """Add query/response pair to session history."""
+    session = get_session(session_id)
+    if session:
+        session['history'].append({
+            "query": query,
+            "response": response,
+            "timestamp": datetime.utcnow().isoformat()
+        })
+        # Keep only last N turns
+        session['history'] = session['history'][-Config.MAX_CONVERSATION_TURNS:]
+        db[f"session:{session_id}"] = session
+
+def get_conversation_context(session_id: str) -> str:
+    """Get formatted conversation history for context."""
+    session = get_session(session_id)
+    if not session or not session.get('history'):
+        return ""
+    
+    context_parts = []
+    for turn in session['history'][-5:]:  # Last 5 turns
+        context_parts.append(f"User: {turn['query']}")
+        context_parts.append(f"Assistant: {turn['response'][:200]}...")
+    
+    return "\n".join(context_parts)
+```
+
+## 2.8 Admin Panel Routes
+
+```python
+from functools import wraps
+
+def require_admin(f):
+    """Decorator to require admin authentication."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth = request.headers.get('Authorization', '')
+        if auth != f"Bearer {Config.ADMIN_SECRET_KEY}":
+            return jsonify({"error": "Unauthorized"}), 401
+        return f(*args, **kwargs)
+    return decorated
+
+@app.route('/admin')
+def admin_panel():
+    """Render admin panel (requires auth via form)."""
+    return render_template('admin.html')
+
+@app.route('/admin/api/tas', methods=['GET'])
+@require_admin
+def list_tas():
+    """List all TAs."""
+    return jsonify(list_all_tas())
+
+@app.route('/admin/api/tas', methods=['POST'])
+@require_admin
+def create_ta():
+    """Create a new TA."""
+    data = request.json
+    ta_id = secrets.token_urlsafe(8)
+    
+    config = {
+        "name": data.get("name", "New TA"),
+        "course_name": data.get("course_name", ""),
+        "system_prompt": data.get("system_prompt", "You are a helpful teaching assistant."),
+        "created_at": datetime.utcnow().isoformat(),
+        "is_indexed": False,
+        "document_count": 0,
+    }
+    
+    save_ta_config(ta_id, config)
+    return jsonify({"id": ta_id, **config})
+
+@app.route('/admin/api/tas/<ta_id>/upload', methods=['POST'])
+@require_admin
+def upload_document_route(ta_id):
+    """Upload a document to a TA."""
+    if 'file' not in request.files:
+        return jsonify({"error": "No file provided"}), 400
+    
+    file = request.files['file']
+    filename = file.filename
+    content = file.read()
+    
+    upload_document(ta_id, filename, content)
+    
+    # Update document count
+    config = load_ta_config(ta_id)
+    config['document_count'] = len(list_documents(ta_id))
+    config['is_indexed'] = False  # Needs reindex
+    save_ta_config(ta_id, config)
+    
+    return jsonify({"success": True, "filename": filename})
+
+@app.route('/admin/api/tas/<ta_id>/reindex', methods=['POST'])
+@require_admin
+def reindex_ta(ta_id):
+    """Trigger reindexing for a TA."""
+    # Download docs, process, create index
+    docs_dir = download_docs_for_processing(ta_id)
+    index = process_documents(ta_id, docs_dir)
+    save_index_to_storage(ta_id)
+    
+    # Update config
+    config = load_ta_config(ta_id)
+    config['is_indexed'] = True
+    config['indexed_at'] = datetime.utcnow().isoformat()
+    save_ta_config(ta_id, config)
+    
+    # Cleanup temp files
+    shutil.rmtree(docs_dir, ignore_errors=True)
+    
+    return jsonify({"success": True})
+```
+
+---
+
+# Part 3: Query-Response Flow
+
+## 3.1 Complete Query Processing Flow
+
+```python
+@app.route('/<ta_id>/api/chat', methods=['POST'])
+def chat_api(ta_id):
+    """Main chat endpoint."""
+    data = request.json
+    query = data.get('query', '').strip()
+    session_id = data.get('session_id', '')
+    
+    if not query:
+        return jsonify({"error": "Query required"}), 400
+    
+    # Load TA config
+    ta_config = load_ta_config(ta_id)
+    if not ta_config:
+        return jsonify({"error": "TA not found"}), 404
+    
+    if not ta_config.get('is_indexed'):
+        return jsonify({"error": "TA not indexed yet"}), 400
+    
+    # Get or create session
+    if not session_id or not get_session(session_id):
+        session_id = create_session(ta_id)
+    
+    # Get conversation context for follow-up handling
+    conversation_context = get_conversation_context(session_id)
+    
+    # Retrieve relevant chunks
+    chunks = retrieve_context(ta_id, query, top_k=8)
+    
+    # Build context from chunks
+    context = "\n\n---\n\n".join([
+        f"[From: {c['file_name']}]\n{c['text']}" 
+        for c in chunks
+    ])
+    
+    # Generate response
+    system_prompt = ta_config.get('system_prompt', 'You are a helpful teaching assistant.')
+    
+    full_prompt = f"{system_prompt}\n\nPrevious conversation:\n{conversation_context}" if conversation_context else system_prompt
+    
+    response_text = generate_response(query, context, full_prompt)
+    
+    # Save to history
+    add_to_history(session_id, query, response_text)
+    
+    return jsonify({
+        "response": response_text,
+        "session_id": session_id,
+        "sources": [c['file_name'] for c in chunks[:3]]  # Top 3 sources
+    })
+```
+
+---
+
+# Part 4: Deployment Configuration
+
+## 4.1 Gunicorn Setup
+
+For production, use gunicorn instead of Flask's dev server:
+
+```bash
+gunicorn --bind 0.0.0.0:5000 --workers 2 --timeout 120 app:app
+```
+
+## 4.2 Workflow Configuration
+
+The app needs a workflow that runs:
+```
+python app.py
+```
+or for production:
+```
+gunicorn --bind 0.0.0.0:5000 --workers 2 --timeout 120 app:app
+```
+
+---
+
+# Part 5: What NOT to Build (Lessons Learned)
+
+## 5.1 AVOID: Multiple Retrieval Paths
+
+**What we did wrong:** Created 5+ different code paths based on query classification:
+- Standard retrieval
+- Conceptual retrieval
+- Unit overview path
+- Hard-filtered path
+- Relaxed mode path
+
+**Why it failed:** Query misclassification sent queries down the wrong path. Each path had different logic, making debugging impossible.
+
+**What to do instead:** ONE retrieval path with parameters. Query analysis outputs settings (top_k, filter criteria), not path selection.
+
+## 5.2 AVOID: Post-Retrieval Hard Filtering
+
+**What we did wrong:** Retrieved top_k chunks first, then filtered by assignment number. If correct chunks weren't in initial results, they were lost.
+
+**Why it failed:** Vector search doesn't guarantee the right document is in top_k.
+
+**What to do instead:** Use ChromaDB's metadata filtering BEFORE vector search:
+```python
+# GOOD: Pre-filter
+collection.query(
+    query_embeddings=[embedding],
+    where={"assignment_number": "3"},  # Filter first
+    n_results=20
+)
+```
+
+## 5.3 AVOID: LLM-Assisted Document Structuring
+
+**What we did wrong:** Used LLM to "understand" document structure and create "structure graphs" at ingestion time.
+
+**Why it failed:** 
+- Expensive (LLM calls per document)
+- Inconsistent outputs
+- Added complexity without proportional benefit
+
+**What to do instead:** Simple regex-based metadata extraction. If a document has "Homework 3" in filename/header, that's sufficient.
+
+## 5.4 AVOID: Complex Metadata Schemas
+
+**What we did wrong:** Created many metadata fields:
+- doc_type, document_subtype, document_variant
+- assignment_number, assignment_id_type, assignment_id_raw, assignment_label
+- problem_number, sub_part, roman_part
+- hierarchy_filters, instructional_unit_number, instructional_unit_label
+
+**Why it failed:** 
+- Schema drift (old indices lacked new fields)
+- Filter matching became complex
+- Each query needed to extract all these fields
+
+**What to do instead:** Minimal metadata:
+- `doc_type` (homework, exam, lecture, other)
+- `assignment_number` (simple string: "1", "2", "3")
+- `file_name` (for source attribution)
+
+## 5.5 AVOID: Regex + LLM Hybrid Extraction
+
+**What we did wrong:** Used regex for "easy" cases, LLM for "hard" cases.
+
+**Why it failed:** Unpredictable which path was taken. Sometimes LLM disagreed with regex.
+
+**What to do instead:** Pick ONE approach:
+- **Simple:** Regex only (fast, predictable, limited)
+- **Consistent:** LLM only (slower, expensive, but uniform)
+
+## 5.6 AVOID: Query Rewriting for Pronoun Resolution
+
+**What we did wrong:** Used LLM to rewrite "Explain part b" into "Explain Homework 3 Problem 2 part b" based on conversation history.
+
+**Why it failed:** 
+- Added latency (LLM call before retrieval)
+- Sometimes rewrote incorrectly
+- Made debugging harder
+
+**What to do instead:** Include last 2-3 conversation turns directly in the LLM prompt context. Let the LLM resolve pronouns naturally during response generation.
+
+---
+
+# Part 6: What WORKED (Keep These Ideas)
+
+## 6.1 Instructional Unit Abstraction
+
+"Lecture 5", "Class 5", "Session 5", "Week 5" all map to unit_number=5. This worked well for conceptual queries about lectures.
+
+## 6.2 Session-Based Conversation History
+
+Storing last N turns and including in context works well. Keep it simple - just store query/response pairs.
+
+## 6.3 Per-TA Isolation
+
+Each TA has its own:
+- Document storage folder
+- ChromaDB collection
+- Configuration
+
+This prevents cross-contamination and allows independent reindexing.
+
+## 6.4 Admin Panel with Reindex Trigger
+
+Making reindexing an explicit admin action (not automatic) prevents unexpected behavior when documents change.
+
+---
+
+# Part 7: Recommended Build Order
+
+1. **Flask app skeleton** with health check and basic routes
+2. **OpenAI integration** - embeddings and chat completion working
+3. **Object Storage** - document upload/download
+4. **Replit Database** - TA config storage
+5. **Document processing** - chunking and ChromaDB indexing
+6. **Basic retrieval** - vector search returning relevant chunks
+7. **Response generation** - combining retrieval with LLM
+8. **Session management** - conversation history
+9. **Admin panel** - TA CRUD, document upload, reindex trigger
+10. **Chat UI** - simple HTML/CSS interface
+
+**Only after all basics work:** Consider adding metadata filtering, query analysis, etc.
+
+---
+
+# Appendix: Replit-Specific Notes
+
+## Object Storage
+
+Use the Replit Object Storage integration. It provides:
+- `upload_from_bytes(key, data)`
+- `download_as_bytes(key)`
+- `list(prefix=prefix)`
+- `delete(key)`
+
+## Replit Database
+
+Key-value store accessed via `from replit import db`. Use for:
+- TA configurations
+- Session data
+- Any small metadata
+
+## Port Configuration
+
+- Bind to `0.0.0.0:5000` for web preview to work
+- Don't use other ports for the main web server
+
+## Secrets
+
+Store in Replit Secrets (not .env file):
+- OPENAI_API_KEY
+- ADMIN_SECRET_KEY

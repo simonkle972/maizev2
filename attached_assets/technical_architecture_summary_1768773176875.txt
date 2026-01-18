@@ -1,0 +1,199 @@
+# AI Teaching Assistant - Technical Architecture Summary
+
+## 1. Core Architecture
+
+**Structure:** Flask web app with routes in `app.py` (chat/query handling) and `admin_routes.py` (TA management). Multi-tenancy via `ta_index_manager.py` which loads indices on-demand per TA.
+
+**Data Flow:**
+```
+User Query → Query Analyzer → [Multiple Retrieval Paths] → Reranking → Grounding → LLM Response
+```
+
+**Key Problem:** The app has **at least 5 different retrieval paths** that can be taken depending on query classification:
+1. Standard hybrid retrieval + reranking
+2. Conceptual retrieval (lecture-focused)
+3. Unit overview path (bypasses retrieval entirely)
+4. Hard-filtered structured queries
+5. Relaxed mode structured queries
+
+Each path has different logic branches, making the system hard to reason about.
+
+---
+
+## 2. Document Processing Pipeline
+
+**Intent:** Ingest course documents, extract metadata, create searchable chunks.
+
+**What it does:**
+- `document_processor.py` - Loads documents, chunks them, extracts metadata
+- `llm_metadata_extractor.py` - Uses regex + LLM to extract doc_type, assignment_number, year, problem numbers
+- `structure_discovery.py` + `llm_structure_synthesizer.py` - Build "structure graphs" representing document hierarchy
+- ChromaDB stores vectors; Object Storage persists full index artifacts
+
+**Complexity creep:**
+- Started with simple regex for "HW1, HW2" patterns
+- Added LLM-assisted extraction for messier docs
+- Added structure graphs for hierarchy-aware retrieval
+- Added type-aware identifiers (ordinal/year/alpha/week)
+- Added multiple extraction priority sources (header > filename > folder)
+
+**Key Issue:** Metadata schema keeps evolving, but old indices don't have new fields, causing filter failures.
+
+---
+
+## 3. Retrieval System - The Heart of Complexity
+
+**Layers added over time:**
+
+| Layer | Purpose | Issue |
+|-------|---------|-------|
+| Vector Search (OpenAI embeddings + ChromaDB) | Semantic similarity | Base layer, works well |
+| BM25 Retriever | Keyword matching for exact terms | Adds recall for specific queries |
+| Hybrid Fusion | Combine vector + BM25 with RRF | Weighted fusion adds tuning complexity |
+| Reranking | Re-score top chunks | Adds latency, sometimes drops good chunks |
+| Structure Boost | Boost chunks matching resolved structure nodes | Per-TA feature flag, adds conditional logic |
+| Hard Assignment Filtering | Filter to exact assignment match | **Post-retrieval** - can zero out if correct chunks not in initial top_k |
+| Conceptual Retrieval | Different path for conceptual queries | Separate code path with different boosting |
+| Unit Overview | Bypass retrieval for unit-level queries | Yet another separate path |
+
+**Critical Limitation:** Hard filtering runs **after** vector/BM25 retrieval. If the correct document's chunks aren't in the initial top_k results, they're lost before filtering even happens.
+
+---
+
+## 4. Query Understanding
+
+**Components:**
+- `LLMQueryAnalyzer._fast_analysis()` - Regex patterns for doc_type, assignment number, problem number, year, etc.
+- `LLMQueryAnalyzer._llm_analyze()` - Falls back to LLM for ambiguous queries
+- Query rewriter - Resolves pronouns using conversation history ("Explain part b" → "Explain HW3 Problem 2 part b")
+
+**What we extracted:**
+- doc_type (homework, exam, lecture, solutions)
+- document_subtype (final, midterm, quiz)
+- assignment_number, problem_number, sub_part, roman_part
+- instructional_unit_number, instructional_unit_label
+- hierarchy_filters (section, case, part)
+- assignment_id_type (ordinal, year, alpha, week)
+
+**Issue:** Too many fields to track, and query classification determines which code path is taken. Misclassification sends query down wrong path.
+
+---
+
+## 5. Response Generation
+
+**Components:**
+- `grounding.py` - Builds context from retrieved chunks, selects authoritative docs
+- Evidence matcher - Validates that chunks actually contain relevant content
+- LLM prompt assembly - Includes course context, retrieved content, no-solutions policy
+
+**Issue:** Tightly coupled to metadata quality. If retrieval returns wrong chunks or empty set, response generation can't compensate.
+
+---
+
+## 6. Session Management
+
+- Session IDs via cryptographic tokens
+- Last 10 conversation turns stored in memory
+- Persisted to Replit Database with 24-hour TTL
+
+---
+
+## 7. Admin/Multi-tenancy
+
+- CRUD for TAs via `admin_routes.py`
+- Per-TA storage in `data/courses/<ta_id>/docs/`
+- Per-TA feature flags (structure_boost_enabled, is_demo_ta)
+- Background reindexing with status tracking
+- Index manifest with schema versions for compatibility
+
+---
+
+# Key Lessons for Rebuild
+
+### 1. Foundation was too narrow
+The app started optimized for one course with homogeneous documents. When other courses were added with different structures, we kept patching rather than redesigning.
+
+### 2. Post-retrieval filtering is fundamentally flawed
+Hard filtering after vector search means you can miss correct documents entirely. A rebuild should use **pre-retrieval filtering** at the vector DB level (ChromaDB metadata queries).
+
+### 3. Too many code paths
+Having 5+ different retrieval paths based on query classification makes the system unpredictable. A rebuild should have **one unified retrieval path** with configurable parameters, not conditional branches.
+
+### 4. Metadata schema drift
+Every new feature added new metadata fields, but old indices lacked them. A rebuild should have a **strict schema contract** with migration/reindex enforcement.
+
+### 5. No comprehensive test suite
+Without tests, each "improvement" risked breaking something else. Regressions accumulated.
+
+### 6. Regex + LLM hybrid extraction is fragile
+The combination of regex heuristics and LLM fallbacks creates unpredictable behavior. Either go full LLM extraction (more expensive but consistent) or full regex (simpler but limited).
+
+---
+
+# Appendix: File Reference
+
+| File | Purpose |
+|------|---------|
+| `app.py` | Main Flask routes, query handling, response generation |
+| `admin_routes.py` | Admin panel routes for TA management |
+| `document_processor.py` | Document ingestion, chunking, metadata extraction |
+| `llm_metadata_extractor.py` | LLM + regex metadata extraction, query analysis |
+| `hybrid_retriever.py` | Vector + BM25 retrieval, fusion, filtering |
+| `grounding.py` | Context assembly, evidence matching |
+| `structure_boost.py` | Structure graph score boosting |
+| `structure_discovery.py` | Document structure detection |
+| `llm_structure_synthesizer.py` | LLM-assisted structure graph creation |
+| `query_processor.py` | Query rewriting with conversation context |
+| `ta_index_manager.py` | Multi-tenant index management |
+| `document_identifier.py` | Type-aware document ID extraction |
+
+---
+
+# What Worked Well (Preserve These Ideas)
+
+### Instructional Unit Abstraction
+- "Lecture 5", "Class 5", "Session 5", "Week 5", "Module 5" all map to `instructional_unit_number=5`
+- The label (lecture/class/week/module) is stored separately
+- **Key insight:** Normalize the descriptor but keep the number separate
+
+### Concept Index for Lectures
+- Extract key concepts from lectures at ingestion time
+- Store in `concept_index.json` for additive retrieval
+- Helps with conceptual queries that don't match document text exactly
+
+### Session-based Conversation History
+- Enables pronoun resolution ("Explain part b" after discussing a problem)
+- 10-turn context window is sufficient for educational conversations
+
+### Admin Panel with Per-TA Configuration
+- Feature flags per TA allow gradual rollout
+- Readiness status helps identify issues before users hit them
+
+---
+
+# Recommendations for Rebuild
+
+1. **Start with multi-tenant architecture from day one**
+   - Design for heterogeneous document structures
+   - Don't optimize for a single course's patterns
+
+2. **Use pre-retrieval filtering**
+   - Filter by metadata (doc_type, assignment) BEFORE vector search
+   - ChromaDB supports metadata queries natively
+
+3. **One retrieval path, parameterized**
+   - Instead of 5 code paths, have one path with parameters
+   - Query analysis outputs parameters, not path selection
+
+4. **Schema versioning with forced reindex**
+   - Track metadata schema version in manifest
+   - Refuse to serve queries if index schema is outdated
+
+5. **Full LLM extraction OR full regex, not both**
+   - Pick one approach and commit to it
+   - Hybrid creates unpredictable behavior
+
+6. **Comprehensive test suite**
+   - Unit tests for query analysis
+   - Integration tests for retrieval paths
+   - Regression tests for known failure cases
