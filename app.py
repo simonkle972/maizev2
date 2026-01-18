@@ -26,12 +26,9 @@ db.init_app(app)
 with app.app_context():
     db.create_all()
 
-from openai import OpenAI
-openai_client = OpenAI(api_key=Config.OPENAI_API_KEY)
-
 @app.route('/health')
 def health():
-    return jsonify({"status": "healthy", "timestamp": datetime.utcnow().isoformat()})
+    return jsonify({"status": "healthy"})
 
 @app.route('/favicon.ico')
 def favicon():

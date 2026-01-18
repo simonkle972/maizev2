@@ -35,6 +35,11 @@ outputType = "webview"
 localPort = 5000
 externalPort = 80
 
+[[ports]]
+localPort = 5001
+externalPort = 3000
+
 [deployment]
 deploymentTarget = "autoscale"
-run = ["gunicorn", "--bind=0.0.0.0:5000", "--reuse-port", "--workers=2", "app:app"]
+run = ["gunicorn", "--bind=0.0.0.0:5000", "--reuse-port", "--workers=2", "--timeout=120", "app:app"]
+build = ["python", "-c", "from app import app, db; app.app_context().push(); db.create_all(); print('Database initialized')"]
