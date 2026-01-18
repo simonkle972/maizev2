@@ -49,7 +49,8 @@ maize/
 - `OPENAI_API_KEY` - Required for embeddings and LLM
 - `DATABASE_URL` - PostgreSQL connection (auto-provided)
 - `SESSION_SECRET` - Flask session secret
-- `ADMIN_SECRET_KEY` - Admin panel authentication (default: maize-admin-2024)
+- `admin_id` - Admin username for login (required)
+- `admin_pw` - Admin password for login (required)
 
 ## How to Use
 1. Go to `/admin` and login with the admin key
@@ -66,6 +67,7 @@ maize/
 - PPTX (lecture slides)
 
 ## Recent Changes
+- Session-based admin login with username/password (Jan 2026)
 - LaTeX math rendering in chat using KaTeX (Jan 2026)
 - Drag-and-drop multi-file upload in admin panel (Jan 2026)
 - Editable URL slugs for TAs (Jan 2026)
