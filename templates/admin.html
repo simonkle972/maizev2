@@ -153,9 +153,19 @@
                 document.getElementById('ta-detail-content').innerHTML = `
                     <div class="detail-info">
                         <p><strong>Course:</strong> ${ta.course_name}</p>
-                        <p><strong>URL:</strong> <a href="/${ta.slug}" target="_blank">/${ta.slug}</a></p>
                         <p><strong>Status:</strong> ${ta.is_indexed ? 'Ready' : 'Needs Indexing'}</p>
                         <p><strong>Documents:</strong> ${ta.document_count}</p>
+                    </div>
+                    
+                    <div class="slug-section">
+                        <h3>URL Path</h3>
+                        <div class="slug-edit-group">
+                            <span class="slug-prefix">/</span>
+                            <input type="text" id="ta-slug-edit" value="${ta.slug}" pattern="[a-z0-9-]+" title="Lowercase letters, numbers, and hyphens only">
+                            <button onclick="updateSlug('${ta.id}')" class="btn btn-secondary">Update URL</button>
+                        </div>
+                        <p class="slug-hint">Current URL: <a href="/${ta.slug}" target="_blank">/${ta.slug}</a></p>
+                        <p id="slug-status"></p>
                     </div>
                     
                     <div class="upload-section">
@@ -321,6 +331,50 @@
                 if (result.success) {
                     alert('System prompt updated!');
                 }
+            });
+        }
+        
+        function updateSlug(taId) {
+            const newSlug = document.getElementById('ta-slug-edit').value.trim().toLowerCase().replace(/\s+/g, '-');
+            const statusEl = document.getElementById('slug-status');
+            
+            if (!newSlug) {
+                statusEl.textContent = 'URL path cannot be empty';
+                statusEl.style.color = '#ef4444';
+                return;
+            }
+            
+            if (!/^[a-z0-9-]+$/.test(newSlug)) {
+                statusEl.textContent = 'Only lowercase letters, numbers, and hyphens allowed';
+                statusEl.style.color = '#ef4444';
+                return;
+            }
+            
+            statusEl.textContent = 'Updating...';
+            statusEl.style.color = '#64748b';
+            
+            fetch(`/admin/api/tas/${taId}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${adminKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ slug: newSlug })
+            })
+            .then(res => res.json())
+            .then(result => {
+                if (result.error) {
+                    statusEl.textContent = result.error;
+                    statusEl.style.color = '#ef4444';
+                } else {
+                    statusEl.textContent = 'URL updated successfully!';
+                    statusEl.style.color = '#22c55e';
+                    showTADetail(taId);
+                }
+            })
+            .catch(err => {
+                statusEl.textContent = 'Failed to update URL';
+                statusEl.style.color = '#ef4444';
             });
         }
     </script>

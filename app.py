@@ -139,6 +139,20 @@ def update_ta(ta_id):
         return jsonify({"error": "TA not found"}), 404
     
     data = request.json
+    
+    if "slug" in data:
+        import re
+        new_slug = re.sub(r'\s+', '-', data["slug"].strip().lower())
+        if not new_slug:
+            return jsonify({"error": "Slug cannot be empty"}), 400
+        if not re.match(r'^[a-z0-9-]+$', new_slug):
+            return jsonify({"error": "URL path can only contain lowercase letters, numbers, and hyphens"}), 400
+        if new_slug != ta.slug:
+            existing = TeachingAssistant.query.filter_by(slug=new_slug).first()
+            if existing:
+                return jsonify({"error": "This URL path is already in use"}), 400
+            ta.slug = new_slug
+    
     if "name" in data:
         ta.name = data["name"]
     if "course_name" in data:
@@ -147,7 +161,7 @@ def update_ta(ta_id):
         ta.system_prompt = data["system_prompt"]
     
     db.session.commit()
-    return jsonify({"success": True})
+    return jsonify({"success": True, "slug": ta.slug})
 
 @app.route('/admin/api/tas/<ta_id>', methods=['DELETE'])
 def delete_ta(ta_id):
