@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ ta.name }} - Maize</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="chat-container">
+        <header class="chat-header">
+            <div class="header-info">
+                <h1>{{ ta.name }}</h1>
+                <p class="course-name">{{ ta.course_name }}</p>
+            </div>
+            <a href="/" class="logo-link">Maize</a>
+        </header>
+        
+        <main class="chat-main">
+            <div id="messages" class="messages">
+                <div class="message assistant">
+                    <div class="message-content">
+                        <p>Hello! I'm your teaching assistant for <strong>{{ ta.course_name }}</strong>. I'm here to help you understand course concepts, work through problems, and prepare for exams.</p>
+                        <p>How can I help you today?</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <footer class="chat-footer">
+            <form id="chat-form" onsubmit="sendMessage(event)">
+                <div class="input-group">
+                    <textarea 
+                        id="query-input" 
+                        placeholder="Ask a question about the course..." 
+                        rows="1"
+                        onkeydown="handleKeydown(event)"
+                    ></textarea>
+                    <button type="submit" id="send-btn" class="btn btn-primary">Send</button>
+                </div>
+            </form>
+            <p class="disclaimer">This TA helps explain concepts but won't give direct homework answers.</p>
+        </footer>
+    </div>
+    
+    <script>
+        let sessionId = '';
+        const taSlug = '{{ ta.slug }}';
+        
+        function handleKeydown(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage(e);
+            }
+        }
+        
+        function autoResize(el) {
+            el.style.height = 'auto';
+            el.style.height = Math.min(el.scrollHeight, 150) + 'px';
+        }
+        
+        document.getElementById('query-input').addEventListener('input', function() {
+            autoResize(this);
+        });
+        
+        function addMessage(role, content, sources = []) {
+            const messagesEl = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}`;
+            
+            let html = `<div class="message-content">${formatContent(content)}</div>`;
+            
+            if (sources && sources.length > 0) {
+                const uniqueSources = [...new Set(sources)];
+                html += `
+                    <div class="message-sources">
+                        <span class="sources-label">Sources:</span>
+                        ${uniqueSources.map(s => `<span class="source-tag">${s}</span>`).join('')}
+                    </div>
+                `;
+            }
+            
+            messageDiv.innerHTML = html;
+            messagesEl.appendChild(messageDiv);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+        
+        function formatContent(content) {
+            content = content.replace(/\n/g, '<br>');
+            content = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            content = content.replace(/\*(.*?)\*/g, '<em>$1</em>');
+            content = content.replace(/`(.*?)`/g, '<code>$1</code>');
+            return `<p>${content}</p>`;
+        }
+        
+        function addLoadingMessage() {
+            const messagesEl = document.getElementById('messages');
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'message assistant loading';
+            loadingDiv.id = 'loading-message';
+            loadingDiv.innerHTML = `
+                <div class="message-content">
+                    <div class="typing-indicator">
+                        <span></span><span></span><span></span>
+                    </div>
+                </div>
+            `;
+            messagesEl.appendChild(loadingDiv);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+        
+        function removeLoadingMessage() {
+            const loading = document.getElementById('loading-message');
+            if (loading) loading.remove();
+        }
+        
+        async function sendMessage(e) {
+            e.preventDefault();
+            
+            const input = document.getElementById('query-input');
+            const query = input.value.trim();
+            
+            if (!query) return;
+            
+            addMessage('user', query);
+            input.value = '';
+            autoResize(input);
+            
+            const sendBtn = document.getElementById('send-btn');
+            sendBtn.disabled = true;
+            addLoadingMessage();
+            
+            try {
+                const response = await fetch(`/${taSlug}/api/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query, session_id: sessionId })
+                });
+                
+                const data = await response.json();
+                
+                removeLoadingMessage();
+                
+                if (data.error) {
+                    addMessage('assistant', `I'm sorry, I encountered an issue: ${data.error}`);
+                } else {
+                    sessionId = data.session_id;
+                    addMessage('assistant', data.response, data.sources);
+                }
+            } catch (err) {
+                removeLoadingMessage();
+                addMessage('assistant', 'I apologize, but I had trouble connecting. Please try again.');
+            } finally {
+                sendBtn.disabled = false;
+                input.focus();
+            }
+        }
+    </script>
+</body>
+</html>

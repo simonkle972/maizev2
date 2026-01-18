@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maize Admin - Teaching Assistant Management</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="admin-container">
+        <header class="admin-header">
+            <h1><a href="/">Maize</a> Admin Panel</h1>
+        </header>
+        
+        <div id="auth-section" class="auth-section">
+            <h2>Administrator Login</h2>
+            <div class="form-group">
+                <label for="admin-key">Admin Key:</label>
+                <input type="password" id="admin-key" placeholder="Enter admin secret key">
+            </div>
+            <button onclick="authenticate()" class="btn btn-primary">Login</button>
+            <p id="auth-error" class="error-message" style="display: none;"></p>
+        </div>
+        
+        <main id="admin-main" class="admin-main" style="display: none;">
+            <section class="ta-list-section">
+                <div class="section-header">
+                    <h2>Teaching Assistants</h2>
+                    <button onclick="showCreateModal()" class="btn btn-primary">Create New TA</button>
+                </div>
+                <div id="ta-list" class="ta-list">
+                    <p class="loading">Loading...</p>
+                </div>
+            </section>
+            
+            <section id="ta-detail" class="ta-detail-section" style="display: none;">
+                <div class="section-header">
+                    <h2 id="detail-title">TA Details</h2>
+                    <button onclick="hideDetail()" class="btn btn-secondary">Back to List</button>
+                </div>
+                <div id="ta-detail-content"></div>
+            </section>
+        </main>
+        
+        <div id="create-modal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <span class="close" onclick="hideCreateModal()">&times;</span>
+                <h2>Create New Teaching Assistant</h2>
+                <form id="create-ta-form" onsubmit="createTA(event)">
+                    <div class="form-group">
+                        <label for="ta-slug">URL Path (slug):</label>
+                        <input type="text" id="ta-slug" required placeholder="e.g., financecourse" pattern="[a-z0-9-]+" title="Lowercase letters, numbers, and hyphens only">
+                        <small>This will be the URL path: /financecourse</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="ta-name">TA Name:</label>
+                        <input type="text" id="ta-name" required placeholder="e.g., Finance 101 TA">
+                    </div>
+                    <div class="form-group">
+                        <label for="ta-course">Course Name:</label>
+                        <input type="text" id="ta-course" required placeholder="e.g., Introduction to Finance">
+                    </div>
+                    <div class="form-group">
+                        <label for="ta-prompt">System Prompt (optional):</label>
+                        <textarea id="ta-prompt" rows="4" placeholder="Custom instructions for the TA..."></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Create TA</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let adminKey = '';
+        
+        function authenticate() {
+            adminKey = document.getElementById('admin-key').value;
+            if (!adminKey) {
+                showError('Please enter the admin key');
+                return;
+            }
+            
+            fetch('/admin/api/tas', {
+                headers: { 'Authorization': `Bearer ${adminKey}` }
+            })
+            .then(res => {
+                if (res.ok) {
+                    document.getElementById('auth-section').style.display = 'none';
+                    document.getElementById('admin-main').style.display = 'block';
+                    loadTAs();
+                } else {
+                    showError('Invalid admin key');
+                }
+            })
+            .catch(err => showError('Authentication failed'));
+        }
+        
+        function showError(msg) {
+            const el = document.getElementById('auth-error');
+            el.textContent = msg;
+            el.style.display = 'block';
+        }
+        
+        function loadTAs() {
+            fetch('/admin/api/tas', {
+                headers: { 'Authorization': `Bearer ${adminKey}` }
+            })
+            .then(res => res.json())
+            .then(tas => {
+                const list = document.getElementById('ta-list');
+                if (tas.length === 0) {
+                    list.innerHTML = '<p class="empty">No teaching assistants yet. Create your first one!</p>';
+                    return;
+                }
+                
+                list.innerHTML = tas.map(ta => `
+                    <div class="ta-card" onclick="showTADetail('${ta.id}')">
+                        <h3>${ta.name}</h3>
+                        <p class="course-name">${ta.course_name}</p>
+                        <p class="ta-slug">/${ta.slug}</p>
+                        <div class="ta-meta">
+                            <span class="status ${ta.is_indexed ? 'indexed' : 'not-indexed'}">
+                                ${ta.is_indexed ? 'Ready' : 'Not Indexed'}
+                            </span>
+                            <span class="doc-count">${ta.document_count} documents</span>
+                        </div>
+                    </div>
+                `).join('');
+            });
+        }
+        
+        function showTADetail(taId) {
+            fetch(`/admin/api/tas/${taId}`, {
+                headers: { 'Authorization': `Bearer ${adminKey}` }
+            })
+            .then(res => res.json())
+            .then(ta => {
+                document.getElementById('ta-list-section') && 
+                    (document.querySelector('.ta-list-section').style.display = 'none');
+                document.getElementById('ta-detail').style.display = 'block';
+                document.getElementById('detail-title').textContent = ta.name;
+                
+                const docsHtml = ta.documents.length > 0 
+                    ? ta.documents.map(doc => `
+                        <div class="doc-item">
+                            <span class="doc-name">${doc.filename}</span>
+                            <span class="doc-type">${doc.doc_type || 'unknown'}</span>
+                            <button onclick="deleteDocument('${ta.id}', ${doc.id})" class="btn btn-small btn-danger">Delete</button>
+                        </div>
+                    `).join('')
+                    : '<p class="empty">No documents uploaded yet.</p>';
+                
+                document.getElementById('ta-detail-content').innerHTML = `
+                    <div class="detail-info">
+                        <p><strong>Course:</strong> ${ta.course_name}</p>
+                        <p><strong>URL:</strong> <a href="/${ta.slug}" target="_blank">/${ta.slug}</a></p>
+                        <p><strong>Status:</strong> ${ta.is_indexed ? 'Ready' : 'Needs Indexing'}</p>
+                        <p><strong>Documents:</strong> ${ta.document_count}</p>
+                    </div>
+                    
+                    <div class="upload-section">
+                        <h3>Upload Documents</h3>
+                        <form id="upload-form" onsubmit="uploadDocument(event, '${ta.id}')">
+                            <input type="file" id="doc-file" required accept=".pdf,.docx,.doc,.xlsx,.xls,.txt,.pptx,.ppt">
+                            <button type="submit" class="btn btn-primary">Upload</button>
+                        </form>
+                        <p id="upload-status"></p>
+                    </div>
+                    
+                    <div class="documents-section">
+                        <h3>Documents</h3>
+                        <div class="documents-list">${docsHtml}</div>
+                    </div>
+                    
+                    <div class="actions-section">
+                        <button onclick="reindexTA('${ta.id}')" class="btn btn-primary" ${ta.document_count === 0 ? 'disabled' : ''}>
+                            ${ta.is_indexed ? 'Re-index Documents' : 'Index Documents'}
+                        </button>
+                        <button onclick="deleteTA('${ta.id}')" class="btn btn-danger">Delete TA</button>
+                    </div>
+                    
+                    <div class="prompt-section">
+                        <h3>System Prompt</h3>
+                        <textarea id="system-prompt" rows="6">${ta.system_prompt}</textarea>
+                        <button onclick="updatePrompt('${ta.id}')" class="btn btn-secondary">Update Prompt</button>
+                    </div>
+                `;
+            });
+        }
+        
+        function hideDetail() {
+            document.getElementById('ta-detail').style.display = 'none';
+            document.querySelector('.ta-list-section').style.display = 'block';
+            loadTAs();
+        }
+        
+        function showCreateModal() {
+            document.getElementById('create-modal').style.display = 'flex';
+        }
+        
+        function hideCreateModal() {
+            document.getElementById('create-modal').style.display = 'none';
+        }
+        
+        function createTA(e) {
+            e.preventDefault();
+            
+            const data = {
+                slug: document.getElementById('ta-slug').value,
+                name: document.getElementById('ta-name').value,
+                course_name: document.getElementById('ta-course').value,
+                system_prompt: document.getElementById('ta-prompt').value || undefined
+            };
+            
+            fetch('/admin/api/tas', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${adminKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(res => res.json())
+            .then(result => {
+                if (result.error) {
+                    alert(result.error);
+                } else {
+                    hideCreateModal();
+                    document.getElementById('create-ta-form').reset();
+                    loadTAs();
+                }
+            });
+        }
+        
+        function uploadDocument(e, taId) {
+            e.preventDefault();
+            const file = document.getElementById('doc-file').files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            document.getElementById('upload-status').textContent = 'Uploading...';
+            
+            fetch(`/admin/api/tas/${taId}/upload`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${adminKey}` },
+                body: formData
+            })
+            .then(res => res.json())
+            .then(result => {
+                if (result.error) {
+                    document.getElementById('upload-status').textContent = `Error: ${result.error}`;
+                } else {
+                    document.getElementById('upload-status').textContent = 'Uploaded successfully!';
+                    document.getElementById('upload-form').reset();
+                    showTADetail(taId);
+                }
+            });
+        }
+        
+        function deleteDocument(taId, docId) {
+            if (!confirm('Delete this document?')) return;
+            
+            fetch(`/admin/api/tas/${taId}/documents/${docId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${adminKey}` }
+            })
+            .then(() => showTADetail(taId));
+        }
+        
+        function reindexTA(taId) {
+            if (!confirm('This will process all documents and create the search index. Continue?')) return;
+            
+            const btn = event.target;
+            btn.disabled = true;
+            btn.textContent = 'Indexing...';
+            
+            fetch(`/admin/api/tas/${taId}/reindex`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${adminKey}` }
+            })
+            .then(res => res.json())
+            .then(result => {
+                if (result.error) {
+                    alert(`Indexing failed: ${result.error}`);
+                } else {
+                    alert(`Indexing complete! ${result.chunks_indexed} chunks indexed.`);
+                }
+                showTADetail(taId);
+            })
+            .catch(err => {
+                alert('Indexing failed');
+                showTADetail(taId);
+            });
+        }
+        
+        function deleteTA(taId) {
+            if (!confirm('Delete this teaching assistant? This cannot be undone.')) return;
+            
+            fetch(`/admin/api/tas/${taId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${adminKey}` }
+            })
+            .then(() => {
+                hideDetail();
+            });
+        }
+        
+        function updatePrompt(taId) {
+            const prompt = document.getElementById('system-prompt').value;
+            
+            fetch(`/admin/api/tas/${taId}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${adminKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ system_prompt: prompt })
+            })
+            .then(res => res.json())
+            .then(result => {
+                if (result.success) {
+                    alert('System prompt updated!');
+                }
+            });
+        }
+    </script>
+</body>
+</html>
