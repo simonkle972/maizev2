@@ -66,6 +66,9 @@ maize/
 - PPTX (lecture slides)
 
 ## Recent Changes
+- LaTeX math rendering in chat using KaTeX (Jan 2026)
+- Drag-and-drop multi-file upload in admin panel (Jan 2026)
+- Editable URL slugs for TAs (Jan 2026)
 - Initial MVP build (Jan 2026)
 - Multi-tenant architecture with PostgreSQL
 - LLM-based metadata extraction
