@@ -5,9 +5,9 @@ with app.app_context():
     db.create_all()
     
     columns_to_add = [
-        ("teaching_assistant", "indexing_status", "VARCHAR(32)"),
-        ("teaching_assistant", "indexing_error", "TEXT"),
-        ("teaching_assistant", "indexing_progress", "INTEGER DEFAULT 0"),
+        ("teaching_assistants", "indexing_status", "VARCHAR(32)"),
+        ("teaching_assistants", "indexing_error", "TEXT"),
+        ("teaching_assistants", "indexing_progress", "INTEGER DEFAULT 0"),
     ]
     
     for table, column, col_type in columns_to_add:
