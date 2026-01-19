@@ -1,12 +1,11 @@
 import os
 import logging
-import chromadb
 from openai import OpenAI
+from sqlalchemy import text
 from config import Config
 
 logger = logging.getLogger(__name__)
 
-_chroma_clients = {}
 _openai_client = None
 
 def get_openai_client():
@@ -14,18 +13,6 @@ def get_openai_client():
     if _openai_client is None:
         _openai_client = OpenAI(api_key=Config.OPENAI_API_KEY)
     return _openai_client
-
-def get_chroma_collection(ta_id: str):
-    if ta_id not in _chroma_clients:
-        chroma_path = os.path.join(Config.CHROMA_DB_PATH, ta_id)
-        if not os.path.exists(chroma_path):
-            raise ValueError(f"Index not found for TA: {ta_id}")
-        
-        client = chromadb.PersistentClient(path=chroma_path)
-        collection = client.get_collection(f"ta_{ta_id}")
-        _chroma_clients[ta_id] = collection
-    
-    return _chroma_clients[ta_id]
 
 def analyze_query(query: str) -> dict:
     query_lower = query.lower()
@@ -93,10 +80,11 @@ def analyze_query(query: str) -> dict:
     return analysis
 
 def retrieve_context(ta_id: str, query: str, top_k: int = 8) -> list:
-    try:
-        collection = get_chroma_collection(ta_id)
-    except Exception as e:
-        logger.error(f"Failed to get collection for {ta_id}: {e}")
+    from models import db, DocumentChunk
+    
+    chunk_count = DocumentChunk.query.filter_by(ta_id=ta_id).count()
+    if chunk_count == 0:
+        logger.warning(f"No indexed chunks found for TA: {ta_id}")
         return []
     
     client = get_openai_client()
@@ -109,70 +97,96 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8) -> list:
     
     query_analysis = analyze_query(query)
     
-    where_filter = None
+    embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
+    
+    where_clauses = ["ta_id = :ta_id"]
+    params = {"ta_id": ta_id, "top_k": top_k, "embedding": embedding_str}
     
     if query_analysis["doc_type_filter"] and query_analysis["assignment_filter"]:
-        where_filter = {
-            "$and": [
-                {"doc_type": query_analysis["doc_type_filter"]},
-                {"assignment_number": query_analysis["assignment_filter"]}
-            ]
-        }
+        where_clauses.append("doc_type = :doc_type")
+        where_clauses.append("assignment_number = :assignment_number")
+        params["doc_type"] = query_analysis["doc_type_filter"]
+        params["assignment_number"] = query_analysis["assignment_filter"]
     elif query_analysis["doc_type_filter"] and query_analysis["unit_filter"]:
-        where_filter = {
-            "$and": [
-                {"doc_type": query_analysis["doc_type_filter"]},
-                {"instructional_unit_number": query_analysis["unit_filter"]}
-            ]
-        }
+        where_clauses.append("doc_type = :doc_type")
+        where_clauses.append("instructional_unit_number = :unit_number")
+        params["doc_type"] = query_analysis["doc_type_filter"]
+        params["unit_number"] = query_analysis["unit_filter"]
     elif query_analysis["doc_type_filter"]:
-        where_filter = {"doc_type": query_analysis["doc_type_filter"]}
+        where_clauses.append("doc_type = :doc_type")
+        params["doc_type"] = query_analysis["doc_type_filter"]
+    
+    where_clause = " AND ".join(where_clauses)
+    
+    sql = text(f"""
+        SELECT 
+            chunk_text,
+            file_name,
+            doc_type,
+            assignment_number,
+            instructional_unit_number,
+            instructional_unit_label,
+            1 - (embedding <=> :embedding::vector) as score
+        FROM document_chunks
+        WHERE {where_clause}
+        ORDER BY embedding <=> :embedding::vector
+        LIMIT :top_k
+    """)
     
     try:
-        if where_filter:
-            results = collection.query(
-                query_embeddings=[query_embedding],
-                where=where_filter,
-                n_results=top_k,
-                include=["documents", "metadatas", "distances"]
-            )
-            
-            if not results["documents"][0]:
-                logger.info(f"No results with filter, falling back to unfiltered search")
-                results = collection.query(
-                    query_embeddings=[query_embedding],
-                    n_results=top_k,
-                    include=["documents", "metadatas", "distances"]
-                )
-        else:
-            results = collection.query(
-                query_embeddings=[query_embedding],
-                n_results=top_k,
-                include=["documents", "metadatas", "distances"]
-            )
+        result = db.session.execute(sql, params)
+        rows = result.fetchall()
     except Exception as e:
-        logger.error(f"ChromaDB query failed: {e}")
-        results = collection.query(
-            query_embeddings=[query_embedding],
-            n_results=top_k,
-            include=["documents", "metadatas", "distances"]
-        )
+        logger.error(f"Vector search failed with filter: {e}")
+        base_sql = text("""
+            SELECT 
+                chunk_text,
+                file_name,
+                doc_type,
+                assignment_number,
+                instructional_unit_number,
+                instructional_unit_label,
+                1 - (embedding <=> :embedding::vector) as score
+            FROM document_chunks
+            WHERE ta_id = :ta_id
+            ORDER BY embedding <=> :embedding::vector
+            LIMIT :top_k
+        """)
+        result = db.session.execute(base_sql, {"ta_id": ta_id, "top_k": top_k, "embedding": embedding_str})
+        rows = result.fetchall()
+    
+    if not rows and len(where_clauses) > 1:
+        logger.info("No results with filter, falling back to unfiltered search")
+        base_sql = text("""
+            SELECT 
+                chunk_text,
+                file_name,
+                doc_type,
+                assignment_number,
+                instructional_unit_number,
+                instructional_unit_label,
+                1 - (embedding <=> :embedding::vector) as score
+            FROM document_chunks
+            WHERE ta_id = :ta_id
+            ORDER BY embedding <=> :embedding::vector
+            LIMIT :top_k
+        """)
+        result = db.session.execute(base_sql, {"ta_id": ta_id, "top_k": top_k, "embedding": embedding_str})
+        rows = result.fetchall()
     
     chunks = []
-    if results["documents"] and results["documents"][0]:
-        for i, doc in enumerate(results["documents"][0]):
-            metadata = results["metadatas"][0][i] if results["metadatas"] else {}
-            distance = results["distances"][0][i] if results["distances"] else 0
-            
-            score = 1 - distance
-            
-            chunks.append({
-                "text": doc,
-                "score": score,
-                "file_name": metadata.get("file_name", "unknown"),
-                "doc_type": metadata.get("doc_type", "other"),
-                "metadata": metadata
-            })
+    for row in rows:
+        chunks.append({
+            "text": row.chunk_text,
+            "score": float(row.score) if row.score else 0.0,
+            "file_name": row.file_name or "unknown",
+            "doc_type": row.doc_type or "other",
+            "metadata": {
+                "assignment_number": row.assignment_number,
+                "instructional_unit_number": row.instructional_unit_number,
+                "instructional_unit_label": row.instructional_unit_label
+            }
+        })
     
     logger.info(f"Retrieved {len(chunks)} chunks for query: {query[:50]}...")
     
