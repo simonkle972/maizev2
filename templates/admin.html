@@ -142,6 +142,19 @@
             }, duration);
         }
         
+        async function apiCall(url, options = {}) {
+            const res = await fetch(url, options);
+            if (res.status === 401) {
+                window.location.href = '/admin/login';
+                throw new Error('Session expired');
+            }
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.error || 'Request failed with status ' + res.status);
+            }
+            return res.json();
+        }
+        
         function getStatusDisplay(ta) {
             if (ta.indexing_status === 'running') {
                 return '<span class="status indexing">Indexing...</span>';
@@ -153,8 +166,7 @@
         }
         
         function loadTAs() {
-            fetch('/admin/api/tas')
-            .then(res => res.json())
+            apiCall('/admin/api/tas')
             .then(tas => {
                 const list = document.getElementById('ta-list');
                 if (tas.length === 0) {
@@ -173,12 +185,16 @@
                         </div>
                     </div>
                 `).join('');
+            })
+            .catch(err => {
+                if (err.message !== 'Session expired') {
+                    showNotification('Failed to load TAs: ' + err.message, 'error');
+                }
             });
         }
         
         function showTADetail(taId) {
-            fetch(`/admin/api/tas/${taId}`)
-            .then(res => res.json())
+            apiCall('/admin/api/tas/' + taId)
             .then(ta => {
                 document.getElementById('ta-list-section') && 
                     (document.querySelector('.ta-list-section').style.display = 'none');
@@ -264,6 +280,11 @@
                 `;
                 currentTaId = ta.id;
                 setTimeout(setupDropZone, 0);
+            })
+            .catch(err => {
+                if (err.message !== 'Session expired') {
+                    showNotification('Failed to load TA details: ' + err.message, 'error');
+                }
             });
         }
         
@@ -291,22 +312,22 @@
                 system_prompt: document.getElementById('ta-prompt').value || undefined
             };
             
-            fetch('/admin/api/tas', {
+            apiCall('/admin/api/tas', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(data)
             })
-            .then(res => res.json())
             .then(result => {
-                if (result.error) {
-                    showNotification(result.error, 'error');
-                } else {
-                    hideCreateModal();
-                    document.getElementById('create-ta-form').reset();
-                    showNotification('Teaching Assistant created successfully!', 'success');
-                    loadTAs();
+                hideCreateModal();
+                document.getElementById('create-ta-form').reset();
+                showNotification('Teaching Assistant created successfully!', 'success');
+                loadTAs();
+            })
+            .catch(err => {
+                if (err.message !== 'Session expired') {
+                    showNotification(err.message, 'error');
                 }
             });
         }
@@ -370,13 +391,17 @@
                 formData.append('file', file);
                 
                 try {
-                    const res = await fetch(`/admin/api/tas/${taId}/upload`, {
+                    const res = await fetch('/admin/api/tas/' + taId + '/upload', {
                         method: 'POST',
                         body: formData
                     });
+                    if (res.status === 401) {
+                        window.location.href = '/admin/login';
+                        return;
+                    }
                     const result = await res.json();
                     
-                    const statusEl = document.querySelector(`#${fileId} .upload-status`);
+                    const statusEl = document.querySelector('#' + fileId + ' .upload-status');
                     if (result.error) {
                         statusEl.textContent = result.error;
                         statusEl.className = 'upload-status error';
@@ -387,7 +412,7 @@
                         successCount++;
                     }
                 } catch (err) {
-                    const statusEl = document.querySelector(`#${fileId} .upload-status`);
+                    const statusEl = document.querySelector('#' + fileId + ' .upload-status');
                     statusEl.textContent = 'Failed';
                     statusEl.className = 'upload-status error';
                     errorCount++;
@@ -404,10 +429,15 @@
         function deleteDocument(taId, docId) {
             if (!confirm('Delete this document?')) return;
             
-            fetch(`/admin/api/tas/${taId}/documents/${docId}`, {
+            apiCall('/admin/api/tas/' + taId + '/documents/' + docId, {
                 method: 'DELETE'
             })
-            .then(() => showTADetail(taId));
+            .then(() => showTADetail(taId))
+            .catch(err => {
+                if (err.message !== 'Session expired') {
+                    showNotification('Failed to delete document: ' + err.message, 'error');
+                }
+            });
         }
         
         function reindexTA(taId) {
@@ -417,22 +447,18 @@
             btn.disabled = true;
             btn.textContent = 'Starting...';
             
-            fetch(`/admin/api/tas/${taId}/reindex`, {
+            apiCall('/admin/api/tas/' + taId + '/reindex', {
                 method: 'POST'
             })
-            .then(res => res.json())
             .then(result => {
-                if (result.error) {
-                    showNotification(`Indexing failed: ${result.error}`, 'error');
-                    showTADetail(taId);
-                } else {
-                    showNotification('Indexing started in the background. You can continue working.', 'info', 8000);
-                    startIndexingPoll(taId);
-                }
+                showNotification('Indexing started in the background. You can continue working.', 'info', 8000);
+                startIndexingPoll(taId);
             })
             .catch(err => {
-                showNotification('Failed to start indexing', 'error');
-                showTADetail(taId);
+                if (err.message !== 'Session expired') {
+                    showNotification('Failed to start indexing: ' + err.message, 'error');
+                    showTADetail(taId);
+                }
             });
         }
         
@@ -442,8 +468,7 @@
             }
             
             indexingPollInterval = setInterval(() => {
-                fetch(`/admin/api/tas/${taId}/indexing-status`)
-                .then(res => res.json())
+                apiCall('/admin/api/tas/' + taId + '/indexing-status')
                 .then(status => {
                     if (status.status === 'completed') {
                         clearInterval(indexingPollInterval);
@@ -456,7 +481,7 @@
                     } else if (status.status === 'failed') {
                         clearInterval(indexingPollInterval);
                         indexingPollInterval = null;
-                        showNotification(`Indexing failed: ${status.error}`, 'error', 10000);
+                        showNotification('Indexing failed: ' + status.error, 'error', 10000);
                         if (currentTaId === taId) {
                             showTADetail(taId);
                         }
@@ -464,7 +489,10 @@
                     }
                 })
                 .catch(err => {
-                    console.error('Error polling indexing status:', err);
+                    if (err.message === 'Session expired') {
+                        clearInterval(indexingPollInterval);
+                        indexingPollInterval = null;
+                    }
                 });
             }, 3000);
         }
@@ -472,29 +500,36 @@
         function deleteTA(taId) {
             if (!confirm('Delete this teaching assistant? This cannot be undone.')) return;
             
-            fetch(`/admin/api/tas/${taId}`, {
+            apiCall('/admin/api/tas/' + taId, {
                 method: 'DELETE'
             })
             .then(() => {
                 showNotification('Teaching Assistant deleted', 'success');
                 hideDetail();
+            })
+            .catch(err => {
+                if (err.message !== 'Session expired') {
+                    showNotification('Failed to delete TA: ' + err.message, 'error');
+                }
             });
         }
         
         function updatePrompt(taId) {
             const prompt = document.getElementById('system-prompt').value;
             
-            fetch(`/admin/api/tas/${taId}`, {
+            apiCall('/admin/api/tas/' + taId, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ system_prompt: prompt })
             })
-            .then(res => res.json())
             .then(result => {
-                if (result.success) {
-                    showNotification('System prompt updated!', 'success');
+                showNotification('System prompt updated!', 'success');
+            })
+            .catch(err => {
+                if (err.message !== 'Session expired') {
+                    showNotification('Failed to update prompt: ' + err.message, 'error');
                 }
             });
         }
@@ -518,26 +553,21 @@
             statusEl.textContent = 'Updating...';
             statusEl.style.color = '#64748b';
             
-            fetch(`/admin/api/tas/${taId}`, {
+            apiCall('/admin/api/tas/' + taId, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ slug: newSlug })
             })
-            .then(res => res.json())
             .then(result => {
-                if (result.error) {
-                    statusEl.textContent = result.error;
-                    statusEl.style.color = '#ef4444';
-                } else {
-                    statusEl.textContent = 'URL updated successfully!';
-                    statusEl.style.color = '#22c55e';
-                    showTADetail(taId);
-                }
+                statusEl.textContent = 'URL updated successfully!';
+                statusEl.style.color = '#22c55e';
+                showTADetail(taId);
             })
             .catch(err => {
-                statusEl.textContent = 'Failed to update URL';
+                if (err.message === 'Session expired') return;
+                statusEl.textContent = err.message || 'Failed to update URL';
                 statusEl.style.color = '#ef4444';
             });
         }
