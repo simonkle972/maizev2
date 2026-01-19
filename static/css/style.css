@@ -713,6 +713,47 @@ a:hover {
     40% { transform: scale(1); opacity: 1; }
 }
 
+.message.streaming .message-status {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.message.streaming .status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-light);
+    font-size: 0.875rem;
+}
+
+.message.streaming .status-dot {
+    width: 8px;
+    height: 8px;
+    background: var(--primary);
+    border-radius: 50%;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+.message.streaming .status-text {
+    animation: fadeInOut 2s ease-in-out infinite;
+}
+
+@keyframes fadeInOut {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 1; }
+}
+
+.message.streaming #streaming-content {
+    white-space: pre-wrap;
+    min-height: 1.5em;
+}
+
 .chat-footer {
     padding: 1rem 1.5rem;
     background: var(--card-bg);

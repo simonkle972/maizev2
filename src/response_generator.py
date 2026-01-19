@@ -4,16 +4,7 @@ from config import Config
 
 logger = logging.getLogger(__name__)
 
-def generate_response(
-    query: str,
-    context: str,
-    system_prompt: str,
-    conversation_history: str = "",
-    course_name: str = ""
-) -> str:
-    client = OpenAI(api_key=Config.OPENAI_API_KEY)
-    
-    base_instructions = """
+BASE_INSTRUCTIONS = """
 You are a helpful teaching assistant for a college/university-level course.
 You help students understand concepts based on the provided course material and ONLY the provided course material.
 
@@ -27,8 +18,9 @@ IMPORTANT RULES:
 8. For questions asking about math-based problems, make a reasonable judgement about how much help to provide with the math itself but never give full solutions or answers.
 
 """
-    
-    full_system_prompt = f"{system_prompt}\n\n{base_instructions}"
+
+def build_messages(query: str, context: str, system_prompt: str, conversation_history: str = "", course_name: str = ""):
+    full_system_prompt = f"{system_prompt}\n\n{BASE_INSTRUCTIONS}"
     
     if course_name:
         full_system_prompt = f"You are a teaching assistant for {course_name}.\n\n{full_system_prompt}"
@@ -49,14 +41,26 @@ IMPORTANT RULES:
     
     user_message += f"Student's question: {query}"
     
+    return [
+        {"role": "system", "content": full_system_prompt},
+        {"role": "user", "content": user_message}
+    ]
+
+def generate_response(
+    query: str,
+    context: str,
+    system_prompt: str,
+    conversation_history: str = "",
+    course_name: str = ""
+) -> str:
+    client = OpenAI(api_key=Config.OPENAI_API_KEY)
+    
+    messages = build_messages(query, context, system_prompt, conversation_history, course_name)
+    
     try:
-        # the newest OpenAI model is "gpt-4o" which was released May 13, 2024
         response = client.chat.completions.create(
             model=Config.LLM_MODEL,
-            messages=[
-                {"role": "system", "content": full_system_prompt},
-                {"role": "user", "content": user_message}
-            ],
+            messages=messages,
             temperature=0.7,
             max_tokens=1500
         )
@@ -66,3 +70,31 @@ IMPORTANT RULES:
     except Exception as e:
         logger.error(f"Response generation failed: {e}")
         return "I apologize, but I'm having trouble generating a response right now. Please try again in a moment."
+
+def generate_response_stream(
+    query: str,
+    context: str,
+    system_prompt: str,
+    conversation_history: str = "",
+    course_name: str = ""
+):
+    client = OpenAI(api_key=Config.OPENAI_API_KEY)
+    
+    messages = build_messages(query, context, system_prompt, conversation_history, course_name)
+    
+    try:
+        stream = client.chat.completions.create(
+            model=Config.LLM_MODEL,
+            messages=messages,
+            temperature=0.7,
+            max_tokens=1500,
+            stream=True
+        )
+        
+        for chunk in stream:
+            if chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
+    
+    except Exception as e:
+        logger.error(f"Response streaming failed: {e}")
+        yield "I apologize, but I'm having trouble generating a response right now. Please try again in a moment."

@@ -50,6 +50,12 @@
         let sessionId = '';
         const taSlug = '{{ ta.slug }}';
         
+        const statusMessages = [
+            'Searching course materials...',
+            'Analyzing relevant content...',
+            'Generating response...'
+        ];
+        
         function handleKeydown(e) {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -89,47 +95,143 @@
             renderLatex(messageDiv);
         }
         
+        function preprocessLatex(text) {
+            let processed = text;
+            
+            processed = processed.replace(/\\\[/g, '$$$$');
+            processed = processed.replace(/\\\]/g, '$$$$');
+            processed = processed.replace(/\\\(/g, '$');
+            processed = processed.replace(/\\\)/g, '$');
+            
+            processed = processed.replace(/\\frac\{([^}]*)\}\{([^}]*)\}/g, '\\frac{$1}{$2}');
+            processed = processed.replace(/\\sqrt\{([^}]*)\}/g, '\\sqrt{$1}');
+            
+            return processed;
+        }
+        
         function formatContent(content) {
+            content = preprocessLatex(content);
+            
+            const mathPlaceholders = [];
+            let placeholderIndex = 0;
+            
+            content = content.replace(/\$\$[\s\S]*?\$\$/g, (match) => {
+                mathPlaceholders.push(match);
+                return `%%%MATH_DISPLAY_${placeholderIndex++}%%%`;
+            });
+            
+            content = content.replace(/\$[^\$\n]+?\$/g, (match) => {
+                mathPlaceholders.push(match);
+                return `%%%MATH_INLINE_${placeholderIndex++}%%%`;
+            });
+            
             content = content.replace(/\n/g, '<br>');
             content = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
             content = content.replace(/\*(.*?)\*/g, '<em>$1</em>');
-            content = content.replace(/`(.*?)`/g, '<code>$1</code>');
+            content = content.replace(/`([^`]+)`/g, '<code>$1</code>');
+            
+            for (let i = 0; i < mathPlaceholders.length; i++) {
+                content = content.replace(`%%%MATH_DISPLAY_${i}%%%`, mathPlaceholders[i]);
+                content = content.replace(`%%%MATH_INLINE_${i}%%%`, mathPlaceholders[i]);
+            }
+            
             return `<p>${content}</p>`;
         }
         
         function renderLatex(element) {
             if (typeof renderMathInElement !== 'undefined') {
-                renderMathInElement(element, {
-                    delimiters: [
-                        {left: '$$', right: '$$', display: true},
-                        {left: '$', right: '$', display: false},
-                        {left: '\\[', right: '\\]', display: true},
-                        {left: '\\(', right: '\\)', display: false}
-                    ],
-                    throwOnError: false
-                });
+                try {
+                    renderMathInElement(element, {
+                        delimiters: [
+                            {left: '$$', right: '$$', display: true},
+                            {left: '$', right: '$', display: false},
+                            {left: '\\[', right: '\\]', display: true},
+                            {left: '\\(', right: '\\)', display: false}
+                        ],
+                        throwOnError: false,
+                        errorColor: '#cc0000',
+                        strict: false,
+                        trust: true,
+                        macros: {
+                            "\\R": "\\mathbb{R}",
+                            "\\N": "\\mathbb{N}",
+                            "\\Z": "\\mathbb{Z}",
+                            "\\Q": "\\mathbb{Q}",
+                            "\\C": "\\mathbb{C}"
+                        }
+                    });
+                } catch (e) {
+                    console.warn('LaTeX rendering error:', e);
+                }
             }
         }
         
-        function addLoadingMessage() {
+        function addStreamingMessage() {
             const messagesEl = document.getElementById('messages');
-            const loadingDiv = document.createElement('div');
-            loadingDiv.className = 'message assistant loading';
-            loadingDiv.id = 'loading-message';
-            loadingDiv.innerHTML = `
-                <div class="message-content">
-                    <div class="typing-indicator">
-                        <span></span><span></span><span></span>
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message assistant streaming';
+            messageDiv.id = 'streaming-message';
+            messageDiv.innerHTML = `
+                <div class="message-status">
+                    <div class="status-indicator">
+                        <span class="status-dot"></span>
+                        <span class="status-text">Preparing...</span>
                     </div>
                 </div>
+                <div class="message-content" id="streaming-content"></div>
             `;
-            messagesEl.appendChild(loadingDiv);
+            messagesEl.appendChild(messageDiv);
             messagesEl.scrollTop = messagesEl.scrollHeight;
+            return messageDiv;
         }
         
-        function removeLoadingMessage() {
-            const loading = document.getElementById('loading-message');
-            if (loading) loading.remove();
+        function updateStreamingStatus(message) {
+            const statusText = document.querySelector('#streaming-message .status-text');
+            if (statusText) {
+                statusText.textContent = message;
+            }
+        }
+        
+        function hideStreamingStatus() {
+            const statusDiv = document.querySelector('#streaming-message .message-status');
+            if (statusDiv) {
+                statusDiv.style.display = 'none';
+            }
+        }
+        
+        function appendToStreamingContent(token) {
+            const contentEl = document.getElementById('streaming-content');
+            if (contentEl) {
+                contentEl.textContent += token;
+                const messagesEl = document.getElementById('messages');
+                messagesEl.scrollTop = messagesEl.scrollHeight;
+            }
+        }
+        
+        function finalizeStreamingMessage(sources) {
+            const streamingMsg = document.getElementById('streaming-message');
+            if (!streamingMsg) return;
+            
+            const contentEl = document.getElementById('streaming-content');
+            const rawContent = contentEl.textContent;
+            
+            streamingMsg.id = '';
+            streamingMsg.className = 'message assistant';
+            
+            let html = `<div class="message-content">${formatContent(rawContent)}</div>`;
+            
+            if (sources && sources.length > 0) {
+                const uniqueSources = [...new Set(sources)];
+                html += `
+                    <div class="message-sources">
+                        <span class="sources-label">Sources:</span>
+                        ${uniqueSources.map(s => `<span class="source-tag">${s}</span>`).join('')}
+                    </div>
+                `;
+            }
+            
+            streamingMsg.innerHTML = html;
+            renderLatex(streamingMsg);
         }
         
         async function sendMessage(e) {
@@ -146,28 +248,78 @@
             
             const sendBtn = document.getElementById('send-btn');
             sendBtn.disabled = true;
-            addLoadingMessage();
+            
+            let sources = [];
+            addStreamingMessage();
             
             try {
-                const response = await fetch(`/${taSlug}/api/chat`, {
+                const response = await fetch(`/${taSlug}/api/chat/stream`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ query, session_id: sessionId })
                 });
                 
-                const data = await response.json();
-                
-                removeLoadingMessage();
-                
-                if (data.error) {
-                    addMessage('assistant', `I'm sorry, I encountered an issue: ${data.error}`);
-                } else {
-                    sessionId = data.session_id;
-                    addMessage('assistant', data.response, data.sources);
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Request failed');
                 }
+                
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let hasStartedContent = false;
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    buffer += decoder.decode(value, { stream: true });
+                    
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                
+                                switch (data.type) {
+                                    case 'status':
+                                        updateStreamingStatus(data.message);
+                                        break;
+                                    case 'sources':
+                                        sources = data.sources;
+                                        break;
+                                    case 'token':
+                                        if (!hasStartedContent) {
+                                            hideStreamingStatus();
+                                            hasStartedContent = true;
+                                        }
+                                        appendToStreamingContent(data.content);
+                                        break;
+                                    case 'done':
+                                        sessionId = data.session_id;
+                                        finalizeStreamingMessage(sources);
+                                        break;
+                                    case 'error':
+                                        throw new Error(data.message);
+                                }
+                            } catch (parseErr) {
+                                if (parseErr.message !== 'Unexpected end of JSON input') {
+                                    console.warn('Parse error:', parseErr);
+                                }
+                            }
+                        }
+                    }
+                }
+                
             } catch (err) {
-                removeLoadingMessage();
-                addMessage('assistant', 'I apologize, but I had trouble connecting. Please try again.');
+                console.error('Stream error:', err);
+                const streamingMsg = document.getElementById('streaming-message');
+                if (streamingMsg) {
+                    streamingMsg.remove();
+                }
+                addMessage('assistant', `I apologize, but I had trouble processing your request: ${err.message}`);
             } finally {
                 sendBtn.disabled = false;
                 input.focus();
