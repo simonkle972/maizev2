@@ -214,7 +214,15 @@ def delete_ta(ta_id):
     if not ta:
         return jsonify({"error": "TA not found"}), 404
     
-    ta.is_active = False
+    try:
+        chroma_path = os.path.join(Config.CHROMA_DB_PATH, ta_id)
+        if os.path.exists(chroma_path):
+            import shutil
+            shutil.rmtree(chroma_path)
+    except Exception as e:
+        logger.warning(f"Could not delete ChromaDB for {ta_id}: {e}")
+    
+    db.session.delete(ta)
     db.session.commit()
     return jsonify({"success": True})
 
