@@ -163,29 +163,17 @@ def chunk_text(text: str, chunk_size: int = 512, overlap: int = 50) -> list:
     return chunks
 
 def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
-    import chromadb
     import tempfile
     from openai import OpenAI
     
-    from models import db, Document, TeachingAssistant
+    from models import db, Document, TeachingAssistant, DocumentChunk
     from flask import current_app
     
     client = OpenAI(api_key=Config.OPENAI_API_KEY)
     
-    chroma_path = os.path.join(Config.CHROMA_DB_PATH, ta_id)
-    os.makedirs(chroma_path, exist_ok=True)
-    
-    chroma_client = chromadb.PersistentClient(path=chroma_path)
-    
-    try:
-        chroma_client.delete_collection(f"ta_{ta_id}")
-    except:
-        pass
-    
-    collection = chroma_client.create_collection(
-        name=f"ta_{ta_id}",
-        metadata={"hnsw:space": "cosine"}
-    )
+    DocumentChunk.query.filter_by(ta_id=ta_id).delete()
+    db.session.commit()
+    logger.info(f"Cleared existing chunks for TA {ta_id}")
     
     documents = Document.query.filter_by(ta_id=ta_id).all()
     total_docs = len(documents)
@@ -193,10 +181,7 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
     if total_docs == 0:
         raise ValueError("No documents found for this TA")
     
-    all_chunks = []
-    all_embeddings = []
-    all_ids = []
-    all_metadatas = []
+    all_chunk_data = []
     
     for doc_idx, doc in enumerate(documents):
         logger.info(f"Processing document: {doc.original_filename}")
@@ -234,35 +219,31 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
             doc.extraction_metadata = metadata
             doc.metadata_extracted = True
             db.session.commit()
-        else:
-            metadata = doc.extraction_metadata or {}
         
         chunks = chunk_text(text, Config.CHUNK_SIZE, Config.CHUNK_OVERLAP)
         
         for i, chunk in enumerate(chunks):
-            chunk_id = f"{doc.id}_{i}"
-            chunk_metadata = {
+            all_chunk_data.append({
                 "ta_id": ta_id,
                 "document_id": doc.id,
-                "file_name": doc.original_filename,
                 "chunk_index": i,
+                "chunk_text": chunk,
                 "doc_type": doc.doc_type or "other",
                 "assignment_number": doc.assignment_number or "",
                 "instructional_unit_number": doc.instructional_unit_number or 0,
-                "instructional_unit_label": doc.instructional_unit_label or ""
-            }
-            
-            all_chunks.append(chunk)
-            all_ids.append(chunk_id)
-            all_metadatas.append(chunk_metadata)
+                "instructional_unit_label": doc.instructional_unit_label or "",
+                "file_name": doc.original_filename
+            })
     
-    if not all_chunks:
+    if not all_chunk_data:
         raise ValueError("No text content found in any documents")
     
+    all_embeddings = []
     batch_size = 100
-    total_batches = (len(all_chunks) + batch_size - 1) // batch_size
-    for batch_idx, i in enumerate(range(0, len(all_chunks), batch_size)):
-        batch_texts = all_chunks[i:i+batch_size]
+    total_batches = (len(all_chunk_data) + batch_size - 1) // batch_size
+    
+    for batch_idx, i in enumerate(range(0, len(all_chunk_data), batch_size)):
+        batch_texts = [c["chunk_text"] for c in all_chunk_data[i:i+batch_size]]
         
         if progress_callback and total_batches > 0:
             progress = 50 + int((batch_idx / total_batches) * 40)
@@ -276,23 +257,38 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
         batch_embeddings = [item.embedding for item in response.data]
         all_embeddings.extend(batch_embeddings)
     
-    chroma_batch_size = 5000
-    total_chroma_batches = (len(all_chunks) + chroma_batch_size - 1) // chroma_batch_size
-    for batch_idx, i in enumerate(range(0, len(all_chunks), chroma_batch_size)):
-        batch_end = min(i + chroma_batch_size, len(all_chunks))
+    if progress_callback:
+        progress_callback(ta_id, 90)
+    
+    db_batch_size = 500
+    total_db_batches = (len(all_chunk_data) + db_batch_size - 1) // db_batch_size
+    
+    for batch_idx, i in enumerate(range(0, len(all_chunk_data), db_batch_size)):
+        batch_end = min(i + db_batch_size, len(all_chunk_data))
         
-        if progress_callback and total_chroma_batches > 0:
-            progress = 90 + int((batch_idx / total_chroma_batches) * 10)
+        if progress_callback and total_db_batches > 0:
+            progress = 90 + int((batch_idx / total_db_batches) * 10)
             progress_callback(ta_id, progress)
         
-        collection.add(
-            documents=all_chunks[i:batch_end],
-            embeddings=all_embeddings[i:batch_end],
-            ids=all_ids[i:batch_end],
-            metadatas=all_metadatas[i:batch_end]
-        )
-        logger.info(f"Added batch {i//chroma_batch_size + 1}: chunks {i+1}-{batch_end} of {len(all_chunks)}")
+        for j in range(i, batch_end):
+            chunk_data = all_chunk_data[j]
+            chunk_obj = DocumentChunk(
+                ta_id=chunk_data["ta_id"],
+                document_id=chunk_data["document_id"],
+                chunk_index=chunk_data["chunk_index"],
+                chunk_text=chunk_data["chunk_text"],
+                doc_type=chunk_data["doc_type"],
+                assignment_number=chunk_data["assignment_number"],
+                instructional_unit_number=chunk_data["instructional_unit_number"],
+                instructional_unit_label=chunk_data["instructional_unit_label"],
+                file_name=chunk_data["file_name"],
+                embedding=all_embeddings[j]
+            )
+            db.session.add(chunk_obj)
+        
+        db.session.commit()
+        logger.info(f"Stored batch {batch_idx + 1}: chunks {i+1}-{batch_end} of {len(all_chunk_data)}")
     
-    logger.info(f"Indexed {len(all_chunks)} chunks for TA {ta_id}")
+    logger.info(f"Indexed {len(all_chunk_data)} chunks for TA {ta_id} in PostgreSQL")
     
-    return {"chunks_indexed": len(all_chunks)}
+    return {"chunks_indexed": len(all_chunk_data)}
