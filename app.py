@@ -1,6 +1,7 @@
 import os
 import logging
 import secrets
+import threading
 from datetime import datetime
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for, send_from_directory
 from config import Config
@@ -105,7 +106,8 @@ def list_tas():
         "is_indexed": ta.is_indexed,
         "document_count": ta.document_count,
         "created_at": ta.created_at.isoformat() if ta.created_at else None,
-        "indexed_at": ta.indexed_at.isoformat() if ta.indexed_at else None
+        "indexed_at": ta.indexed_at.isoformat() if ta.indexed_at else None,
+        "indexing_status": ta.indexing_status
     } for ta in tas])
 
 @app.route('/admin/api/tas', methods=['POST'])
@@ -167,7 +169,10 @@ def get_ta(ta_id):
         "document_count": ta.document_count,
         "documents": documents,
         "created_at": ta.created_at.isoformat() if ta.created_at else None,
-        "indexed_at": ta.indexed_at.isoformat() if ta.indexed_at else None
+        "indexed_at": ta.indexed_at.isoformat() if ta.indexed_at else None,
+        "indexing_status": ta.indexing_status,
+        "indexing_error": ta.indexing_error,
+        "indexing_progress": ta.indexing_progress
     })
 
 @app.route('/admin/api/tas/<ta_id>', methods=['PUT'])
@@ -254,6 +259,8 @@ def upload_document(ta_id):
     db.session.add(doc)
     ta.document_count = ta.documents.count() + 1
     ta.is_indexed = False
+    ta.indexing_status = None
+    ta.indexing_error = None
     db.session.commit()
     
     return jsonify({
@@ -277,9 +284,53 @@ def delete_document(ta_id, doc_id):
     db.session.delete(doc)
     ta.document_count = max(0, ta.document_count - 1)
     ta.is_indexed = False
+    ta.indexing_status = None
+    ta.indexing_error = None
     db.session.commit()
     
     return jsonify({"success": True})
+
+def update_indexing_progress(ta_id, progress):
+    """Update indexing progress for a TA (called from document_processor)."""
+    with app.app_context():
+        ta = TeachingAssistant.query.get(ta_id)
+        if ta:
+            ta.indexing_progress = progress
+            db.session.commit()
+
+def run_indexing_task(ta_id):
+    """Background task to run document indexing."""
+    with app.app_context():
+        ta = TeachingAssistant.query.get(ta_id)
+        if not ta:
+            return
+        
+        try:
+            ta.indexing_status = 'running'
+            ta.indexing_error = None
+            ta.indexing_progress = 0
+            ta.is_indexed = False
+            db.session.commit()
+            
+            from src.document_processor import process_and_index_documents
+            result = process_and_index_documents(ta_id, progress_callback=update_indexing_progress)
+            
+            ta = TeachingAssistant.query.get(ta_id)
+            ta.is_indexed = True
+            ta.indexed_at = datetime.utcnow()
+            ta.indexing_status = 'completed'
+            ta.indexing_progress = 100
+            db.session.commit()
+            logger.info(f"Indexing completed for {ta_id}: {result.get('chunks_indexed', 0)} chunks")
+            
+        except Exception as e:
+            logger.error(f"Indexing failed for {ta_id}: {e}")
+            ta = TeachingAssistant.query.get(ta_id)
+            if ta:
+                ta.indexing_status = 'failed'
+                ta.indexing_error = str(e)
+                ta.is_indexed = False
+                db.session.commit()
 
 @app.route('/admin/api/tas/<ta_id>/reindex', methods=['POST'])
 @admin_api_required
@@ -291,18 +342,29 @@ def reindex_ta(ta_id):
     if ta.document_count == 0:
         return jsonify({"error": "No documents to index"}), 400
     
-    try:
-        from src.document_processor import process_and_index_documents
-        result = process_and_index_documents(ta_id)
-        
-        ta.is_indexed = True
-        ta.indexed_at = datetime.utcnow()
-        db.session.commit()
-        
-        return jsonify({"success": True, "chunks_indexed": result.get("chunks_indexed", 0)})
-    except Exception as e:
-        logger.error(f"Indexing failed for {ta_id}: {e}")
-        return jsonify({"error": str(e)}), 500
+    if ta.indexing_status == 'running':
+        return jsonify({"error": "Indexing is already in progress"}), 400
+    
+    thread = threading.Thread(target=run_indexing_task, args=(ta_id,))
+    thread.daemon = True
+    thread.start()
+    
+    return jsonify({"success": True, "message": "Indexing started in the background"})
+
+@app.route('/admin/api/tas/<ta_id>/indexing-status', methods=['GET'])
+@admin_api_required
+def get_indexing_status(ta_id):
+    ta = TeachingAssistant.query.get(ta_id)
+    if not ta:
+        return jsonify({"error": "TA not found"}), 404
+    
+    return jsonify({
+        "status": ta.indexing_status,
+        "progress": ta.indexing_progress,
+        "error": ta.indexing_error,
+        "is_indexed": ta.is_indexed,
+        "indexed_at": ta.indexed_at.isoformat() if ta.indexed_at else None
+    })
 
 @app.route('/<slug>')
 def ta_chat(slug):

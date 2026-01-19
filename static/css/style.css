@@ -313,6 +313,11 @@ a:hover {
     color: #92400e;
 }
 
+.status.indexing {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
 .ta-detail-section {
     background: var(--card-bg);
     padding: 2rem;

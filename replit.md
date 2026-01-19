@@ -67,6 +67,9 @@ maize/
 - PPTX (lecture slides)
 
 ## Recent Changes
+- Background indexing with progress tracking (Jan 2026)
+- In-page notification bar replacing browser alerts (Jan 2026)
+- ChromaDB batch size fix for large document collections (Jan 2026)
 - Session-based admin login with username/password (Jan 2026)
 - LaTeX math rendering in chat using KaTeX (Jan 2026)
 - Drag-and-drop multi-file upload in admin panel (Jan 2026)

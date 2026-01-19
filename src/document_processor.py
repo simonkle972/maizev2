@@ -162,7 +162,7 @@ def chunk_text(text: str, chunk_size: int = 512, overlap: int = 50) -> list:
     
     return chunks
 
-def process_and_index_documents(ta_id: str) -> dict:
+def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
     import chromadb
     from openai import OpenAI
     
@@ -192,14 +192,19 @@ def process_and_index_documents(ta_id: str) -> dict:
     )
     
     documents = Document.query.filter_by(ta_id=ta_id).all()
+    total_docs = len(documents)
     
     all_chunks = []
     all_embeddings = []
     all_ids = []
     all_metadatas = []
     
-    for doc in documents:
+    for doc_idx, doc in enumerate(documents):
         logger.info(f"Processing document: {doc.original_filename}")
+        
+        if progress_callback and total_docs > 0:
+            progress = int((doc_idx / total_docs) * 50)
+            progress_callback(ta_id, progress)
         
         text = extract_text_from_file(doc.storage_path)
         if not text:
@@ -241,8 +246,13 @@ def process_and_index_documents(ta_id: str) -> dict:
         raise ValueError("No text content found in any documents")
     
     batch_size = 100
-    for i in range(0, len(all_chunks), batch_size):
+    total_batches = (len(all_chunks) + batch_size - 1) // batch_size
+    for batch_idx, i in enumerate(range(0, len(all_chunks), batch_size)):
         batch_texts = all_chunks[i:i+batch_size]
+        
+        if progress_callback and total_batches > 0:
+            progress = 50 + int((batch_idx / total_batches) * 40)
+            progress_callback(ta_id, progress)
         
         response = client.embeddings.create(
             model=Config.EMBEDDING_MODEL,
@@ -252,12 +262,22 @@ def process_and_index_documents(ta_id: str) -> dict:
         batch_embeddings = [item.embedding for item in response.data]
         all_embeddings.extend(batch_embeddings)
     
-    collection.add(
-        documents=all_chunks,
-        embeddings=all_embeddings,
-        ids=all_ids,
-        metadatas=all_metadatas
-    )
+    chroma_batch_size = 5000
+    total_chroma_batches = (len(all_chunks) + chroma_batch_size - 1) // chroma_batch_size
+    for batch_idx, i in enumerate(range(0, len(all_chunks), chroma_batch_size)):
+        batch_end = min(i + chroma_batch_size, len(all_chunks))
+        
+        if progress_callback and total_chroma_batches > 0:
+            progress = 90 + int((batch_idx / total_chroma_batches) * 10)
+            progress_callback(ta_id, progress)
+        
+        collection.add(
+            documents=all_chunks[i:batch_end],
+            embeddings=all_embeddings[i:batch_end],
+            ids=all_ids[i:batch_end],
+            metadatas=all_metadatas[i:batch_end]
+        )
+        logger.info(f"Added batch {i//chroma_batch_size + 1}: chunks {i+1}-{batch_end} of {len(all_chunks)}")
     
     logger.info(f"Indexed {len(all_chunks)} chunks for TA {ta_id}")
     

@@ -22,6 +22,9 @@ class TeachingAssistant(db.Model):
     document_count = db.Column(db.Integer, default=0)
     schema_version = db.Column(db.String(16), default="1.0")
     is_active = db.Column(db.Boolean, default=True)
+    indexing_status = db.Column(db.String(32), default=None)
+    indexing_error = db.Column(db.Text, nullable=True)
+    indexing_progress = db.Column(db.Integer, default=0)
     
     documents = db.relationship('Document', backref='ta', lazy='dynamic', cascade='all, delete-orphan')
     sessions = db.relationship('ChatSession', backref='ta', lazy='dynamic', cascade='all, delete-orphan')

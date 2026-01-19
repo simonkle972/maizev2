@@ -5,8 +5,75 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Maize Admin - Teaching Assistant Management</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .notification-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 12px 20px;
+            text-align: center;
+            font-weight: 500;
+            z-index: 1000;
+            transform: translateY(-100%);
+            transition: transform 0.3s ease;
+        }
+        .notification-bar.show {
+            transform: translateY(0);
+        }
+        .notification-bar.success {
+            background: #22c55e;
+            color: white;
+        }
+        .notification-bar.error {
+            background: #ef4444;
+            color: white;
+        }
+        .notification-bar.info {
+            background: #3b82f6;
+            color: white;
+        }
+        .notification-bar.warning {
+            background: #f59e0b;
+            color: white;
+        }
+        .indexing-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+        .indexing-status.running {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+        .indexing-status.failed {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+        .indexing-status.completed {
+            background: #dcfce7;
+            color: #166534;
+        }
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #3b82f6;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
 </head>
 <body>
+    <div id="notification-bar" class="notification-bar"></div>
+    
     <div class="admin-container">
         <header class="admin-header">
             <h1><a href="/">Maize</a> Admin Panel</h1>
@@ -63,6 +130,27 @@
     
     <script>
         let currentTaId = null;
+        let indexingPollInterval = null;
+        
+        function showNotification(message, type = 'info', duration = 5000) {
+            const bar = document.getElementById('notification-bar');
+            bar.textContent = message;
+            bar.className = 'notification-bar ' + type + ' show';
+            
+            setTimeout(() => {
+                bar.classList.remove('show');
+            }, duration);
+        }
+        
+        function getStatusDisplay(ta) {
+            if (ta.indexing_status === 'running') {
+                return '<span class="status indexing">Indexing...</span>';
+            } else if (ta.is_indexed) {
+                return '<span class="status indexed">Ready</span>';
+            } else {
+                return '<span class="status not-indexed">Not Indexed</span>';
+            }
+        }
         
         function loadTAs() {
             fetch('/admin/api/tas')
@@ -80,9 +168,7 @@
                         <p class="course-name">${ta.course_name}</p>
                         <p class="ta-slug">/${ta.slug}</p>
                         <div class="ta-meta">
-                            <span class="status ${ta.is_indexed ? 'indexed' : 'not-indexed'}">
-                                ${ta.is_indexed ? 'Ready' : 'Not Indexed'}
-                            </span>
+                            ${getStatusDisplay(ta)}
                             <span class="doc-count">${ta.document_count} documents</span>
                         </div>
                     </div>
@@ -109,7 +195,21 @@
                     `).join('')
                     : '<p class="empty">No documents uploaded yet.</p>';
                 
+                let indexingStatusHtml = '';
+                if (ta.indexing_status === 'running') {
+                    indexingStatusHtml = `<div class="indexing-status running"><div class="spinner"></div> Indexing in progress...</div>`;
+                    startIndexingPoll(ta.id);
+                } else if (ta.indexing_status === 'failed') {
+                    indexingStatusHtml = `<div class="indexing-status failed">Indexing failed: ${ta.indexing_error || 'Unknown error'}</div>`;
+                } else if (ta.indexing_status === 'completed') {
+                    indexingStatusHtml = `<div class="indexing-status completed">Indexing completed successfully</div>`;
+                }
+                
+                const indexBtnDisabled = ta.document_count === 0 || ta.indexing_status === 'running';
+                const indexBtnText = ta.indexing_status === 'running' ? 'Indexing...' : (ta.is_indexed ? 'Re-index Documents' : 'Index Documents');
+                
                 document.getElementById('ta-detail-content').innerHTML = `
+                    ${indexingStatusHtml}
                     <div class="detail-info">
                         <p><strong>Course:</strong> ${ta.course_name}</p>
                         <p><strong>Status:</strong> ${ta.is_indexed ? 'Ready' : 'Needs Indexing'}</p>
@@ -150,8 +250,8 @@
                     </div>
                     
                     <div class="actions-section">
-                        <button onclick="reindexTA('${ta.id}')" class="btn btn-primary" ${ta.document_count === 0 ? 'disabled' : ''}>
-                            ${ta.is_indexed ? 'Re-index Documents' : 'Index Documents'}
+                        <button onclick="reindexTA('${ta.id}')" class="btn btn-primary" ${indexBtnDisabled ? 'disabled' : ''}>
+                            ${indexBtnText}
                         </button>
                         <button onclick="deleteTA('${ta.id}')" class="btn btn-danger">Delete TA</button>
                     </div>
@@ -201,10 +301,11 @@
             .then(res => res.json())
             .then(result => {
                 if (result.error) {
-                    alert(result.error);
+                    showNotification(result.error, 'error');
                 } else {
                     hideCreateModal();
                     document.getElementById('create-ta-form').reset();
+                    showNotification('Teaching Assistant created successfully!', 'success');
                     loadTAs();
                 }
             });
@@ -314,7 +415,7 @@
             
             const btn = event.target;
             btn.disabled = true;
-            btn.textContent = 'Indexing...';
+            btn.textContent = 'Starting...';
             
             fetch(`/admin/api/tas/${taId}/reindex`, {
                 method: 'POST'
@@ -322,16 +423,50 @@
             .then(res => res.json())
             .then(result => {
                 if (result.error) {
-                    alert(`Indexing failed: ${result.error}`);
+                    showNotification(`Indexing failed: ${result.error}`, 'error');
+                    showTADetail(taId);
                 } else {
-                    alert(`Indexing complete! ${result.chunks_indexed} chunks indexed.`);
+                    showNotification('Indexing started in the background. You can continue working.', 'info', 8000);
+                    startIndexingPoll(taId);
                 }
-                showTADetail(taId);
             })
             .catch(err => {
-                alert('Indexing failed');
+                showNotification('Failed to start indexing', 'error');
                 showTADetail(taId);
             });
+        }
+        
+        function startIndexingPoll(taId) {
+            if (indexingPollInterval) {
+                clearInterval(indexingPollInterval);
+            }
+            
+            indexingPollInterval = setInterval(() => {
+                fetch(`/admin/api/tas/${taId}/indexing-status`)
+                .then(res => res.json())
+                .then(status => {
+                    if (status.status === 'completed') {
+                        clearInterval(indexingPollInterval);
+                        indexingPollInterval = null;
+                        showNotification('Indexing completed successfully!', 'success');
+                        if (currentTaId === taId) {
+                            showTADetail(taId);
+                        }
+                        loadTAs();
+                    } else if (status.status === 'failed') {
+                        clearInterval(indexingPollInterval);
+                        indexingPollInterval = null;
+                        showNotification(`Indexing failed: ${status.error}`, 'error', 10000);
+                        if (currentTaId === taId) {
+                            showTADetail(taId);
+                        }
+                        loadTAs();
+                    }
+                })
+                .catch(err => {
+                    console.error('Error polling indexing status:', err);
+                });
+            }, 3000);
         }
         
         function deleteTA(taId) {
@@ -341,6 +476,7 @@
                 method: 'DELETE'
             })
             .then(() => {
+                showNotification('Teaching Assistant deleted', 'success');
                 hideDetail();
             });
         }
@@ -358,7 +494,7 @@
             .then(res => res.json())
             .then(result => {
                 if (result.success) {
-                    alert('System prompt updated!');
+                    showNotification('System prompt updated!', 'success');
                 }
             });
         }
