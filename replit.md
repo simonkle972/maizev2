@@ -67,6 +67,7 @@ maize/
 - PPTX (lecture slides)
 
 ## Recent Changes
+- Document content stored in PostgreSQL (file_content column) for persistence across deployments (Jan 2026)
 - Admin panel session expiration handling with user-friendly redirect (Jan 2026)
 - Background indexing with progress tracking (Jan 2026)
 - In-page notification bar replacing browser alerts (Jan 2026)
