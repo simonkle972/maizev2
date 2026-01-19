@@ -81,6 +81,8 @@ def analyze_query(query: str) -> dict:
 
 def retrieve_context(ta_id: str, query: str, top_k: int = 8) -> list:
     from models import db, DocumentChunk
+    from sqlalchemy import func, literal
+    from pgvector.sqlalchemy import Vector
     
     chunk_count = DocumentChunk.query.filter_by(ta_id=ta_id).count()
     if chunk_count == 0:
@@ -97,82 +99,54 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8) -> list:
     
     query_analysis = analyze_query(query)
     
-    embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
+    base_query = db.session.query(
+        DocumentChunk.chunk_text,
+        DocumentChunk.file_name,
+        DocumentChunk.doc_type,
+        DocumentChunk.assignment_number,
+        DocumentChunk.instructional_unit_number,
+        DocumentChunk.instructional_unit_label,
+        (1 - DocumentChunk.embedding.cosine_distance(query_embedding)).label('score')
+    ).filter(DocumentChunk.ta_id == ta_id)
     
-    where_clauses = ["ta_id = :ta_id"]
-    params = {"ta_id": ta_id, "top_k": top_k, "embedding": embedding_str}
+    filtered_query = base_query
+    has_filters = False
     
     if query_analysis["doc_type_filter"] and query_analysis["assignment_filter"]:
-        where_clauses.append("doc_type = :doc_type")
-        where_clauses.append("assignment_number = :assignment_number")
-        params["doc_type"] = query_analysis["doc_type_filter"]
-        params["assignment_number"] = query_analysis["assignment_filter"]
+        filtered_query = base_query.filter(
+            DocumentChunk.doc_type == query_analysis["doc_type_filter"],
+            DocumentChunk.assignment_number == query_analysis["assignment_filter"]
+        )
+        has_filters = True
     elif query_analysis["doc_type_filter"] and query_analysis["unit_filter"]:
-        where_clauses.append("doc_type = :doc_type")
-        where_clauses.append("instructional_unit_number = :unit_number")
-        params["doc_type"] = query_analysis["doc_type_filter"]
-        params["unit_number"] = query_analysis["unit_filter"]
+        filtered_query = base_query.filter(
+            DocumentChunk.doc_type == query_analysis["doc_type_filter"],
+            DocumentChunk.instructional_unit_number == query_analysis["unit_filter"]
+        )
+        has_filters = True
     elif query_analysis["doc_type_filter"]:
-        where_clauses.append("doc_type = :doc_type")
-        params["doc_type"] = query_analysis["doc_type_filter"]
-    
-    where_clause = " AND ".join(where_clauses)
-    
-    sql = text(f"""
-        SELECT 
-            chunk_text,
-            file_name,
-            doc_type,
-            assignment_number,
-            instructional_unit_number,
-            instructional_unit_label,
-            1 - (embedding <=> :embedding::vector) as score
-        FROM document_chunks
-        WHERE {where_clause}
-        ORDER BY embedding <=> :embedding::vector
-        LIMIT :top_k
-    """)
+        filtered_query = base_query.filter(
+            DocumentChunk.doc_type == query_analysis["doc_type_filter"]
+        )
+        has_filters = True
     
     try:
-        result = db.session.execute(sql, params)
-        rows = result.fetchall()
+        results = filtered_query.order_by(
+            DocumentChunk.embedding.cosine_distance(query_embedding)
+        ).limit(top_k).all()
+        
+        if not results and has_filters:
+            logger.info("No results with filter, falling back to unfiltered search")
+            results = base_query.order_by(
+                DocumentChunk.embedding.cosine_distance(query_embedding)
+            ).limit(top_k).all()
     except Exception as e:
-        logger.error(f"Vector search failed with filter: {e}")
-        base_sql = text("""
-            SELECT 
-                chunk_text,
-                file_name,
-                doc_type,
-                assignment_number,
-                instructional_unit_number,
-                instructional_unit_label,
-                1 - (embedding <=> :embedding::vector) as score
-            FROM document_chunks
-            WHERE ta_id = :ta_id
-            ORDER BY embedding <=> :embedding::vector
-            LIMIT :top_k
-        """)
-        result = db.session.execute(base_sql, {"ta_id": ta_id, "top_k": top_k, "embedding": embedding_str})
-        rows = result.fetchall()
+        logger.error(f"Vector search failed: {e}")
+        results = base_query.order_by(
+            DocumentChunk.embedding.cosine_distance(query_embedding)
+        ).limit(top_k).all()
     
-    if not rows and len(where_clauses) > 1:
-        logger.info("No results with filter, falling back to unfiltered search")
-        base_sql = text("""
-            SELECT 
-                chunk_text,
-                file_name,
-                doc_type,
-                assignment_number,
-                instructional_unit_number,
-                instructional_unit_label,
-                1 - (embedding <=> :embedding::vector) as score
-            FROM document_chunks
-            WHERE ta_id = :ta_id
-            ORDER BY embedding <=> :embedding::vector
-            LIMIT :top_k
-        """)
-        result = db.session.execute(base_sql, {"ta_id": ta_id, "top_k": top_k, "embedding": embedding_str})
-        rows = result.fetchall()
+    rows = results
     
     chunks = []
     for row in rows:
