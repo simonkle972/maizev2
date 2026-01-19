@@ -43,3 +43,8 @@ externalPort = 3000
 deploymentTarget = "autoscale"
 run = ["gunicorn", "--bind=0.0.0.0:5000", "--reuse-port", "--workers=2", "--timeout=120", "app:app"]
 build = ["python", "init_db.py"]
+
+[userenv]
+
+[userenv.shared]
+qa_log_googlesheet = "1ROwrm10eqx-DH9uzdUlV_irziwK_3_iFdtZOErBTVFY"
