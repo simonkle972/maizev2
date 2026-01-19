@@ -51,6 +51,7 @@ maize/
 - `SESSION_SECRET` - Flask session secret
 - `admin_id` - Admin username for login (required)
 - `admin_pw` - Admin password for login (required)
+- `qa_log_googlesheet` - Google Sheet ID for QA logging (optional)
 
 ## How to Use
 1. Go to `/admin` and login with the admin key
@@ -67,6 +68,13 @@ maize/
 - PPTX (lecture slides)
 
 ## Recent Changes
+- QA logging to Google Sheets with timing metrics (Jan 2026)
+  - 14 fields: timestamp, ta_id, ta_slug, ta_name, course_name, session_id, query, answer, sources, chunk_count, latency_ms, retrieval_latency_ms, generation_latency_ms, token_count
+  - Async logging via background threads for non-blocking operation
+- Streaming chat responses with SSE (Jan 2026)
+- Dynamic status indicators during query processing (Jan 2026)
+- Improved LaTeX rendering with delimiter conversion (Jan 2026)
+- Fixed Flask app context issue in streaming endpoint (Jan 2026)
 - Migrated from ChromaDB to PostgreSQL pgvector for persistent vector storage (Jan 2026)
 - Added DocumentChunk model with embeddings stored in PostgreSQL (Jan 2026)
 - Added admin endpoint to reset stuck indexing status (Jan 2026)
