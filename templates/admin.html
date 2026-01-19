@@ -145,7 +145,9 @@
         async function apiCall(url, options = {}) {
             const res = await fetch(url, options);
             if (res.status === 401) {
-                window.location.href = '/admin/login';
+                document.getElementById('ta-list').innerHTML = '<p class="loading">Session expired. Redirecting...</p>';
+                showNotification('Session expired. Redirecting to login...', 'warning');
+                setTimeout(() => { window.location.href = '/admin/login'; }, 1500);
                 throw new Error('Session expired');
             }
             if (!res.ok) {
@@ -396,7 +398,9 @@
                         body: formData
                     });
                     if (res.status === 401) {
-                        window.location.href = '/admin/login';
+                        progressContainer.innerHTML = '<p>Session expired. Redirecting to login...</p>';
+                        showNotification('Session expired. Redirecting to login...', 'warning');
+                        setTimeout(() => { window.location.href = '/admin/login'; }, 1500);
                         return;
                     }
                     const result = await res.json();
@@ -489,9 +493,10 @@
                     }
                 })
                 .catch(err => {
+                    clearInterval(indexingPollInterval);
+                    indexingPollInterval = null;
                     if (err.message === 'Session expired') {
-                        clearInterval(indexingPollInterval);
-                        indexingPollInterval = null;
+                        showNotification('Session expired. Redirecting to login...', 'warning');
                     }
                 });
             }, 3000);
