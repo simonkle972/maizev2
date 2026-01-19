@@ -39,6 +39,7 @@ class Document(db.Model):
     file_type = db.Column(db.String(32), nullable=False)
     file_size = db.Column(db.Integer, nullable=False)
     storage_path = db.Column(db.String(1024), nullable=False)
+    file_content = db.Column(db.LargeBinary, nullable=True)
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
     doc_type = db.Column(db.String(64), nullable=True)
     assignment_number = db.Column(db.String(32), nullable=True)

@@ -242,10 +242,8 @@ def upload_document(ta_id):
     safe_filename = f"{secrets.token_urlsafe(8)}_{original_filename}"
     storage_path = f"data/courses/{ta_id}/docs/{safe_filename}"
     
-    os.makedirs(os.path.dirname(storage_path), exist_ok=True)
-    file.save(storage_path)
-    
-    file_size = os.path.getsize(storage_path)
+    file_content = file.read()
+    file_size = len(file_content)
     
     doc = Document(
         ta_id=ta_id,
@@ -253,7 +251,8 @@ def upload_document(ta_id):
         original_filename=original_filename,
         file_type=file_ext,
         file_size=file_size,
-        storage_path=storage_path
+        storage_path=storage_path,
+        file_content=file_content
     )
     
     db.session.add(doc)

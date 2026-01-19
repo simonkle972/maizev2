@@ -8,6 +8,7 @@ with app.app_context():
         ("teaching_assistants", "indexing_status", "VARCHAR(32)"),
         ("teaching_assistants", "indexing_error", "TEXT"),
         ("teaching_assistants", "indexing_progress", "INTEGER DEFAULT 0"),
+        ("documents", "file_content", "BYTEA"),
     ]
     
     for table, column, col_type in columns_to_add:

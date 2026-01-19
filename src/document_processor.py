@@ -164,17 +164,13 @@ def chunk_text(text: str, chunk_size: int = 512, overlap: int = 50) -> list:
 
 def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
     import chromadb
+    import tempfile
     from openai import OpenAI
     
     from models import db, Document, TeachingAssistant
     from flask import current_app
     
     client = OpenAI(api_key=Config.OPENAI_API_KEY)
-    
-    docs_dir = f"data/courses/{ta_id}/docs"
-    
-    if not os.path.exists(docs_dir):
-        raise ValueError(f"Documents directory not found: {docs_dir}")
     
     chroma_path = os.path.join(Config.CHROMA_DB_PATH, ta_id)
     os.makedirs(chroma_path, exist_ok=True)
@@ -194,6 +190,9 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
     documents = Document.query.filter_by(ta_id=ta_id).all()
     total_docs = len(documents)
     
+    if total_docs == 0:
+        raise ValueError("No documents found for this TA")
+    
     all_chunks = []
     all_embeddings = []
     all_ids = []
@@ -206,7 +205,22 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
             progress = int((doc_idx / total_docs) * 50)
             progress_callback(ta_id, progress)
         
-        text = extract_text_from_file(doc.storage_path)
+        text = None
+        
+        if doc.file_content:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=f".{doc.file_type}") as tmp_file:
+                tmp_file.write(doc.file_content)
+                tmp_path = tmp_file.name
+            try:
+                text = extract_text_from_file(tmp_path)
+            finally:
+                os.unlink(tmp_path)
+        elif os.path.exists(doc.storage_path):
+            text = extract_text_from_file(doc.storage_path)
+        else:
+            logger.warning(f"No file content available for {doc.original_filename} - document needs to be re-uploaded")
+            continue
+        
         if not text:
             logger.warning(f"No text extracted from {doc.original_filename}")
             continue
