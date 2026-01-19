@@ -25,3 +25,6 @@ class Config:
     CHROMA_DB_PATH = "./chroma_db"
     
     METADATA_SCHEMA_VERSION = "1.0"
+    
+    QA_LOG_SHEET_ID = os.getenv("qa_log_googlesheet", "")
+    QA_LOG_TAB_NAME = "qa_logs"

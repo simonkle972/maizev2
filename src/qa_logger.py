@@ -1,0 +1,239 @@
+import os
+import logging
+import threading
+from datetime import datetime, timezone
+from typing import Optional, Dict, Any
+import requests
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+from config import Config
+
+logger = logging.getLogger(__name__)
+
+_connection_settings = None
+_connection_lock = threading.Lock()
+
+QA_LOG_HEADERS = [
+    "timestamp",
+    "ta_id",
+    "ta_slug",
+    "ta_name",
+    "course_name",
+    "session_id",
+    "query",
+    "answer",
+    "sources",
+    "chunk_count",
+    "latency_ms",
+    "retrieval_latency_ms",
+    "generation_latency_ms",
+    "token_count"
+]
+
+def _get_access_token() -> Optional[str]:
+    global _connection_settings
+    
+    with _connection_lock:
+        if (_connection_settings and 
+            _connection_settings.get('settings', {}).get('expires_at') and
+            datetime.fromisoformat(_connection_settings['settings']['expires_at'].replace('Z', '+00:00')) > datetime.now(timezone.utc)):
+            return _connection_settings['settings'].get('access_token')
+    
+    hostname = os.environ.get('REPLIT_CONNECTORS_HOSTNAME')
+    repl_identity = os.environ.get('REPL_IDENTITY')
+    web_repl_renewal = os.environ.get('WEB_REPL_RENEWAL')
+    
+    if repl_identity:
+        x_replit_token = f'repl {repl_identity}'
+    elif web_repl_renewal:
+        x_replit_token = f'depl {web_repl_renewal}'
+    else:
+        logger.warning("No Replit token found for Google Sheets authentication")
+        return None
+    
+    if not hostname:
+        logger.warning("REPLIT_CONNECTORS_HOSTNAME not set")
+        return None
+    
+    try:
+        response = requests.get(
+            f'https://{hostname}/api/v2/connection?include_secrets=true&connector_names=google-sheet',
+            headers={
+                'Accept': 'application/json',
+                'X_REPLIT_TOKEN': x_replit_token
+            },
+            timeout=10
+        )
+        response.raise_for_status()
+        data = response.json()
+        
+        with _connection_lock:
+            _connection_settings = data.get('items', [{}])[0] if data.get('items') else {}
+        
+        settings = _connection_settings.get('settings', {})
+        access_token = settings.get('access_token') or settings.get('oauth', {}).get('credentials', {}).get('access_token')
+        
+        if not access_token:
+            logger.warning("No access token found in Google Sheets connection")
+            return None
+        
+        return access_token
+        
+    except Exception as e:
+        logger.error(f"Failed to get Google Sheets access token: {e}")
+        return None
+
+def _get_sheets_service():
+    access_token = _get_access_token()
+    if not access_token:
+        return None
+    
+    credentials = Credentials(token=access_token)
+    return build('sheets', 'v4', credentials=credentials, cache_discovery=False)
+
+def _ensure_headers_exist(service, spreadsheet_id: str, tab_name: str) -> bool:
+    try:
+        result = service.spreadsheets().values().get(
+            spreadsheetId=spreadsheet_id,
+            range=f'{tab_name}!A1:N1'
+        ).execute()
+        
+        values = result.get('values', [])
+        if not values or values[0] != QA_LOG_HEADERS:
+            service.spreadsheets().values().update(
+                spreadsheetId=spreadsheet_id,
+                range=f'{tab_name}!A1:N1',
+                valueInputOption='RAW',
+                body={'values': [QA_LOG_HEADERS]}
+            ).execute()
+            logger.info(f"Created/updated headers in {tab_name}")
+        
+        return True
+        
+    except Exception as e:
+        if 'Unable to parse range' in str(e) or 'not found' in str(e).lower():
+            try:
+                service.spreadsheets().batchUpdate(
+                    spreadsheetId=spreadsheet_id,
+                    body={
+                        'requests': [{
+                            'addSheet': {
+                                'properties': {'title': tab_name}
+                            }
+                        }]
+                    }
+                ).execute()
+                logger.info(f"Created new tab: {tab_name}")
+                
+                service.spreadsheets().values().update(
+                    spreadsheetId=spreadsheet_id,
+                    range=f'{tab_name}!A1:N1',
+                    valueInputOption='RAW',
+                    body={'values': [QA_LOG_HEADERS]}
+                ).execute()
+                return True
+                
+            except Exception as create_error:
+                logger.error(f"Failed to create tab {tab_name}: {create_error}")
+                return False
+        else:
+            logger.error(f"Failed to check/create headers: {e}")
+            return False
+
+def log_qa_entry(
+    ta_id: str,
+    ta_slug: str,
+    ta_name: str,
+    course_name: str,
+    session_id: str,
+    query: str,
+    answer: str,
+    sources: list,
+    chunk_count: int,
+    latency_ms: int,
+    retrieval_latency_ms: int,
+    generation_latency_ms: int,
+    token_count: int
+) -> bool:
+    if not Config.QA_LOG_SHEET_ID:
+        logger.debug("QA logging disabled - no sheet ID configured")
+        return False
+    
+    def _do_log():
+        try:
+            service = _get_sheets_service()
+            if not service:
+                logger.warning("Could not get Google Sheets service")
+                return
+            
+            if not _ensure_headers_exist(service, Config.QA_LOG_SHEET_ID, Config.QA_LOG_TAB_NAME):
+                return
+            
+            row = [
+                datetime.utcnow().isoformat() + 'Z',
+                str(ta_id),
+                ta_slug,
+                ta_name,
+                course_name,
+                session_id,
+                query[:5000] if query else "",
+                answer[:10000] if answer else "",
+                ", ".join(sources) if sources else "",
+                str(chunk_count),
+                str(latency_ms),
+                str(retrieval_latency_ms),
+                str(generation_latency_ms),
+                str(token_count)
+            ]
+            
+            service.spreadsheets().values().append(
+                spreadsheetId=Config.QA_LOG_SHEET_ID,
+                range=f'{Config.QA_LOG_TAB_NAME}!A:N',
+                valueInputOption='RAW',
+                insertDataOption='INSERT_ROWS',
+                body={'values': [row]}
+            ).execute()
+            
+            logger.info(f"Logged QA entry for query: {query[:50]}...")
+            
+        except Exception as e:
+            logger.error(f"Failed to log QA entry: {e}")
+    
+    thread = threading.Thread(target=_do_log, daemon=True)
+    thread.start()
+    return True
+
+def test_connection() -> Dict[str, Any]:
+    result = {
+        "success": False,
+        "message": "",
+        "sheet_id": Config.QA_LOG_SHEET_ID,
+        "tab_name": Config.QA_LOG_TAB_NAME
+    }
+    
+    if not Config.QA_LOG_SHEET_ID:
+        result["message"] = "No sheet ID configured"
+        return result
+    
+    try:
+        service = _get_sheets_service()
+        if not service:
+            result["message"] = "Could not authenticate with Google Sheets"
+            return result
+        
+        spreadsheet = service.spreadsheets().get(
+            spreadsheetId=Config.QA_LOG_SHEET_ID
+        ).execute()
+        
+        result["success"] = True
+        result["message"] = f"Connected to: {spreadsheet.get('properties', {}).get('title', 'Unknown')}"
+        result["spreadsheet_title"] = spreadsheet.get('properties', {}).get('title')
+        
+        if _ensure_headers_exist(service, Config.QA_LOG_SHEET_ID, Config.QA_LOG_TAB_NAME):
+            result["headers_ready"] = True
+        
+        return result
+        
+    except Exception as e:
+        result["message"] = f"Connection failed: {str(e)}"
+        return result

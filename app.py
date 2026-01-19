@@ -414,6 +414,13 @@ def reset_indexing_status(ta_id):
     
     return jsonify({"success": True, "message": "Indexing status reset"})
 
+@app.route('/admin/api/test-qa-logging', methods=['GET'])
+@admin_api_required
+def test_qa_logging():
+    from src.qa_logger import test_connection
+    result = test_connection()
+    return jsonify(result)
+
 @app.route('/<slug>')
 def ta_chat(slug):
     ta = TeachingAssistant.query.filter_by(slug=slug, is_active=True).first()
@@ -539,10 +546,22 @@ def chat_stream_api(slug):
     db.session.commit()
     
     ta_id = ta.id
+    ta_slug = ta.slug
+    ta_name = ta.name
     ta_system_prompt = ta.system_prompt
     ta_course_name = ta.course_name
     
     def generate():
+        import time
+        from src.qa_logger import log_qa_entry
+        
+        start_time = time.time()
+        retrieval_latency_ms = 0
+        generation_latency_ms = 0
+        chunk_count = 0
+        sources = []
+        full_response = ""
+        
         try:
             from src.retriever import retrieve_context
             from src.response_generator import generate_response_stream
@@ -560,7 +579,10 @@ def chat_stream_api(slug):
                     history_parts.append(f"{role}: {msg.content[:300]}...")
                 history_text = "\n".join(history_parts)
             
+            retrieval_start = time.time()
             chunks = retrieve_context(ta_id, query, top_k=8)
+            retrieval_latency_ms = int((time.time() - retrieval_start) * 1000)
+            chunk_count = len(chunks)
             
             yield f"data: {json.dumps({'type': 'status', 'message': 'Analyzing relevant content...'})}\n\n"
             
@@ -574,7 +596,7 @@ def chat_stream_api(slug):
             
             yield f"data: {json.dumps({'type': 'status', 'message': 'Generating response...'})}\n\n"
             
-            full_response = ""
+            generation_start = time.time()
             for token in generate_response_stream(
                 query=query,
                 context=context,
@@ -584,6 +606,7 @@ def chat_stream_api(slug):
             ):
                 full_response += token
                 yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
+            generation_latency_ms = int((time.time() - generation_start) * 1000)
             
             chat_session_update = ChatSession.query.get(session_id)
             assistant_message = ChatMessage(
@@ -596,6 +619,25 @@ def chat_stream_api(slug):
             if chat_session_update:
                 chat_session_update.last_activity = datetime.utcnow()
             db.session.commit()
+            
+            total_latency_ms = int((time.time() - start_time) * 1000)
+            token_count = len(full_response.split())
+            
+            log_qa_entry(
+                ta_id=str(ta_id),
+                ta_slug=ta_slug,
+                ta_name=ta_name,
+                course_name=ta_course_name,
+                session_id=session_id,
+                query=query,
+                answer=full_response,
+                sources=sources,
+                chunk_count=chunk_count,
+                latency_ms=total_latency_ms,
+                retrieval_latency_ms=retrieval_latency_ms,
+                generation_latency_ms=generation_latency_ms,
+                token_count=token_count
+            )
             
             yield f"data: {json.dumps({'type': 'done', 'session_id': session_id})}\n\n"
             

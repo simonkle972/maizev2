@@ -21,4 +21,6 @@ dependencies = [
     "pandas>=2.0.0",
     "sqlalchemy>=2.0.45",
     "pgvector>=0.4.2",
+    "google-api-python-client>=2.188.0",
+    "google-auth>=2.47.0",
 ]
