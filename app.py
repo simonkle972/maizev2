@@ -403,6 +403,20 @@ def get_indexing_status(ta_id):
         "indexed_at": ta.indexed_at.isoformat() if ta.indexed_at else None
     })
 
+@app.route('/admin/api/tas/<ta_id>/reset-indexing', methods=['POST'])
+@admin_api_required
+def reset_indexing_status(ta_id):
+    ta = TeachingAssistant.query.get(ta_id)
+    if not ta:
+        return jsonify({"error": "TA not found"}), 404
+    
+    ta.indexing_status = None
+    ta.indexing_progress = 0
+    ta.indexing_error = None
+    db.session.commit()
+    
+    return jsonify({"success": True, "message": "Indexing status reset"})
+
 @app.route('/<slug>')
 def ta_chat(slug):
     ta = TeachingAssistant.query.filter_by(slug=slug, is_active=True).first()
