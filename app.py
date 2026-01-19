@@ -3,7 +3,7 @@ import logging
 import secrets
 import threading
 from datetime import datetime
-from flask import Flask, request, jsonify, render_template, session, redirect, url_for, send_from_directory, Response
+from flask import Flask, request, jsonify, render_template, session, redirect, url_for, send_from_directory, Response, stream_with_context
 from config import Config
 from models import db, TeachingAssistant, Document, ChatSession, ChatMessage
 
@@ -538,6 +538,10 @@ def chat_stream_api(slug):
     db.session.add(user_message)
     db.session.commit()
     
+    ta_id = ta.id
+    ta_system_prompt = ta.system_prompt
+    ta_course_name = ta.course_name
+    
     def generate():
         try:
             from src.retriever import retrieve_context
@@ -548,15 +552,6 @@ def chat_stream_api(slug):
             recent_messages = ChatMessage.query.filter_by(session_id=session_id).order_by(ChatMessage.created_at.desc()).limit(10).all()
             conversation_history = list(reversed(recent_messages))
             
-            chunks = retrieve_context(ta.id, query, top_k=8)
-            
-            yield f"data: {json.dumps({'type': 'status', 'message': 'Analyzing relevant content...'})}\n\n"
-            
-            context = "\n\n---\n\n".join([
-                f"[From: {c['file_name']}]\n{c['text']}" 
-                for c in chunks
-            ])
-            
             history_text = ""
             if conversation_history:
                 history_parts = []
@@ -564,6 +559,15 @@ def chat_stream_api(slug):
                     role = "Student" if msg.role == "user" else "Assistant"
                     history_parts.append(f"{role}: {msg.content[:300]}...")
                 history_text = "\n".join(history_parts)
+            
+            chunks = retrieve_context(ta_id, query, top_k=8)
+            
+            yield f"data: {json.dumps({'type': 'status', 'message': 'Analyzing relevant content...'})}\n\n"
+            
+            context = "\n\n---\n\n".join([
+                f"[From: {c['file_name']}]\n{c['text']}" 
+                for c in chunks
+            ])
             
             sources = [c['file_name'] for c in chunks[:3]]
             yield f"data: {json.dumps({'type': 'sources', 'sources': sources})}\n\n"
@@ -574,13 +578,14 @@ def chat_stream_api(slug):
             for token in generate_response_stream(
                 query=query,
                 context=context,
-                system_prompt=ta.system_prompt,
+                system_prompt=ta_system_prompt,
                 conversation_history=history_text,
-                course_name=ta.course_name
+                course_name=ta_course_name
             ):
                 full_response += token
                 yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
             
+            chat_session_update = ChatSession.query.get(session_id)
             assistant_message = ChatMessage(
                 session_id=session_id, 
                 role="assistant", 
@@ -588,17 +593,20 @@ def chat_stream_api(slug):
                 sources=sources
             )
             db.session.add(assistant_message)
-            chat_session.last_activity = datetime.utcnow()
+            if chat_session_update:
+                chat_session_update.last_activity = datetime.utcnow()
             db.session.commit()
             
             yield f"data: {json.dumps({'type': 'done', 'session_id': session_id})}\n\n"
             
         except Exception as e:
             logger.error(f"Streaming chat error for {slug}: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             yield f"data: {json.dumps({'type': 'error', 'message': 'An error occurred processing your question.'})}\n\n"
     
     return Response(
-        generate(),
+        stream_with_context(generate()),
         mimetype='text/event-stream',
         headers={
             'Cache-Control': 'no-cache',
