@@ -32,18 +32,18 @@ maize/
 ## Technology Stack
 - **Backend**: Python 3.11, Flask
 - **Database**: PostgreSQL (via SQLAlchemy)
-- **Vector Store**: ChromaDB (persistent, per-TA collections)
-- **Embeddings**: OpenAI text-embedding-3-small
+- **Vector Store**: PostgreSQL with pgvector extension (persistent, uses ivfflat indexing)
+- **Embeddings**: OpenAI text-embedding-3-small (1536 dimensions)
 - **LLM**: OpenAI GPT-4o
 - **File Parsing**: PyPDF2, python-docx, openpyxl/pandas
 
 ## Key Design Decisions (Lessons from Prior Build)
 1. **One Retrieval Path**: Unified pipeline with parameterized behavior, not multiple conditional code paths
-2. **Pre-retrieval Filtering**: ChromaDB metadata filters applied BEFORE vector search, not after
+2. **Pre-retrieval Filtering**: PostgreSQL metadata filters applied BEFORE vector search, not after
 3. **Full LLM Metadata Extraction**: Consistent approach using GPT-4o for document classification
 4. **Instructional Unit Normalization**: "Lecture 5", "Class 5", "Week 5" all map to unit_number=5
-5. **PostgreSQL for Persistence**: TA configs, documents, sessions all in PostgreSQL
-6. **Per-TA Isolation**: Each TA has separate ChromaDB collection and document folder
+5. **PostgreSQL for Persistence**: TA configs, documents, sessions, AND vector embeddings all in PostgreSQL
+6. **Per-TA Isolation**: Each TA has separate document collection filtered by ta_id
 
 ## Environment Variables
 - `OPENAI_API_KEY` - Required for embeddings and LLM
@@ -67,11 +67,13 @@ maize/
 - PPTX (lecture slides)
 
 ## Recent Changes
+- Migrated from ChromaDB to PostgreSQL pgvector for persistent vector storage (Jan 2026)
+- Added DocumentChunk model with embeddings stored in PostgreSQL (Jan 2026)
+- Added admin endpoint to reset stuck indexing status (Jan 2026)
 - Document content stored in PostgreSQL (file_content column) for persistence across deployments (Jan 2026)
 - Admin panel session expiration handling with user-friendly redirect (Jan 2026)
 - Background indexing with progress tracking (Jan 2026)
 - In-page notification bar replacing browser alerts (Jan 2026)
-- ChromaDB batch size fix for large document collections (Jan 2026)
 - Session-based admin login with username/password (Jan 2026)
 - LaTeX math rendering in chat using KaTeX (Jan 2026)
 - Drag-and-drop multi-file upload in admin panel (Jan 2026)
@@ -79,7 +81,6 @@ maize/
 - Initial MVP build (Jan 2026)
 - Multi-tenant architecture with PostgreSQL
 - LLM-based metadata extraction
-- Pre-retrieval filtering in ChromaDB
 - Session-based conversation history
 
 ## User Preferences
