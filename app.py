@@ -534,6 +534,10 @@ def chat_stream_api(slug):
             db.session.add(chat_session)
             db.session.commit()
     
+    user_message = ChatMessage(session_id=session_id, role="user", content=query)
+    db.session.add(user_message)
+    db.session.commit()
+    
     def generate():
         try:
             from src.retriever import retrieve_context
@@ -577,14 +581,12 @@ def chat_stream_api(slug):
                 full_response += token
                 yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
             
-            user_message = ChatMessage(session_id=session_id, role="user", content=query)
             assistant_message = ChatMessage(
                 session_id=session_id, 
                 role="assistant", 
                 content=full_response,
                 sources=sources
             )
-            db.session.add(user_message)
             db.session.add(assistant_message)
             chat_session.last_activity = datetime.utcnow()
             db.session.commit()
