@@ -20,4 +20,5 @@ dependencies = [
     "openpyxl>=3.1.0",
     "pandas>=2.0.0",
     "sqlalchemy>=2.0.45",
+    "pgvector>=0.4.2",
 ]

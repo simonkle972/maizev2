@@ -1,6 +1,7 @@
 from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
+from pgvector.sqlalchemy import Vector
 
 class Base(DeclarativeBase):
     pass
@@ -67,3 +68,19 @@ class ChatMessage(db.Model):
     content = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     sources = db.Column(db.JSON, nullable=True)
+
+class DocumentChunk(db.Model):
+    __tablename__ = 'document_chunks'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    ta_id = db.Column(db.String(32), db.ForeignKey('teaching_assistants.id'), nullable=False, index=True)
+    document_id = db.Column(db.Integer, db.ForeignKey('documents.id'), nullable=False)
+    chunk_index = db.Column(db.Integer, nullable=False)
+    chunk_text = db.Column(db.Text, nullable=False)
+    doc_type = db.Column(db.String(64), nullable=True)
+    assignment_number = db.Column(db.String(32), nullable=True)
+    instructional_unit_number = db.Column(db.Integer, nullable=True)
+    instructional_unit_label = db.Column(db.String(64), nullable=True)
+    file_name = db.Column(db.String(512), nullable=True)
+    embedding = db.Column(Vector(1536), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)

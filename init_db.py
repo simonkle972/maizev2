@@ -2,6 +2,14 @@ from app import app, db
 from sqlalchemy import text
 
 with app.app_context():
+    try:
+        db.session.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        db.session.commit()
+        print("pgvector extension enabled")
+    except Exception as e:
+        db.session.rollback()
+        print(f"Note: pgvector extension - {e}")
+    
     db.create_all()
     
     columns_to_add = [
@@ -22,5 +30,20 @@ with app.app_context():
                 print(f"Column {column} already exists in {table}")
             else:
                 print(f"Note: {column} - {e}")
+    
+    try:
+        db.session.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_document_chunks_embedding 
+            ON document_chunks USING ivfflat (embedding vector_cosine_ops)
+            WITH (lists = 100)
+        """))
+        db.session.commit()
+        print("Vector index created on document_chunks")
+    except Exception as e:
+        db.session.rollback()
+        if "already exists" in str(e).lower():
+            print("Vector index already exists")
+        else:
+            print(f"Note: vector index - {e}")
     
     print('Database initialized')
