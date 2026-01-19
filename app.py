@@ -120,7 +120,7 @@ def create_ta():
     if not slug:
         return jsonify({"error": "Slug is required"}), 400
     
-    existing = TeachingAssistant.query.filter_by(slug=slug).first()
+    existing = TeachingAssistant.query.filter_by(slug=slug, is_active=True).first()
     if existing:
         return jsonify({"error": "Slug already exists"}), 400
     
@@ -192,7 +192,7 @@ def update_ta(ta_id):
         if not re.match(r'^[a-z0-9-]+$', new_slug):
             return jsonify({"error": "URL path can only contain lowercase letters, numbers, and hyphens"}), 400
         if new_slug != ta.slug:
-            existing = TeachingAssistant.query.filter_by(slug=new_slug).first()
+            existing = TeachingAssistant.query.filter_by(slug=new_slug, is_active=True).first()
             if existing:
                 return jsonify({"error": "This URL path is already in use"}), 400
             ta.slug = new_slug
@@ -225,6 +225,36 @@ def delete_ta(ta_id):
     db.session.delete(ta)
     db.session.commit()
     return jsonify({"success": True})
+
+@app.route('/admin/api/cleanup-slug', methods=['POST'])
+@admin_api_required
+def cleanup_orphaned_slug():
+    """Force-delete any TA with a given slug (including inactive ones)."""
+    data = request.json
+    slug = data.get("slug", "").strip().lower()
+    
+    if not slug:
+        return jsonify({"error": "Slug is required"}), 400
+    
+    tas = TeachingAssistant.query.filter_by(slug=slug).all()
+    if not tas:
+        return jsonify({"error": "No TA found with that slug"}), 404
+    
+    deleted_count = 0
+    for ta in tas:
+        try:
+            chroma_path = os.path.join(Config.CHROMA_DB_PATH, ta.id)
+            if os.path.exists(chroma_path):
+                import shutil
+                shutil.rmtree(chroma_path)
+        except Exception as e:
+            logger.warning(f"Could not delete ChromaDB for {ta.id}: {e}")
+        
+        db.session.delete(ta)
+        deleted_count += 1
+    
+    db.session.commit()
+    return jsonify({"success": True, "deleted_count": deleted_count})
 
 @app.route('/admin/api/tas/<ta_id>/upload', methods=['POST'])
 @admin_api_required
