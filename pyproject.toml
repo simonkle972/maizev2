@@ -23,4 +23,5 @@ dependencies = [
     "pgvector>=0.4.2",
     "google-api-python-client>=2.188.0",
     "google-auth>=2.47.0",
+    "pdfplumber>=0.11.9",
 ]

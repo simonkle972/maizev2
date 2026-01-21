@@ -29,15 +29,45 @@ def extract_text_from_file(file_path: str) -> str:
         return ""
 
 def extract_pdf(file_path: str) -> str:
-    from PyPDF2 import PdfReader
+    text = _extract_pdf_pdfplumber(file_path)
+    if text and len(text.strip()) > 100:
+        return text
     
-    reader = PdfReader(file_path)
-    text_parts = []
-    for page in reader.pages:
-        text = page.extract_text()
-        if text:
-            text_parts.append(text)
-    return "\n\n".join(text_parts)
+    text = _extract_pdf_pypdf2(file_path)
+    if text and len(text.strip()) > 100:
+        return text
+    
+    return ""
+
+def _extract_pdf_pdfplumber(file_path: str) -> str:
+    try:
+        import pdfplumber
+        
+        text_parts = []
+        with pdfplumber.open(file_path) as pdf:
+            for page in pdf.pages:
+                text = page.extract_text()
+                if text:
+                    text_parts.append(text)
+        return "\n\n".join(text_parts)
+    except Exception as e:
+        logger.warning(f"pdfplumber extraction failed: {e}")
+        return ""
+
+def _extract_pdf_pypdf2(file_path: str) -> str:
+    try:
+        from PyPDF2 import PdfReader
+        
+        reader = PdfReader(file_path)
+        text_parts = []
+        for page in reader.pages:
+            text = page.extract_text()
+            if text:
+                text_parts.append(text)
+        return "\n\n".join(text_parts)
+    except Exception as e:
+        logger.warning(f"PyPDF2 extraction failed: {e}")
+        return ""
 
 def extract_docx(file_path: str) -> str:
     from docx import Document
