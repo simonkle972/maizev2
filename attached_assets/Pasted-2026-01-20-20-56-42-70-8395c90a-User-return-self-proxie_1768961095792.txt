@@ -1,0 +1,144 @@
+2026-01-20 20:56:42.70
+8395c90a
+User
+return self._proxied.commit()
+2026-01-20 20:56:42.79
+8395c90a
+User
+File "", line 2, in commit
+2026-01-20 20:56:42.79
+8395c90a
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/state_changes.py", line 137, in _go
+2026-01-20 20:56:42.79
+8395c90a
+User
+trans.commit(_to_root=True)
+2026-01-20 20:56:42.79
+8395c90a
+User
+^^^^^^^^^^^^^^^^^^^^^^
+2026-01-20 20:56:42.79
+8395c90a
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2030, in commit
+2026-01-20 20:56:42.90
+8395c90a
+User
+ret_value = fn(self, *arg, **kw)
+2026-01-20 20:56:42.90
+8395c90a
+User
+^^^^^^^^^^^^^^^^^^^^
+2026-01-20 20:56:42.90
+8395c90a
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 1311, in commit
+2026-01-20 20:56:42.99
+8395c90a
+User
+^^^^^^^^^^^^^^^^^^^^
+2026-01-20 20:56:42.99
+8395c90a
+User
+ret_value = fn(self, *arg, **kw)
+2026-01-20 20:56:42.99
+8395c90a
+User
+self._prepare_impl()
+2026-01-20 20:56:42.99
+8395c90a
+User
+File "", line 2, in _prepare_impl
+2026-01-20 20:56:42.99
+8395c90a
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/state_changes.py", line 137, in _go
+2026-01-20 20:56:42.99
+8395c90a
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 1286, in _prepare_impl
+2026-01-20 20:56:43.09
+8395c90a
+User
+self.session.flush()
+2026-01-20 20:56:43.09
+8395c90a
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 4331, in flush
+2026-01-20 20:56:43.19
+8395c90a
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 4466, in _flush
+2026-01-20 20:56:43.19
+8395c90a
+User
+self._flush(objects)
+2026-01-20 20:56:43.29
+8395c90a
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/util/langhelpers.py", line 224, in __exit__
+2026-01-20 20:56:43.29
+8395c90a
+User
+with util.safe_reraise():
+2026-01-20 20:56:43.39
+8395c90a
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 4427, in _flush
+2026-01-20 20:56:43.39
+8395c90a
+User
+raise exc_value.with_traceback(exc_tb)
+2026-01-20 20:56:43.39
+8395c90a
+User
+flush_context.execute()
+2026-01-20 20:56:43.39
+8395c90a
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/unitofwork.py", line 466, in execute
+2026-01-20 20:56:43.39
+8395c90a
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/persistence.py", line 85, in save_obj
+2026-01-20 20:56:43.39
+8395c90a
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/unitofwork.py", line 642, in execute
+2026-01-20 20:56:43.39
+8395c90a
+User
+util.preloaded.orm_persistence.save_obj(
+2026-01-20 20:56:43.39
+8395c90a
+User
+rec.execute(self)
+2026-01-20 20:56:43.39
+8395c90a
+User
+_emit_update_statements(
+2026-01-20 20:56:43.39
+8395c90a
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/persistence.py", line 912, in _emit_update_statements
+2026-01-20 20:56:43.39
+8395c90a
+User
+^^^^^^^^^^^^^^^^^^^
+2026-01-20 20:56:43.39
+8395c90a
+User
+return meth(
+2026-01-20 20:56:43.39
+8395c90a
+User
+c = connection.execute(
+2026-01-20 20:56:43.39
+8395c90a
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+2026-01-20 20:56:43.41
+8395c90a
+User
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

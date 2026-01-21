@@ -1,10 +1,28 @@
 import os
 import logging
 import json
+import time
 from datetime import datetime
 from config import Config
+from sqlalchemy.exc import OperationalError, DBAPIError
 
 logger = logging.getLogger(__name__)
+
+def db_commit_with_retry(db, max_retries=3, delay=1.0):
+    """Commit database changes with retry logic for connection issues."""
+    for attempt in range(max_retries):
+        try:
+            db.session.commit()
+            return True
+        except (OperationalError, DBAPIError) as e:
+            db.session.rollback()
+            if attempt < max_retries - 1:
+                logger.warning(f"Database commit failed (attempt {attempt + 1}/{max_retries}): {e}")
+                time.sleep(delay * (attempt + 1))
+            else:
+                logger.error(f"Database commit failed after {max_retries} attempts: {e}")
+                raise
+    return False
 
 def extract_text_from_file(file_path: str) -> str:
     ext = file_path.rsplit('.', 1)[-1].lower() if '.' in file_path else ''
@@ -202,7 +220,7 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
     client = OpenAI(api_key=Config.OPENAI_API_KEY)
     
     DocumentChunk.query.filter_by(ta_id=ta_id).delete()
-    db.session.commit()
+    db_commit_with_retry(db)
     logger.info(f"Cleared existing chunks for TA {ta_id}")
     
     documents = Document.query.filter_by(ta_id=ta_id).all()
@@ -248,7 +266,7 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
             doc.instructional_unit_label = metadata.get("instructional_unit_label")
             doc.extraction_metadata = metadata
             doc.metadata_extracted = True
-            db.session.commit()
+            db_commit_with_retry(db)
         
         chunks = chunk_text(text, Config.CHUNK_SIZE, Config.CHUNK_OVERLAP)
         
@@ -316,7 +334,7 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
             )
             db.session.add(chunk_obj)
         
-        db.session.commit()
+        db_commit_with_retry(db)
         logger.info(f"Stored batch {batch_idx + 1}: chunks {i+1}-{batch_end} of {len(all_chunk_data)}")
     
     logger.info(f"Indexed {len(all_chunk_data)} chunks for TA {ta_id} in PostgreSQL")
