@@ -763,6 +763,34 @@ a:hover {
 .input-group {
     display: flex;
     gap: 0.75rem;
+    align-items: flex-end;
+}
+
+.btn-clear {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    background: var(--card-bg);
+    color: var(--text-light);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.btn-clear:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: rgba(247, 181, 0, 0.05);
+}
+
+.btn-clear svg {
+    width: 18px;
+    height: 18px;
 }
 
 #query-input {
