@@ -1,0 +1,144 @@
+2026-01-23 16:15:43.01
+30128245
+User
+result = load_on_ident(
+2026-01-23 16:15:43.01
+30128245
+User
+[parameters: {'pk_1': 476}]
+2026-01-23 16:15:43.01
+30128245
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/loading.py", line 1674, in load_scalar_attributes
+2026-01-23 16:15:43.01
+30128245
+User
+return state._load_expired(state, passive)
+2026-01-23 16:15:43.01
+30128245
+User
+cursor.execute(statement, parameters)
+2026-01-23 16:15:43.01
+30128245
+User
+2026-01-23 21:15:43,016 | ERROR | [eRzHakv4s5nrJFp1] Traceback:
+2026-01-23 16:15:43.01
+30128245
+User
+return connection._execute_clauseelement(
+2026-01-23 16:15:43.01
+30128245
+User
+result = process_and_index_documents(ta_id, progress_callback=update_indexing_progress)
+2026-01-23 16:15:43.01
+30128245
+User
+self.dialect.do_execute(
+2026-01-23 16:15:43.01
+30128245
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/attributes.py", line 1126, in _fire_loader_callables
+2026-01-23 16:15:43.01
+30128245
+User
+return load_on_pk_identity(
+2026-01-23 16:15:43.01
+30128245
+User
+^^^^^^^^^^^^^^^^^^^^
+2026-01-23 16:15:43.01
+30128245
+User
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-23 16:15:43.01
+30128245
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+2026-01-23 16:15:43.01
+30128245
+User
+^^^^^^^^^^^^^^^^^^^^^^
+2026-01-23 16:15:43.01
+30128245
+User
+[SQL: SELECT documents.id AS documents_id, documents.ta_id AS documents_ta_id, documents.filename AS documents_filename, documents.original_filename AS documents_original_filename, documents.file_type AS documents_file_type, documents.file_size AS documents_file_size, documents.storage_path AS documents_storage_path, documents.file_content AS documents_file_content, documents.uploaded_at AS documents_uploaded_at, documents.doc_type AS documents_doc_type, documents.assignment_number AS documents_assignment_number, documents.instructional_unit_number AS documents_instructional_unit_number, documents.instructional_unit_label AS documents_instructional_unit_label, documents.metadata_extracted AS documents_metadata_extracted, documents.extraction_metadata AS documents_extraction_metadata
+2026-01-23 16:15:43.01
+30128245
+User
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-01-23 16:15:43.01
+30128245
+User
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-23 16:15:43.01
+30128245
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+2026-01-23 16:15:43.01
+30128245
+User
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-23 16:15:43.01
+30128245
+User
+File "/home/runner/workspace/src/document_processor.py", line 259, in process_and_index_documents
+2026-01-23 16:15:43.01
+30128245
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2351, in execute
+2026-01-23 16:15:43.01
+30128245
+User
+FROM documents
+2026-01-23 16:15:43.01
+30128245
+User
+value = self._fire_loader_callables(state, key, passive)
+2026-01-23 16:15:43.01
+30128245
+User
+^^^^^^
+2026-01-23 16:15:43.01
+30128245
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/state.py", line 828, in _load_expired
+2026-01-23 16:15:43.01
+30128245
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1641, in _execute_clauseelement
+2026-01-23 16:15:43.01
+30128245
+User
+logger.info(f"[{ta_id}] Processing document [{doc.id}]: {doc.original_filename} ({doc_idx + 1}/{total_docs})")
+2026-01-23 16:15:43.01
+30128245
+User
+^^^^^
+2026-01-23 16:34:59.08
+30128245
+System
+system: received signal terminated
+2026-01-23 16:34:59.08
+30128245
+User
+[2026-01-23 21:34:59 +0000] [24] [INFO] Handling signal: term
+2026-01-23 16:34:59.08
+30128245
+User
+[2026-01-23 21:34:59 +0000] [32] [INFO] Worker exiting (pid: 32)
+2026-01-23 16:34:59.08
+30128245
+User
+[2026-01-23 21:34:59 +0000] [33] [INFO] Worker exiting (pid: 33)
+2026-01-23 16:34:59.58
+30128245
+User
+[2026-01-23 21:34:59 +0000] [24] [INFO] Shutting down: Master
+2026-01-23 16:34:59.61
+30128245
+System
+command finished successfully with exit code 0
+2026-01-23 16:34:59.61
+30128245
+System
+main done, exiting
