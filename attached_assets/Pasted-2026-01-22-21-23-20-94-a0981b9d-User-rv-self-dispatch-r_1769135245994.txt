@@ -1,0 +1,144 @@
+2026-01-22 21:23:20.94
+a0981b9d
+User
+rv = self.dispatch_request()
+2026-01-22 21:23:20.94
+a0981b9d
+User
+psycopg2.errors.ForeignKeyViolation: update or delete on table "documents" violates foreign key constraint "document_chunks_document_id_fkey" on table "document_chunks"
+2026-01-22 21:23:20.94
+a0981b9d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 4427, in _flush
+2026-01-22 21:23:20.94
+a0981b9d
+User
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-22 21:23:20.94
+a0981b9d
+User
+rec.execute(self)
+2026-01-22 21:23:20.94
+a0981b9d
+User
+2026-01-23 02:23:20,935 | ERROR | Exception on /admin/api/tas/9POnVb2Y4t_PYZcn/documents/372 [DELETE]
+2026-01-22 21:23:20.94
+a0981b9d
+User
+Traceback (most recent call last):
+2026-01-22 21:23:20.94
+a0981b9d
+User
+DETAIL: Key (id)=(372) is still referenced from table "document_chunks".
+2026-01-22 21:23:20.94
+a0981b9d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 917, in full_dispatch_request
+2026-01-22 21:23:20.94
+a0981b9d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/scoping.py", line 597, in commit
+2026-01-22 21:23:20.94
+a0981b9d
+User
+Traceback (most recent call last):
+2026-01-22 21:23:20.94
+a0981b9d
+User
+return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args) # type: ignore[no-any-return]
+2026-01-22 21:23:20.94
+a0981b9d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 4466, in _flush
+2026-01-22 21:23:20.94
+a0981b9d
+User
+flush_context.execute()
+2026-01-22 21:23:20.94
+a0981b9d
+User
+ret_value = fn(self, *arg, **kw)
+2026-01-22 21:23:20.94
+a0981b9d
+User
+cursor.execute(statement, parameters)
+2026-01-22 21:23:20.94
+a0981b9d
+User
+response = self.full_dispatch_request()
+2026-01-22 21:23:20.94
+a0981b9d
+User
+^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-22 21:23:20.94
+a0981b9d
+User
+self.session.flush()
+2026-01-22 21:23:20.94
+a0981b9d
+User
+^^^^^^^^^^^^^^^^^^^^^^
+2026-01-22 21:23:20.94
+a0981b9d
+User
+^^^^^^^^^^^^^^^^^^^^
+2026-01-22 21:23:20.94
+a0981b9d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 919, in full_dispatch_request
+2026-01-22 21:23:20.94
+a0981b9d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 1511, in wsgi_app
+2026-01-22 21:23:20.94
+a0981b9d
+User
+self._prepare_impl()
+2026-01-22 21:23:20.94
+a0981b9d
+User
+return f(*args, **kwargs)
+2026-01-22 21:23:20.94
+a0981b9d
+User
+rv = self.handle_user_exception(e)
+2026-01-22 21:23:20.94
+a0981b9d
+User
+^^^^^^^^^^^^^^^^^^
+2026-01-22 21:23:20.94
+a0981b9d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+2026-01-22 21:23:20.94
+a0981b9d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/state_changes.py", line 137, in _go
+2026-01-22 21:23:20.94
+a0981b9d
+User
+^^^^^^^^^^^^^^^^^^^
+2026-01-22 21:23:20.94
+a0981b9d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 902, in dispatch_request
+2026-01-22 21:23:20.94
+a0981b9d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/util/langhelpers.py", line 224, in __exit__
+2026-01-22 21:23:20.94
+a0981b9d
+User
+File "/home/runner/workspace/app.py", line 323, in delete_document
+2026-01-22 21:23:20.94
+a0981b9d
+User
+raise exc_value.with_traceback(exc_tb)
+2026-01-22 21:23:20.94
+a0981b9d
+User
+The above exception was the direct cause of the following exception:
+2026-01-22 21:23:20.94
+a0981b9d
+User
+ret_value = fn(self, *arg, **kw)
