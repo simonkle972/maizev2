@@ -1,0 +1,144 @@
+2026-01-22 22:49:31.00
+8240fafc
+User
+2026-01-23 03:49:31,003 | INFO | HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-01-22 22:49:33.21
+8240fafc
+User
+2026-01-23 03:49:33,210 | INFO | Processing document: Template with Example (Journal Entries, T-Accounts, Trial Balance and Financial Statements).xlsx
+2026-01-22 22:50:05.37
+8240fafc
+User
+/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/openpyxl/worksheet/_reader.py:223: UserWarning: Cell D67 is marked as a date but the serial value 18413890 is outside the limits for dates. The cell will be treated as an error.
+2026-01-22 22:50:05.37
+8240fafc
+User
+warn(msg)
+2026-01-22 22:50:12.10
+8240fafc
+User
+2026-01-23 03:50:12,103 | INFO | HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-01-22 22:50:14.37
+8240fafc
+User
+2026-01-23 03:50:14,373 | INFO | Processing document: Amazon Exercise solutions.pdf
+2026-01-22 22:50:26.10
+8240fafc
+User
+2026-01-23 03:50:26,103 | INFO | HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-01-22 22:50:26.42
+8240fafc
+User
+2026-01-23 03:50:26,427 | INFO | Processing document: Amazon Exercise.pdf
+2026-01-22 22:50:33.90
+8240fafc
+User
+2026-01-23 03:50:33,903 | INFO | HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-01-22 22:50:35.38
+8240fafc
+User
+2026-01-23 03:50:35,387 | INFO | Processing document: Amazon-2019-Excerpt.pdf
+2026-01-22 22:50:58.90
+8240fafc
+User
+2026-01-23 03:50:58,702 | INFO | Processing document: Class 8 In-class SCF assignment solution.xlsx
+2026-01-22 22:51:19.10
+8240fafc
+User
+2026-01-23 03:51:19,102 | INFO | Processing document: Class_3_2025_after_class.pdf
+2026-01-22 22:53:06.76
+8240fafc
+User
+2026-01-23 03:53:06,766 | INFO | Processing document: Class_7_2025_after_class.pdf
+2026-01-22 22:53:33.24
+8240fafc
+User
+2026-01-23 03:53:33,240 | INFO | Processing document: Handout firm shares.pdf
+2026-01-22 22:53:38.45
+8240fafc
+User
+2026-01-23 03:53:38,455 | INFO | Processing document: MGT 402- A Letter from Prison, Eugene Soltes (1) (1).docx
+2026-01-22 22:53:41.56
+8240fafc
+User
+2026-01-23 03:53:41,565 | INFO | Processing document: Self-study_class2_solutions.pdf
+2026-01-22 22:53:44.53
+8240fafc
+User
+2026-01-23 03:53:44,530 | INFO | Processing document: Self-study_class7_solutions.pdf
+2026-01-22 22:53:50.47
+8240fafc
+User
+2026-01-23 03:53:50,475 | INFO | Processing document: Class 1 In-Class exercise solution.pdf
+2026-01-22 22:53:57.46
+8240fafc
+User
+2026-01-23 03:53:57,464 | INFO | Processing document: Class_1_2025_after_class.pdf
+2026-01-22 22:55:06.37
+8240fafc
+User
+2026-01-23 03:55:06,378 | INFO | Processing document: Class_4_2025.pdf
+2026-01-22 22:56:38.40
+8240fafc
+User
+2026-01-23 03:56:38,406 | INFO | Processing document: Class_8_2025_in_class.pdf
+2026-01-22 22:56:50.45
+8240fafc
+User
+2026-01-23 03:56:50,450 | INFO | Processing document: Definitions of common items-1.pdf
+2026-01-22 22:57:02.26
+8240fafc
+User
+2026-01-23 03:57:02,264 | INFO | Processing document: Handout_HowToReadSCF-1.pdf
+2026-01-22 22:57:08.40
+8240fafc
+User
+2026-01-23 03:57:08,401 | INFO | Processing document: MGT402_sample_final_1.pdf
+2026-01-22 22:57:30.50
+8240fafc
+User
+2026-01-23 03:57:30,503 | INFO | HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-01-22 22:57:31.65
+8240fafc
+User
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-01-22 22:57:31.65
+8240fafc
+User
+2026-01-23 03:57:31,650 | WARNING | Database commit failed (attempt 1/3): (psycopg2.OperationalError) SSL connection has been closed unexpectedly
+2026-01-22 22:57:31.65
+8240fafc
+User
+[parameters: {'doc_type': 'other', 'metadata_extracted': True, 'extraction_metadata': '{"doc_type": "other", "assignment_number": null, "instructional_unit_number": null, "instructional_unit_label": null, "course_code": null, "year": null, "is_solutions": false}', 'documents_id': 378}]
+2026-01-22 22:57:31.65
+8240fafc
+User
+[SQL: UPDATE documents SET doc_type=%(doc_type)s, metadata_extracted=%(metadata_extracted)s, extraction_metadata=%(extraction_metadata)s::JSON WHERE documents.id = %(documents_id)s]
+2026-01-22 22:57:31.65
+8240fafc
+User
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-01-22 22:57:31.65
+8240fafc
+User
+[parameters: {'doc_type': 'other', 'metadata_extracted': True, 'extraction_metadata': '{"doc_type": "other", "assignment_number": null, "instructional_unit_number": null, "instructional_unit_label": null, "course_code": null, "year": null, "is_solutions": false}', 'documents_id': 378}]
+2026-01-22 22:57:31.65
+8240fafc
+User
+[SQL: UPDATE documents SET doc_type=%(doc_type)s, metadata_extracted=%(metadata_extracted)s, extraction_metadata=%(extraction_metadata)s::JSON WHERE documents.id = %(documents_id)s]
+2026-01-22 22:57:31.65
+8240fafc
+User
+2026-01-23 03:57:31,650 | WARNING | Database commit failed (attempt 1/3): (psycopg2.OperationalError) SSL connection has been closed unexpectedly
+2026-01-22 22:57:35.40
+8240fafc
+User
+2026-01-23 03:57:35,409 | INFO | Processing document: Class 1 In-Class exercise solution.pdf
+2026-01-22 22:57:39.30
+8240fafc
+User
+2026-01-23 03:57:39,303 | INFO | HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-01-22 22:57:41.36
+8240fafc
+User
+2026-01-23 03:57:41,362 | INFO | Processing document: Class 1 In-Class exercise.pdf

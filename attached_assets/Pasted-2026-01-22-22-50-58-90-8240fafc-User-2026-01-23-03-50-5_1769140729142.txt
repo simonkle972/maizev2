@@ -1,0 +1,144 @@
+2026-01-22 22:50:58.90
+8240fafc
+User
+2026-01-23 03:50:58,702 | INFO | Processing document: Class 8 In-class SCF assignment solution.xlsx
+2026-01-22 22:51:19.10
+8240fafc
+User
+2026-01-23 03:51:19,102 | INFO | Processing document: Class_3_2025_after_class.pdf
+2026-01-22 22:53:06.76
+8240fafc
+User
+2026-01-23 03:53:06,766 | INFO | Processing document: Class_7_2025_after_class.pdf
+2026-01-22 22:53:33.24
+8240fafc
+User
+2026-01-23 03:53:33,240 | INFO | Processing document: Handout firm shares.pdf
+2026-01-22 22:53:38.45
+8240fafc
+User
+2026-01-23 03:53:38,455 | INFO | Processing document: MGT 402- A Letter from Prison, Eugene Soltes (1) (1).docx
+2026-01-22 22:53:41.56
+8240fafc
+User
+2026-01-23 03:53:41,565 | INFO | Processing document: Self-study_class2_solutions.pdf
+2026-01-22 22:53:44.53
+8240fafc
+User
+2026-01-23 03:53:44,530 | INFO | Processing document: Self-study_class7_solutions.pdf
+2026-01-22 22:53:50.47
+8240fafc
+User
+2026-01-23 03:53:50,475 | INFO | Processing document: Class 1 In-Class exercise solution.pdf
+2026-01-22 22:53:57.46
+8240fafc
+User
+2026-01-23 03:53:57,464 | INFO | Processing document: Class_1_2025_after_class.pdf
+2026-01-22 22:55:06.37
+8240fafc
+User
+2026-01-23 03:55:06,378 | INFO | Processing document: Class_4_2025.pdf
+2026-01-22 22:56:38.40
+8240fafc
+User
+2026-01-23 03:56:38,406 | INFO | Processing document: Class_8_2025_in_class.pdf
+2026-01-22 22:56:50.45
+8240fafc
+User
+2026-01-23 03:56:50,450 | INFO | Processing document: Definitions of common items-1.pdf
+2026-01-22 22:57:02.26
+8240fafc
+User
+2026-01-23 03:57:02,264 | INFO | Processing document: Handout_HowToReadSCF-1.pdf
+2026-01-22 22:57:08.40
+8240fafc
+User
+2026-01-23 03:57:08,401 | INFO | Processing document: MGT402_sample_final_1.pdf
+2026-01-22 22:57:30.50
+8240fafc
+User
+2026-01-23 03:57:30,503 | INFO | HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-01-22 22:57:31.65
+8240fafc
+User
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-01-22 22:57:31.65
+8240fafc
+User
+2026-01-23 03:57:31,650 | WARNING | Database commit failed (attempt 1/3): (psycopg2.OperationalError) SSL connection has been closed unexpectedly
+2026-01-22 22:57:31.65
+8240fafc
+User
+[parameters: {'doc_type': 'other', 'metadata_extracted': True, 'extraction_metadata': '{"doc_type": "other", "assignment_number": null, "instructional_unit_number": null, "instructional_unit_label": null, "course_code": null, "year": null, "is_solutions": false}', 'documents_id': 378}]
+2026-01-22 22:57:31.65
+8240fafc
+User
+[SQL: UPDATE documents SET doc_type=%(doc_type)s, metadata_extracted=%(metadata_extracted)s, extraction_metadata=%(extraction_metadata)s::JSON WHERE documents.id = %(documents_id)s]
+2026-01-22 22:57:31.65
+8240fafc
+User
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-01-22 22:57:31.65
+8240fafc
+User
+[parameters: {'doc_type': 'other', 'metadata_extracted': True, 'extraction_metadata': '{"doc_type": "other", "assignment_number": null, "instructional_unit_number": null, "instructional_unit_label": null, "course_code": null, "year": null, "is_solutions": false}', 'documents_id': 378}]
+2026-01-22 22:57:31.65
+8240fafc
+User
+[SQL: UPDATE documents SET doc_type=%(doc_type)s, metadata_extracted=%(metadata_extracted)s, extraction_metadata=%(extraction_metadata)s::JSON WHERE documents.id = %(documents_id)s]
+2026-01-22 22:57:31.65
+8240fafc
+User
+2026-01-23 03:57:31,650 | WARNING | Database commit failed (attempt 1/3): (psycopg2.OperationalError) SSL connection has been closed unexpectedly
+2026-01-22 22:57:35.40
+8240fafc
+User
+2026-01-23 03:57:35,409 | INFO | Processing document: Class 1 In-Class exercise solution.pdf
+2026-01-22 22:57:39.30
+8240fafc
+User
+2026-01-23 03:57:39,303 | INFO | HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-01-22 22:57:41.36
+8240fafc
+User
+2026-01-23 03:57:41,362 | INFO | Processing document: Class 1 In-Class exercise.pdf
+2026-01-22 22:57:56.36
+8240fafc
+User
+2026-01-23 03:57:56,361 | INFO | Processing document: Self-study_class6_solutions.pdf
+2026-01-22 22:57:56.36
+8240fafc
+User
+2026-01-23 03:57:56,361 | INFO | Processing document: Self-study_class6_solutions.pdf
+2026-01-22 22:58:08.57
+8240fafc
+User
+2026-01-23 03:58:08,576 | INFO | Processing document: Class 1 In-Class exercise.pdf
+2026-01-22 22:58:09.60
+8240fafc
+User
+2026-01-23 03:58:09,603 | INFO | HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-01-22 22:58:11.42
+8240fafc
+User
+2026-01-23 03:58:11,428 | INFO | Processing document: Class 4 in-class solutions.pdf
+2026-01-22 22:58:22.50
+8240fafc
+User
+2026-01-23 03:58:22,502 | INFO | HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-01-22 22:58:23.43
+8240fafc
+User
+2026-01-23 03:58:23,430 | INFO | Processing document: Class 5. Grow Co. I.pdf
+2026-01-22 22:58:23.43
+8240fafc
+User
+2026-01-23 03:58:23,430 | INFO | Processing document: Class 5. Grow Co. I.pdf
+2026-01-22 22:58:31.20
+8240fafc
+User
+2026-01-23 03:58:31,203 | INFO | HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-01-22 22:58:32.38
+8240fafc
+User
+2026-01-23 03:58:32,389 | INFO | Processing document: Class 6.Microsoft.pdf
