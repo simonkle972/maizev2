@@ -291,7 +291,9 @@ def upload_document(ta_id):
     )
     
     db.session.add(doc)
-    ta.document_count = ta.documents.count() + 1
+    db.session.flush()
+    
+    ta.document_count = Document.query.filter_by(ta_id=ta_id).count()
     ta.is_indexed = False
     ta.indexing_status = None
     ta.indexing_error = None
