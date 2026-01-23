@@ -1,0 +1,144 @@
+2026-01-22 21:33:45.96
+6877e4ae
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 919, in full_dispatch_request
+2026-01-22 21:33:45.96
+6877e4ae
+User
+Traceback (most recent call last):
+2026-01-22 21:33:45.96
+6877e4ae
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 902, in dispatch_request
+2026-01-22 21:33:45.96
+6877e4ae
+User
+^^^^^^^^^^^^^^^^^^
+2026-01-22 21:33:45.96
+6877e4ae
+User
+2026-01-23 02:33:45,953 | ERROR | Exception on /admin/api/tas/9POnVb2Y4t_PYZcn/documents/372 [DELETE]
+2026-01-22 21:33:45.96
+6877e4ae
+User
+return f(*args, **kwargs)
+2026-01-22 21:33:45.96
+6877e4ae
+User
+rv = self.handle_user_exception(e)
+2026-01-22 21:33:45.96
+6877e4ae
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 917, in full_dispatch_request
+2026-01-22 21:33:45.96
+6877e4ae
+User
+File "/home/runner/workspace/app.py", line 91, in decorated_function
+2026-01-22 21:33:45.96
+6877e4ae
+User
+rv = self.dispatch_request()
+2026-01-22 21:33:45.96
+6877e4ae
+User
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-22 21:33:45.96
+6877e4ae
+User
+^^^^^^^^^^^^^
+2026-01-22 21:33:45.96
+6877e4ae
+User
+NameError: name 'DocumentChunk' is not defined
+2026-01-22 21:33:45.96
+6877e4ae
+User
+^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-22 21:33:45.96
+6877e4ae
+User
+DocumentChunk.query.filter_by(document_id=doc_id).delete()
+2026-01-22 21:33:45.96
+6877e4ae
+User
+rv = self.handle_user_exception(e)
+2026-01-22 21:33:45.96
+6877e4ae
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 917, in full_dispatch_request
+2026-01-22 21:33:45.96
+6877e4ae
+User
+File "/home/runner/workspace/app.py", line 91, in decorated_function
+2026-01-22 21:33:45.96
+6877e4ae
+User
+rv = self.dispatch_request()
+2026-01-22 21:33:45.96
+6877e4ae
+User
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-22 21:33:45.96
+6877e4ae
+User
+^^^^^^^^^^^^^
+2026-01-22 21:33:45.96
+6877e4ae
+User
+NameError: name 'DocumentChunk' is not defined
+2026-01-22 21:33:45.96
+6877e4ae
+User
+^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-22 21:33:45.96
+6877e4ae
+User
+DocumentChunk.query.filter_by(document_id=doc_id).delete()
+2026-01-22 21:33:45.96
+6877e4ae
+User
+return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args) # type: ignore[no-any-return]
+2026-01-22 21:33:45.96
+6877e4ae
+User
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-22 21:33:45.96
+6877e4ae
+User
+File "/home/runner/workspace/app.py", line 318, in delete_document
+2026-01-22 21:33:45.96
+6877e4ae
+User
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-22 21:33:45.96
+6877e4ae
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 1511, in wsgi_app
+2026-01-22 21:33:45.96
+6877e4ae
+User
+response = self.full_dispatch_request()
+2026-01-22 21:33:45.96
+6877e4ae
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 919, in full_dispatch_request
+2026-01-22 21:33:45.96
+6877e4ae
+User
+Traceback (most recent call last):
+2026-01-22 21:33:45.96
+6877e4ae
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 902, in dispatch_request
+2026-01-22 21:33:45.96
+6877e4ae
+User
+^^^^^^^^^^^^^^^^^^
+2026-01-22 21:33:45.96
+6877e4ae
+User
+2026-01-23 02:33:45,953 | ERROR | Exception on /admin/api/tas/9POnVb2Y4t_PYZcn/documents/372 [DELETE]
+2026-01-22 21:33:45.96
+6877e4ae
+User
+return f(*args, **kwargs)
