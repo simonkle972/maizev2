@@ -275,8 +275,15 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
     all_chunk_data = []
     
     for doc_idx, doc in enumerate(documents):
+        doc_id = doc.id
+        
         if not db_refresh_connection(db):
             raise RuntimeError("Database connection lost and could not be recovered")
+        
+        doc = db.session.get(Document, doc_id)
+        if not doc:
+            logger.warning(f"[{ta_id}] Document {doc_id} not found after session refresh, skipping")
+            continue
         
         logger.info(f"[{ta_id}] Processing document [{doc.id}]: {doc.original_filename} ({doc_idx + 1}/{total_docs})")
         
@@ -309,6 +316,11 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
         
         if not db_refresh_connection(db):
             raise RuntimeError("Database connection lost and could not be recovered")
+        
+        doc = db.session.get(Document, doc_id)
+        if not doc:
+            logger.warning(f"[{ta_id}] Document {doc_id} not found after session refresh, skipping")
+            continue
         
         if not doc.metadata_extracted:
             logger.info(f"[{ta_id}] [{doc.id}] Extracting metadata with LLM...")
