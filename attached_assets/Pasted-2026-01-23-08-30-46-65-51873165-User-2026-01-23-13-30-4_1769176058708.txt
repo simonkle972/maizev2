@@ -1,0 +1,64 @@
+2026-01-23 08:30:46.65
+51873165
+User
+2026-01-23 13:30:46,652 | INFO | [eRzHakv4s5nrJFp1] Starting indexing process...
+2026-01-23 08:30:46.70
+51873165
+User
+2026-01-23 13:30:46,704 | INFO | [eRzHakv4s5nrJFp1] Clearing existing chunks...
+2026-01-23 08:30:47.09
+51873165
+User
+2026-01-23 13:30:47,098 | INFO | [eRzHakv4s5nrJFp1] Cleared existing chunks
+2026-01-23 08:30:52.43
+51873165
+User
+2026-01-23 13:30:52,434 | INFO | [eRzHakv4s5nrJFp1] Processing document [478]: Amazon-2019-Excerpt.pdf (1/50)
+2026-01-23 08:30:52.63
+51873165
+User
+2026-01-23 13:30:52,633 | INFO | [eRzHakv4s5nrJFp1] [478] Extracting text...
+2026-01-23 08:38:16.24
+51873165
+User
+2026-01-23 13:38:16,244 | INFO | [eRzHakv4s5nrJFp1] [478] Extracted 184486 chars
+2026-01-23 08:38:16.24
+51873165
+User
+2026-01-23 13:38:16,244 | INFO | [eRzHakv4s5nrJFp1] [478] Extracting metadata with LLM...
+2026-01-23 08:38:42.04
+51873165
+User
+2026-01-23 13:38:42,020 | INFO | HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-01-23 08:38:44.14
+51873165
+User
+2026-01-23 13:38:44,148 | INFO | [eRzHakv4s5nrJFp1] [478] Saving metadata...
+2026-01-23 08:38:44.74
+51873165
+User
+[SQL: UPDATE documents SET doc_type=%(doc_type)s, metadata_extracted=%(metadata_extracted)s, extraction_metadata=%(extraction_metadata)s::JSON WHERE documents.id = %(documents_id)s]
+2026-01-23 08:38:44.74
+51873165
+User
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-01-23 08:38:44.74
+51873165
+User
+2026-01-23 13:38:44,748 | WARNING | Database commit failed (attempt 1/3): (psycopg2.OperationalError) SSL connection has been closed unexpectedly
+2026-01-23 08:38:44.74
+51873165
+User
+[parameters: {'doc_type': 'other', 'metadata_extracted': True, 'extraction_metadata': '{"doc_type": "other", "assignment_number": null, "instructional_unit_number": null, "instructional_unit_label": null, "course_code": null, "year": null, "is_solutions": false}', 'documents_id': 478}]
+2026-01-23 08:38:48.44
+51873165
+User
+2026-01-23 13:38:48,447 | INFO | [eRzHakv4s5nrJFp1] [478] Metadata saved
+2026-01-23 08:38:54.84
+51873165
+User
+2026-01-23 13:38:54,847 | INFO | [eRzHakv4s5nrJFp1] Processing document [496]: Class_11_2025.pdf (2/50)
+2026-01-23 08:38:56.34
+51873165
+User
+2026-01-23 13:38:56,347 | INFO | [eRzHakv4s5nrJFp1] [496] Extracting text...
