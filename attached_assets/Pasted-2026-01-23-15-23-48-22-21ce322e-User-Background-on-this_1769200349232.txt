@@ -1,0 +1,140 @@
+2026-01-23 15:23:48.22
+21ce322e
+User
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-01-23 15:23:48.22
+21ce322e
+User
+2026-01-23 20:23:48,221 | WARNING | Database connection stale, attempting recovery: (psycopg2.OperationalError) SSL connection has been closed unexpectedly
+2026-01-23 15:23:49.42
+21ce322e
+User
+2026-01-23 20:23:49,421 | INFO | Database connection recovered successfully
+2026-01-23 15:23:55.62
+21ce322e
+User
+2026-01-23 20:23:55,523 | INFO | [eRzHakv4s5nrJFp1] [496] Extracting metadata with LLM...
+2026-01-23 15:25:53.19
+21ce322e
+User
+2026-01-23 20:25:53,192 | INFO | HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-01-23 15:25:54.32
+21ce322e
+User
+2026-01-23 20:25:54,323 | INFO | [eRzHakv4s5nrJFp1] [496] Saving metadata...
+2026-01-23 15:26:01.02
+21ce322e
+User
+2026-01-23 20:26:01,021 | INFO | [eRzHakv4s5nrJFp1] [496] Metadata saved
+2026-01-23 15:26:02.02
+21ce322e
+User
+Traceback (most recent call last):
+2026-01-23 15:26:02.02
+21ce322e
+User
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-23 15:26:02.02
+21ce322e
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/attributes.py", line 569, in __get__
+2026-01-23 15:26:02.02
+21ce322e
+User
+return state._load_expired(state, passive)
+2026-01-23 15:26:02.02
+21ce322e
+User
+2026-01-23 20:26:02,025 | ERROR | [eRzHakv4s5nrJFp1] Indexing failed with error: Instance is not bound to a Session; attribute refresh operation cannot proceed (Background on this error at: https://sqlalche.me/e/20/bhk3)
+2026-01-23 15:26:02.02
+21ce322e
+User
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-23 15:26:02.02
+21ce322e
+User
+File "/home/runner/workspace/src/document_processor.py", line 278, in process_and_index_documents
+2026-01-23 15:26:02.02
+21ce322e
+User
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-23 15:26:02.02
+21ce322e
+User
+return self.impl.get(state, dict_) # type: ignore[no-any-return]
+2026-01-23 15:26:02.02
+21ce322e
+User
+raise orm_exc.DetachedInstanceError(
+2026-01-23 15:26:02.02
+21ce322e
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/loading.py", line 1607, in load_scalar_attributes
+2026-01-23 15:26:02.02
+21ce322e
+User
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-23 15:26:02.02
+21ce322e
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/attributes.py", line 1126, in _fire_loader_callables
+2026-01-23 15:26:02.02
+21ce322e
+User
+self.manager.expired_attribute_loader(self, toload, passive)
+2026-01-23 15:26:02.02
+21ce322e
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/attributes.py", line 1096, in get
+2026-01-23 15:26:02.02
+21ce322e
+User
+^^^^^^
+2026-01-23 15:26:02.02
+21ce322e
+User
+doc_id = doc.id
+2026-01-23 15:26:02.02
+21ce322e
+User
+value = self._fire_loader_callables(state, key, passive)
+2026-01-23 15:26:02.02
+21ce322e
+User
+2026-01-23 20:26:02,025 | ERROR | [eRzHakv4s5nrJFp1] Traceback:
+2026-01-23 15:26:02.02
+21ce322e
+User
+File "/home/runner/workspace/app.py", line 365, in run_indexing_task
+2026-01-23 15:26:02.02
+21ce322e
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/state.py", line 828, in _load_expired
+2026-01-23 15:26:02.02
+21ce322e
+User
+sqlalchemy.orm.exc.DetachedInstanceError: Instance is not bound to a Session; attribute refresh operation cannot proceed (Background on this error at: https://sqlalche.me/e/20/bhk3)
+2026-01-23 15:26:02.02
+21ce322e
+User
+result = process_and_index_documents(ta_id, progress_callback=update_indexing_progress)
+2026-01-23 15:26:03.84
+21ce322e
+User
+2026-01-23 20:26:03,844 | INFO | [eRzHakv4s5nrJFp1] Set indexing status to failed
+2026-01-23 15:26:50.36
+21ce322e
+System
+system: received signal terminated
+2026-01-23 15:26:50.36
+21ce322e
+User
+[2026-01-23 20:26:50 +0000] [34] [INFO] Worker exiting (pid: 34)
+2026-01-23 15:26:50.36
+21ce322e
+User
+[2026-01-23 20:26:50 +0000] [33] [INFO] Worker exiting (pid: 33)
+2026-01-23 15:26:50.36
+21ce322e
+User
+[2026-01-23 20:26:50 +0000] [26] [INFO] Handling
