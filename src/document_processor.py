@@ -217,11 +217,14 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
     from models import db, Document, TeachingAssistant, DocumentChunk
     from flask import current_app
     
+    logger.info(f"[{ta_id}] Starting indexing process...")
+    
     client = OpenAI(api_key=Config.OPENAI_API_KEY)
     
+    logger.info(f"[{ta_id}] Clearing existing chunks...")
     DocumentChunk.query.filter_by(ta_id=ta_id).delete()
     db_commit_with_retry(db)
-    logger.info(f"Cleared existing chunks for TA {ta_id}")
+    logger.info(f"[{ta_id}] Cleared existing chunks")
     
     documents = Document.query.filter_by(ta_id=ta_id).all()
     total_docs = len(documents)
@@ -232,7 +235,7 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
     all_chunk_data = []
     
     for doc_idx, doc in enumerate(documents):
-        logger.info(f"Processing document [{doc.id}]: {doc.original_filename} ({doc_idx + 1}/{total_docs})")
+        logger.info(f"[{ta_id}] Processing document [{doc.id}]: {doc.original_filename} ({doc_idx + 1}/{total_docs})")
         
         if progress_callback and total_docs > 0:
             progress = int((doc_idx / total_docs) * 50)
@@ -240,6 +243,7 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
         
         text = None
         
+        logger.info(f"[{ta_id}] [{doc.id}] Extracting text...")
         if doc.file_content:
             with tempfile.NamedTemporaryFile(delete=False, suffix=f".{doc.file_type}") as tmp_file:
                 tmp_file.write(doc.file_content)
@@ -251,14 +255,17 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
         elif os.path.exists(doc.storage_path):
             text = extract_text_from_file(doc.storage_path)
         else:
-            logger.warning(f"No file content available for {doc.original_filename} - document needs to be re-uploaded")
+            logger.warning(f"[{ta_id}] [{doc.id}] No file content available - document needs to be re-uploaded")
             continue
         
         if not text:
-            logger.warning(f"No text extracted from {doc.original_filename}")
+            logger.warning(f"[{ta_id}] [{doc.id}] No text extracted")
             continue
         
+        logger.info(f"[{ta_id}] [{doc.id}] Extracted {len(text)} chars")
+        
         if not doc.metadata_extracted:
+            logger.info(f"[{ta_id}] [{doc.id}] Extracting metadata with LLM...")
             metadata = extract_metadata_with_llm(text, doc.original_filename)
             doc.doc_type = metadata.get("doc_type")
             doc.assignment_number = metadata.get("assignment_number")
@@ -266,7 +273,9 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
             doc.instructional_unit_label = metadata.get("instructional_unit_label")
             doc.extraction_metadata = metadata
             doc.metadata_extracted = True
+            logger.info(f"[{ta_id}] [{doc.id}] Saving metadata...")
             db_commit_with_retry(db)
+            logger.info(f"[{ta_id}] [{doc.id}] Metadata saved")
         
         chunks = chunk_text(text, Config.CHUNK_SIZE, Config.CHUNK_OVERLAP)
         
@@ -286,9 +295,13 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
     if not all_chunk_data:
         raise ValueError("No text content found in any documents")
     
+    logger.info(f"[{ta_id}] Document processing complete. Total chunks to embed: {len(all_chunk_data)}")
+    
     all_embeddings = []
     batch_size = 100
     total_batches = (len(all_chunk_data) + batch_size - 1) // batch_size
+    
+    logger.info(f"[{ta_id}] Starting embedding generation ({total_batches} batches)...")
     
     for batch_idx, i in enumerate(range(0, len(all_chunk_data), batch_size)):
         batch_texts = [c["chunk_text"] for c in all_chunk_data[i:i+batch_size]]
@@ -297,6 +310,7 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
             progress = 50 + int((batch_idx / total_batches) * 40)
             progress_callback(ta_id, progress)
         
+        logger.info(f"[{ta_id}] Embedding batch {batch_idx + 1}/{total_batches}...")
         response = client.embeddings.create(
             model=Config.EMBEDDING_MODEL,
             input=batch_texts
@@ -304,9 +318,12 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
         
         batch_embeddings = [item.embedding for item in response.data]
         all_embeddings.extend(batch_embeddings)
+        logger.info(f"[{ta_id}] Embedded batch {batch_idx + 1}/{total_batches} ({len(all_embeddings)} total)")
     
     if progress_callback:
         progress_callback(ta_id, 90)
+    
+    logger.info(f"[{ta_id}] Embeddings complete. Storing chunks in database...")
     
     db_batch_size = 500
     total_db_batches = (len(all_chunk_data) + db_batch_size - 1) // db_batch_size
@@ -318,6 +335,7 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
             progress = 90 + int((batch_idx / total_db_batches) * 10)
             progress_callback(ta_id, progress)
         
+        logger.info(f"[{ta_id}] Creating chunk objects for batch {batch_idx + 1}/{total_db_batches}...")
         for j in range(i, batch_end):
             chunk_data = all_chunk_data[j]
             chunk_obj = DocumentChunk(
@@ -334,9 +352,10 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
             )
             db.session.add(chunk_obj)
         
+        logger.info(f"[{ta_id}] Committing batch {batch_idx + 1}/{total_db_batches} to database...")
         db_commit_with_retry(db)
-        logger.info(f"Stored batch {batch_idx + 1}: chunks {i+1}-{batch_end} of {len(all_chunk_data)}")
+        logger.info(f"[{ta_id}] Stored batch {batch_idx + 1}/{total_db_batches}: chunks {i+1}-{batch_end} of {len(all_chunk_data)}")
     
-    logger.info(f"Indexed {len(all_chunk_data)} chunks for TA {ta_id} in PostgreSQL")
+    logger.info(f"[{ta_id}] Indexing complete! Total chunks: {len(all_chunk_data)}")
     
     return {"chunks_indexed": len(all_chunk_data)}

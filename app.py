@@ -343,9 +343,14 @@ def update_indexing_progress(ta_id, progress):
 
 def run_indexing_task(ta_id):
     """Background task to run document indexing."""
+    import traceback
+    
     with app.app_context():
+        logger.info(f"[{ta_id}] Background indexing task started")
+        
         ta = TeachingAssistant.query.get(ta_id)
         if not ta:
+            logger.error(f"[{ta_id}] TA not found, aborting indexing")
             return
         
         try:
@@ -354,26 +359,38 @@ def run_indexing_task(ta_id):
             ta.indexing_progress = 0
             ta.is_indexed = False
             db.session.commit()
+            logger.info(f"[{ta_id}] Set status to running, starting document processing...")
             
             from src.document_processor import process_and_index_documents
             result = process_and_index_documents(ta_id, progress_callback=update_indexing_progress)
             
+            db.session.expire_all()
             ta = TeachingAssistant.query.get(ta_id)
             ta.is_indexed = True
             ta.indexed_at = datetime.utcnow()
             ta.indexing_status = 'completed'
             ta.indexing_progress = 100
             db.session.commit()
-            logger.info(f"Indexing completed for {ta_id}: {result.get('chunks_indexed', 0)} chunks")
+            logger.info(f"[{ta_id}] Indexing completed successfully: {result.get('chunks_indexed', 0)} chunks")
             
         except Exception as e:
-            logger.error(f"Indexing failed for {ta_id}: {e}")
-            ta = TeachingAssistant.query.get(ta_id)
-            if ta:
-                ta.indexing_status = 'failed'
-                ta.indexing_error = str(e)
-                ta.is_indexed = False
-                db.session.commit()
+            error_msg = str(e)
+            tb = traceback.format_exc()
+            logger.error(f"[{ta_id}] Indexing failed with error: {error_msg}")
+            logger.error(f"[{ta_id}] Traceback:\n{tb}")
+            
+            try:
+                db.session.rollback()
+                db.session.expire_all()
+                ta = TeachingAssistant.query.get(ta_id)
+                if ta:
+                    ta.indexing_status = 'failed'
+                    ta.indexing_error = error_msg[:500]
+                    ta.is_indexed = False
+                    db.session.commit()
+                    logger.info(f"[{ta_id}] Set indexing status to failed")
+            except Exception as e2:
+                logger.error(f"[{ta_id}] Failed to update status after error: {e2}")
 
 @app.route('/admin/api/tas/<ta_id>/reindex', methods=['POST'])
 @admin_api_required
