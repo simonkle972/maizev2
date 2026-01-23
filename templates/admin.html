@@ -215,7 +215,7 @@
                 
                 let indexingStatusHtml = '';
                 if (ta.indexing_status === 'running') {
-                    indexingStatusHtml = `<div class="indexing-status running"><div class="spinner"></div> Indexing in progress...</div>`;
+                    indexingStatusHtml = `<div class="indexing-status running"><div class="spinner"></div> Indexing in progress... <button onclick="cancelIndexing('${ta.id}')" class="btn btn-secondary btn-sm" style="margin-left: 12px;">Cancel</button></div>`;
                     startIndexingPoll(ta.id);
                 } else if (ta.indexing_status === 'failed') {
                     indexingStatusHtml = `<div class="indexing-status failed">Indexing failed: ${ta.indexing_error || 'Unknown error'}</div>`;
@@ -500,6 +500,29 @@
                     }
                 });
             }, 3000);
+        }
+        
+        async function cancelIndexing(taId) {
+            if (!confirm('Cancel indexing? The TA will remain in its current state.')) return;
+            
+            try {
+                await apiCall('/admin/api/tas/' + taId + '/reset-indexing', {
+                    method: 'POST'
+                });
+                
+                if (indexingPollInterval) {
+                    clearInterval(indexingPollInterval);
+                    indexingPollInterval = null;
+                }
+                
+                showNotification('Indexing cancelled', 'info');
+                showTADetail(taId);
+                loadTAs();
+            } catch (err) {
+                if (err.message !== 'Session expired') {
+                    showNotification('Failed to cancel indexing: ' + err.message, 'error');
+                }
+            }
         }
         
         function deleteTA(taId) {
