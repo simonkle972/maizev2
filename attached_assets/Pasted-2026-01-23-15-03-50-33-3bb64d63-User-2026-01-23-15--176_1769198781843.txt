@@ -1,0 +1,152 @@
+2026-01-23 15:03:50.33
+3bb64d63
+User
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-23 15:03:50.33
+3bb64d63
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/attributes.py", line 1126, in _fire_loader_callables
+2026-01-23 15:03:50.33
+3bb64d63
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/state.py", line 828, in _load_expired
+2026-01-23 15:03:50.33
+3bb64d63
+User
+Traceback (most recent call last):
+2026-01-23 15:03:50.33
+3bb64d63
+User
+2026-01-23 20:03:50,332 | ERROR | [eRzHakv4s5nrJFp1] Indexing failed with error: Instance is not bound to a Session; attribute refresh operation cannot proceed (Background on this error at: https://sqlalche.me/e/20/bhk3)
+2026-01-23 15:03:50.33
+3bb64d63
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/loading.py", line 1607, in load_scalar_attributes
+2026-01-23 15:03:50.33
+3bb64d63
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/attributes.py", line 569, in __get__
+2026-01-23 15:03:50.33
+3bb64d63
+User
+sqlalchemy.orm.exc.DetachedInstanceError: Instance is not bound to a Session; attribute refresh operation cannot proceed (Background on this error at: https://sqlalche.me/e/20/bhk3)
+2026-01-23 15:03:50.33
+3bb64d63
+User
+File "/home/runner/workspace/src/document_processor.py", line 313, in process_and_index_documents
+2026-01-23 15:03:50.33
+3bb64d63
+User
+self.manager.expired_attribute_loader(self, toload, passive)
+2026-01-23 15:03:50.33
+3bb64d63
+User
+return self.impl.get(state, dict_) # type: ignore[no-any-return]
+2026-01-23 15:03:50.33
+3bb64d63
+User
+return state._load_expired(state, passive)
+2026-01-23 15:03:50.33
+3bb64d63
+User
+File "/home/runner/workspace/app.py", line 365, in run_indexing_task
+2026-01-23 15:03:50.33
+3bb64d63
+User
+if not doc.metadata_extracted:
+2026-01-23 15:03:50.33
+3bb64d63
+User
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-23 15:03:50.33
+3bb64d63
+User
+value = self._fire_loader_callables(state, key, passive)
+2026-01-23 15:03:50.33
+3bb64d63
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/attributes.py", line 1096, in get
+2026-01-23 15:03:50.33
+3bb64d63
+User
+^^^^^^^^^^^^^^^^^^^^^^
+2026-01-23 15:03:50.33
+3bb64d63
+User
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-23 15:03:50.33
+3bb64d63
+User
+raise orm_exc.DetachedInstanceError(
+2026-01-23 15:03:50.33
+3bb64d63
+User
+2026-01-23 20:03:50,332 | ERROR | [eRzHakv4s5nrJFp1] Traceback:
+2026-01-23 15:03:50.33
+3bb64d63
+User
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-23 15:03:50.33
+3bb64d63
+User
+result = process_and_index_documents(ta_id, progress_callback=update_indexing_progress)
+2026-01-23 15:03:50.33
+3bb64d63
+User
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-23 15:03:50.33
+3bb64d63
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/attributes.py", line 1126, in _fire_loader_callables
+2026-01-23 15:03:50.33
+3bb64d63
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/state.py", line 828, in _load_expired
+2026-01-23 15:03:50.33
+3bb64d63
+User
+Traceback (most recent call last):
+2026-01-23 15:03:50.33
+3bb64d63
+User
+2026-01-23 20:03:50,332 | ERROR | [eRzHakv4s5nrJFp1] Indexing failed with error: Instance is not bound to a Session; attribute refresh operation cannot proceed (Background on this error at: https://sqlalche.me/e/20/bhk3)
+2026-01-23 15:03:50.33
+3bb64d63
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/loading.py", line 1607, in load_scalar_attributes
+2026-01-23 15:03:50.33
+3bb64d63
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/attributes.py", line 569, in __get__
+2026-01-23 15:03:50.33
+3bb64d63
+User
+sqlalchemy.orm.exc.DetachedInstanceError: Instance is not bound to a Session; attribute refresh operation cannot proceed (Background on this error at: https://sqlalche.me/e/20/bhk3)
+2026-01-23 15:03:50.33
+3bb64d63
+User
+File "/home/runner/workspace/src/document_processor.py", line 313, in process_and_index_documents
+2026-01-23 15:03:50.33
+3bb64d63
+User
+self.manager.expired_attribute_loader(self, toload, passive)
+2026-01-23 15:03:50.33
+3bb64d63
+User
+return self.impl.get(state, dict_) # type: ignore[no-any-return]
+2026-01-23 15:03:50.33
+3bb64d63
+User
+return state._load_expired(state, passive)
+2026-01-23 15:03:50.33
+3bb64d63
+User
+File "/home/runner/workspace/app.py", line 365, in run_indexing_task
+2026-01-23 15:03:50.33
+3bb64d63
+User
+if not doc.metadata_extracted:
+2026-01-23 15:03:52.23
+3bb64d63
+User
+2026-01-23 20:03:52,132 | INFO | [eRzHakv4s5nrJFp1] Set indexing status to failed
