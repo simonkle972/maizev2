@@ -1,0 +1,144 @@
+2026-01-23 18:04:16.57
+45e89a25
+User
+2026-01-23 23:04:16,577 | INFO | [eRzHakv4s5nrJFp1] Embedding batch 10/16...
+2026-01-23 18:04:18.17
+45e89a25
+User
+2026-01-23 23:04:18,164 | INFO | HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2026-01-23 18:04:19.98
+45e89a25
+User
+2026-01-23 23:04:19,988 | INFO | [eRzHakv4s5nrJFp1] Embedded batch 10/16 (1000 total)
+2026-01-23 18:04:20.08
+45e89a25
+User
+2026-01-23 23:04:20,087 | INFO | [eRzHakv4s5nrJFp1] Embedding batch 11/16...
+2026-01-23 18:04:20.47
+45e89a25
+User
+2026-01-23 23:04:20,473 | INFO | HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2026-01-23 18:04:23.37
+45e89a25
+User
+2026-01-23 23:04:23,377 | INFO | [eRzHakv4s5nrJFp1] Embedded batch 11/16 (1100 total)
+2026-01-23 18:04:27.67
+45e89a25
+User
+2026-01-23 23:04:27,677 | INFO | [eRzHakv4s5nrJFp1] Embedding batch 12/16...
+2026-01-23 18:04:30.37
+45e89a25
+User
+2026-01-23 23:04:30,179 | INFO | HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2026-01-23 18:04:34.17
+45e89a25
+User
+2026-01-23 23:04:34,179 | INFO | [eRzHakv4s5nrJFp1] Embedded batch 12/16 (1200 total)
+2026-01-23 18:04:34.97
+45e89a25
+User
+2026-01-23 23:04:34,977 | INFO | [eRzHakv4s5nrJFp1] Embedding batch 13/16...
+2026-01-23 18:04:35.99
+45e89a25
+User
+2026-01-23 23:04:35,995 | INFO | HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2026-01-23 18:04:37.97
+45e89a25
+User
+2026-01-23 23:04:37,979 | INFO | [eRzHakv4s5nrJFp1] Embedded batch 13/16 (1300 total)
+2026-01-23 18:04:38.67
+45e89a25
+User
+2026-01-23 23:04:38,677 | INFO | [eRzHakv4s5nrJFp1] Embedding batch 14/16...
+2026-01-23 18:04:39.99
+45e89a25
+User
+2026-01-23 23:04:39,999 | INFO | HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2026-01-23 18:04:42.67
+45e89a25
+User
+2026-01-23 23:04:42,677 | INFO | [eRzHakv4s5nrJFp1] Embedded batch 14/16 (1400 total)
+2026-01-23 18:04:43.19
+45e89a25
+User
+2026-01-23 23:04:43,197 | INFO | [eRzHakv4s5nrJFp1] Embedding batch 15/16...
+2026-01-23 18:04:44.08
+45e89a25
+User
+2026-01-23 23:04:44,088 | INFO | HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2026-01-23 18:04:46.67
+45e89a25
+User
+2026-01-23 23:04:46,678 | INFO | [eRzHakv4s5nrJFp1] Embedded batch 15/16 (1500 total)
+2026-01-23 18:04:47.17
+45e89a25
+User
+2026-01-23 23:04:47,177 | INFO | [eRzHakv4s5nrJFp1] Embedding batch 16/16...
+2026-01-23 18:04:47.90
+45e89a25
+User
+2026-01-23 23:04:47,909 | INFO | HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2026-01-23 18:04:49.27
+45e89a25
+User
+2026-01-23 23:04:49,278 | INFO | [eRzHakv4s5nrJFp1] Embedded batch 16/16 (1555 total)
+2026-01-23 18:04:49.89
+45e89a25
+User
+2026-01-23 23:04:49,898 | INFO | [eRzHakv4s5nrJFp1] Embeddings complete. Storing chunks in database...
+2026-01-23 18:04:50.27
+45e89a25
+User
+2026-01-23 23:04:50,277 | INFO | [eRzHakv4s5nrJFp1] Creating chunk objects for batch 1/4...
+2026-01-23 18:04:53.07
+45e89a25
+User
+2026-01-23 23:04:53,078 | INFO | [eRzHakv4s5nrJFp1] Committing batch 1/4 to database...
+2026-01-23 18:06:35.99
+45e89a25
+User
+2026-01-23 23:06:35,998 | INFO | [eRzHakv4s5nrJFp1] Stored batch 1/4: chunks 1-500 of 1555
+2026-01-23 18:06:36.47
+45e89a25
+User
+2026-01-23 23:06:36,477 | INFO | [eRzHakv4s5nrJFp1] Creating chunk objects for batch 2/4...
+2026-01-23 18:06:38.77
+45e89a25
+User
+2026-01-23 23:06:38,779 | INFO | [eRzHakv4s5nrJFp1] Committing batch 2/4 to database...
+2026-01-23 18:07:24.07
+45e89a25
+User
+2026-01-23 23:07:24,077 | INFO | [eRzHakv4s5nrJFp1] Stored batch 2/4: chunks 501-1000 of 1555
+2026-01-23 18:07:26.07
+45e89a25
+User
+2026-01-23 23:07:26,077 | INFO | [eRzHakv4s5nrJFp1] Creating chunk objects for batch 3/4...
+2026-01-23 18:07:28.47
+45e89a25
+User
+2026-01-23 23:07:28,479 | INFO | [eRzHakv4s5nrJFp1] Committing batch 3/4 to database...
+2026-01-23 18:08:35.27
+45e89a25
+User
+2026-01-23 23:08:35,277 | INFO | [eRzHakv4s5nrJFp1] Stored batch 3/4: chunks 1001-1500 of 1555
+2026-01-23 18:08:35.69
+45e89a25
+User
+2026-01-23 23:08:35,698 | INFO | [eRzHakv4s5nrJFp1] Creating chunk objects for batch 4/4...
+2026-01-23 18:08:35.87
+45e89a25
+User
+2026-01-23 23:08:35,879 | INFO | [eRzHakv4s5nrJFp1] Committing batch 4/4 to database...
+2026-01-23 18:08:48.07
+45e89a25
+User
+2026-01-23 23:08:48,077 | INFO | [eRzHakv4s5nrJFp1] Indexing complete! Total chunks: 1555
+2026-01-23 18:08:48.07
+45e89a25
+User
+2026-01-23 23:08:48,077 | INFO | [eRzHakv4s5nrJFp1] Stored batch 4/4: chunks 1501-1555 of 1555
+2026-01-23 18:08:52.19
+45e89a25
+User
+2026-01-23 23:08:52,197 | INFO | [eRzHakv4s5nrJFp1] Indexing completed successfully: 1555 chunks

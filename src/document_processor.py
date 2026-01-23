@@ -292,18 +292,17 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
         
         logger.info(f"[{ta_id}] [{doc.id}] Extracted {len(text)} chars")
         
-        if not doc.metadata_extracted:
-            logger.info(f"[{ta_id}] [{doc.id}] Extracting metadata with LLM...")
-            metadata = extract_metadata_with_llm(text, doc.original_filename)
-            doc.doc_type = metadata.get("doc_type")
-            doc.assignment_number = metadata.get("assignment_number")
-            doc.instructional_unit_number = metadata.get("instructional_unit_number")
-            doc.instructional_unit_label = metadata.get("instructional_unit_label")
-            doc.extraction_metadata = metadata
-            doc.metadata_extracted = True
-            logger.info(f"[{ta_id}] [{doc.id}] Saving metadata...")
-            db_commit_with_retry(db)
-            logger.info(f"[{ta_id}] [{doc.id}] Metadata saved")
+        logger.info(f"[{ta_id}] [{doc.id}] Extracting metadata with LLM...")
+        metadata = extract_metadata_with_llm(text, doc.original_filename)
+        doc.doc_type = metadata.get("doc_type")
+        doc.assignment_number = metadata.get("assignment_number")
+        doc.instructional_unit_number = metadata.get("instructional_unit_number")
+        doc.instructional_unit_label = metadata.get("instructional_unit_label")
+        doc.extraction_metadata = metadata
+        doc.metadata_extracted = True
+        logger.info(f"[{ta_id}] [{doc.id}] Saving metadata...")
+        db_commit_with_retry(db)
+        logger.info(f"[{ta_id}] [{doc.id}] Metadata saved")
         
         chunks = chunk_text(text, Config.CHUNK_SIZE, Config.CHUNK_OVERLAP)
         
