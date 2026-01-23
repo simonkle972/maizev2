@@ -318,7 +318,9 @@ def delete_document(ta_id, doc_id):
     DocumentChunk.query.filter_by(document_id=doc_id).delete()
     
     db.session.delete(doc)
-    ta.document_count = max(0, ta.document_count - 1)
+    db.session.flush()
+    
+    ta.document_count = Document.query.filter_by(ta_id=ta_id).count()
     ta.is_indexed = False
     ta.indexing_status = None
     ta.indexing_error = None
