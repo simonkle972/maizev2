@@ -5,7 +5,7 @@ import threading
 from datetime import datetime
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for, send_from_directory, Response, stream_with_context
 from config import Config
-from models import db, TeachingAssistant, Document, ChatSession, ChatMessage
+from models import db, TeachingAssistant, Document, ChatSession, ChatMessage, DocumentChunk
 
 logging.basicConfig(
     level=logging.INFO,
