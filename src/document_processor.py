@@ -19,29 +19,10 @@ def db_commit_with_retry(db, max_retries=3, delay=1.0):
             if attempt < max_retries - 1:
                 logger.warning(f"Database commit failed (attempt {attempt + 1}/{max_retries}): {e}")
                 time.sleep(delay * (attempt + 1))
-                db_refresh_connection(db)
             else:
                 logger.error(f"Database commit failed after {max_retries} attempts: {e}")
                 raise
     return False
-
-def db_refresh_connection(db):
-    """Refresh database connection to prevent stale SSL connections."""
-    from sqlalchemy import text
-    try:
-        db.session.execute(text("SELECT 1"))
-        return True
-    except Exception as e1:
-        logger.warning(f"Database connection stale, attempting recovery: {e1}")
-        try:
-            db.session.rollback()
-            db.session.close()
-            db.session.execute(text("SELECT 1"))
-            logger.info("Database connection recovered successfully")
-            return True
-        except Exception as e2:
-            logger.error(f"Database connection recovery failed: {e2}")
-            return False
 
 def extract_text_from_file(file_path: str) -> str:
     ext = file_path.rsplit('.', 1)[-1].lower() if '.' in file_path else ''
@@ -275,16 +256,6 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
     all_chunk_data = []
     
     for doc_idx, doc in enumerate(documents):
-        doc_id = doc.id
-        
-        if not db_refresh_connection(db):
-            raise RuntimeError("Database connection lost and could not be recovered")
-        
-        doc = db.session.get(Document, doc_id)
-        if not doc:
-            logger.warning(f"[{ta_id}] Document {doc_id} not found after session refresh, skipping")
-            continue
-        
         logger.info(f"[{ta_id}] Processing document [{doc.id}]: {doc.original_filename} ({doc_idx + 1}/{total_docs})")
         
         if progress_callback and total_docs > 0:
@@ -313,14 +284,6 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
             continue
         
         logger.info(f"[{ta_id}] [{doc.id}] Extracted {len(text)} chars")
-        
-        if not db_refresh_connection(db):
-            raise RuntimeError("Database connection lost and could not be recovered")
-        
-        doc = db.session.get(Document, doc_id)
-        if not doc:
-            logger.warning(f"[{ta_id}] Document {doc_id} not found after session refresh, skipping")
-            continue
         
         if not doc.metadata_extracted:
             logger.info(f"[{ta_id}] [{doc.id}] Extracting metadata with LLM...")
@@ -355,9 +318,6 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
     
     logger.info(f"[{ta_id}] Document processing complete. Total chunks to embed: {len(all_chunk_data)}")
     
-    if not db_refresh_connection(db):
-        raise RuntimeError("Database connection lost and could not be recovered")
-    
     all_embeddings = []
     batch_size = 100
     total_batches = (len(all_chunk_data) + batch_size - 1) // batch_size
@@ -380,10 +340,6 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
         batch_embeddings = [item.embedding for item in response.data]
         all_embeddings.extend(batch_embeddings)
         logger.info(f"[{ta_id}] Embedded batch {batch_idx + 1}/{total_batches} ({len(all_embeddings)} total)")
-        
-        if batch_idx % 5 == 4:
-            if not db_refresh_connection(db):
-                raise RuntimeError("Database connection lost and could not be recovered")
     
     if progress_callback:
         progress_callback(ta_id, 90)

@@ -18,11 +18,17 @@ app.secret_key = os.environ.get("SESSION_SECRET") or secrets.token_hex(32)
 
 app.config["SQLALCHEMY_DATABASE_URI"] = Config.DATABASE_URL
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "pool_recycle": 180,
+    "pool_recycle": 600,
     "pool_pre_ping": True,
-    "pool_timeout": 30,
+    "pool_timeout": 60,
     "pool_size": 5,
     "max_overflow": 10,
+    "connect_args": {
+        "keepalives": 1,
+        "keepalives_idle": 30,
+        "keepalives_interval": 10,
+        "keepalives_count": 5,
+    }
 }
 
 db.init_app(app)
