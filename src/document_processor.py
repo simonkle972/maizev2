@@ -232,7 +232,7 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
     all_chunk_data = []
     
     for doc_idx, doc in enumerate(documents):
-        logger.info(f"Processing document: {doc.original_filename}")
+        logger.info(f"Processing document [{doc.id}]: {doc.original_filename} ({doc_idx + 1}/{total_docs})")
         
         if progress_callback and total_docs > 0:
             progress = int((doc_idx / total_docs) * 50)
