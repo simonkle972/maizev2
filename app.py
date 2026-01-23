@@ -315,6 +315,8 @@ def delete_document(ta_id, doc_id):
     
     ta = TeachingAssistant.query.get(ta_id)
     
+    DocumentChunk.query.filter_by(document_id=doc_id).delete()
+    
     db.session.delete(doc)
     ta.document_count = max(0, ta.document_count - 1)
     ta.is_indexed = False
