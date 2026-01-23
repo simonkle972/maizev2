@@ -247,15 +247,22 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
     db_commit_with_retry(db)
     logger.info(f"[{ta_id}] Cleared existing chunks")
     
-    documents = Document.query.filter_by(ta_id=ta_id).all()
-    total_docs = len(documents)
+    doc_ids = [d.id for d in db.session.query(Document.id).filter_by(ta_id=ta_id).all()]
+    total_docs = len(doc_ids)
     
     if total_docs == 0:
         raise ValueError("No documents found for this TA")
     
+    logger.info(f"[{ta_id}] Found {total_docs} documents to process: {doc_ids}")
+    
     all_chunk_data = []
     
-    for doc_idx, doc in enumerate(documents):
+    for doc_idx, doc_id in enumerate(doc_ids):
+        doc = db.session.get(Document, doc_id)
+        if not doc:
+            logger.warning(f"[{ta_id}] Document {doc_id} not found, skipping")
+            continue
+        
         logger.info(f"[{ta_id}] Processing document [{doc.id}]: {doc.original_filename} ({doc_idx + 1}/{total_docs})")
         
         if progress_callback and total_docs > 0:
