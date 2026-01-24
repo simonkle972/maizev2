@@ -38,7 +38,10 @@ QA_LOG_HEADERS = [
     "score_mean",
     "score_spread",
     "chunk_scores",
-    "chunk_sources_detail"
+    "chunk_sources_detail",
+    "rerank_applied",
+    "pre_rerank_scores",
+    "rerank_scores"
 ]
 
 def _get_access_token() -> Optional[str]:
@@ -106,14 +109,14 @@ def _ensure_headers_exist(service, spreadsheet_id: str, tab_name: str) -> bool:
     try:
         result = service.spreadsheets().values().get(
             spreadsheetId=spreadsheet_id,
-            range=f'{tab_name}!A1:Y1'
+            range=f'{tab_name}!A1:AB1'
         ).execute()
         
         values = result.get('values', [])
         if not values or values[0] != QA_LOG_HEADERS:
             service.spreadsheets().values().update(
                 spreadsheetId=spreadsheet_id,
-                range=f'{tab_name}!A1:Y1',
+                range=f'{tab_name}!A1:AB1',
                 valueInputOption='RAW',
                 body={'values': [QA_LOG_HEADERS]}
             ).execute()
@@ -138,7 +141,7 @@ def _ensure_headers_exist(service, spreadsheet_id: str, tab_name: str) -> bool:
                 
                 service.spreadsheets().values().update(
                     spreadsheetId=spreadsheet_id,
-                    range=f'{tab_name}!A1:Y1',
+                    range=f'{tab_name}!A1:AB1',
                     valueInputOption='RAW',
                     body={'values': [QA_LOG_HEADERS]}
                 ).execute()
@@ -210,12 +213,15 @@ def log_qa_entry(
                 str(diag.get("score_mean", "")),
                 str(diag.get("score_spread", "")),
                 json.dumps(diag.get("chunk_scores", [])),
-                json.dumps(diag.get("chunk_sources_detail", []))
+                json.dumps(diag.get("chunk_sources_detail", [])),
+                str(diag.get("rerank_applied", "")),
+                json.dumps(diag.get("pre_rerank_scores", [])),
+                json.dumps(diag.get("rerank_scores", []))
             ]
             
             service.spreadsheets().values().append(
                 spreadsheetId=Config.QA_LOG_SHEET_ID,
-                range=f'{Config.QA_LOG_TAB_NAME}!A:Y',
+                range=f'{Config.QA_LOG_TAB_NAME}!A:AB',
                 valueInputOption='RAW',
                 insertDataOption='INSERT_ROWS',
                 body={'values': [row]}

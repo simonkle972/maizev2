@@ -68,8 +68,15 @@ maize/
 - PPTX (lecture slides)
 
 ## Recent Changes
+- Phase 2 Retrieval Improvement (Jan 2026)
+  - Retrieve more chunks (20) and rerank with LLM to select top 8
+  - Added GPT-4o-based reranker that scores chunk relevance to query
+  - Added content_identifier metadata field for document name recognition (e.g., "Grow Co. I", "Extra Problem Set")
+  - Query analyzer now checks known content_identifiers and applies pre-retrieval filtering
+  - QA logging expanded to 28 columns (A-AB) with rerank metrics: rerank_applied, pre_rerank_scores, rerank_scores
+  - Config: TOP_K_RETRIEVAL=20, TOP_K_RERANK=8
 - Phase 1 Retrieval Observability (Jan 2026)
-  - Added 11 new diagnostic fields to QA logging (now 25 columns total, A-Y)
+  - Added 11 new diagnostic fields to QA logging
   - New fields: total_chunks_in_ta, filters_applied, filter_match_count, retrieval_method, is_conceptual, score_top1, score_top8, score_mean, score_spread, chunk_scores, chunk_sources_detail
   - Both streaming and non-streaming endpoints now log QA entries
   - Enables diagnosis of retrieval issues (precision vs. extraction problems)

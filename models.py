@@ -46,6 +46,7 @@ class Document(db.Model):
     assignment_number = db.Column(db.String(32), nullable=True)
     instructional_unit_number = db.Column(db.Integer, nullable=True)
     instructional_unit_label = db.Column(db.String(64), nullable=True)
+    content_identifier = db.Column(db.String(256), nullable=True)
     metadata_extracted = db.Column(db.Boolean, default=False)
     extraction_metadata = db.Column(db.JSON, nullable=True)
 
@@ -81,6 +82,7 @@ class DocumentChunk(db.Model):
     assignment_number = db.Column(db.String(32), nullable=True)
     instructional_unit_number = db.Column(db.Integer, nullable=True)
     instructional_unit_label = db.Column(db.String(64), nullable=True)
+    content_identifier = db.Column(db.String(256), nullable=True, index=True)
     file_name = db.Column(db.String(512), nullable=True)
     embedding = db.Column(Vector(1536), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
