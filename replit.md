@@ -68,8 +68,12 @@ maize/
 - PPTX (lecture slides)
 
 ## Recent Changes
+- Phase 1 Retrieval Observability (Jan 2026)
+  - Added 11 new diagnostic fields to QA logging (now 25 columns total, A-Y)
+  - New fields: total_chunks_in_ta, filters_applied, filter_match_count, retrieval_method, is_conceptual, score_top1, score_top8, score_mean, score_spread, chunk_scores, chunk_sources_detail
+  - Both streaming and non-streaming endpoints now log QA entries
+  - Enables diagnosis of retrieval issues (precision vs. extraction problems)
 - QA logging to Google Sheets with timing metrics (Jan 2026)
-  - 14 fields: timestamp, ta_id, ta_slug, ta_name, course_name, session_id, query, answer, sources, chunk_count, latency_ms, retrieval_latency_ms, generation_latency_ms, token_count
   - Async logging via background threads for non-blocking operation
 - Streaming chat responses with SSE (Jan 2026)
 - Dynamic status indicators during query processing (Jan 2026)
