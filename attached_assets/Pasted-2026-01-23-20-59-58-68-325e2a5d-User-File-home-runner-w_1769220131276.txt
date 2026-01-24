@@ -1,0 +1,144 @@
+2026-01-23 20:59:58.68
+325e2a5d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1844, in _execute_context
+2026-01-23 20:59:58.68
+325e2a5d
+User
+_emit_insert_statements(
+2026-01-23 20:59:58.68
+325e2a5d
+User
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-23 20:59:58.68
+325e2a5d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 2133, in _exec_insertmany_context
+2026-01-23 20:59:58.68
+325e2a5d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/unitofwork.py", line 642, in execute
+2026-01-23 20:59:58.68
+325e2a5d
+User
+result = process_and_index_documents(ta_id, progress_callback=update_indexing_progress)
+2026-01-23 20:59:58.68
+325e2a5d
+User
+File "", line 2, in commit
+2026-01-23 20:59:58.68
+325e2a5d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+2026-01-23 20:59:58.68
+325e2a5d
+User
+Traceback (most recent call last):
+2026-01-23 20:59:58.68
+325e2a5d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/scoping.py", line 597, in commit
+2026-01-23 20:59:58.68
+325e2a5d
+User
+util.preloaded.orm_persistence.save_obj(
+2026-01-23 20:59:58.68
+325e2a5d
+User
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-23 20:59:58.68
+325e2a5d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/unitofwork.py", line 466, in execute
+2026-01-23 20:59:58.68
+325e2a5d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 4466, in _flush
+2026-01-23 20:59:58.68
+325e2a5d
+User
+db_commit_with_retry(db)
+2026-01-23 20:59:58.68
+325e2a5d
+User
+^^^^^^^^^^^^^^^^^^^
+2026-01-23 20:59:58.68
+325e2a5d
+User
+2026-01-24 01:59:58,686 | ERROR | [OoeOAnYRYEpNilLk] Traceback:
+2026-01-23 20:59:58.68
+325e2a5d
+User
+File "/home/runner/workspace/src/document_processor.py", line 15, in db_commit_with_retry
+2026-01-23 20:59:58.68
+325e2a5d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/sql/elements.py", line 527, in _execute_on_connection
+2026-01-23 20:59:58.68
+325e2a5d
+User
+raise exc_value.with_traceback(exc_tb)
+2026-01-23 20:59:58.68
+325e2a5d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 2125, in _exec_insertmany_context
+2026-01-23 20:59:58.68
+325e2a5d
+User
+^^^^^^^^^^^^^^^^^^^^^^
+2026-01-23 20:59:58.68
+325e2a5d
+User
+return self._exec_insertmany_context(dialect, context)
+2026-01-23 20:59:58.68
+325e2a5d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/state_changes.py", line 137, in _go
+2026-01-23 20:59:58.68
+325e2a5d
+User
+flush_context.execute()
+2026-01-23 20:59:58.68
+325e2a5d
+User
+self._prepare_impl()
+2026-01-23 20:59:58.68
+325e2a5d
+User
+ret_value = fn(self, *arg, **kw)
+2026-01-23 20:59:58.68
+325e2a5d
+User
+File "/home/runner/workspace/src/document_processor.py", line 383, in process_and_index_documents
+2026-01-23 20:59:58.68
+325e2a5d
+User
+2026-01-24 01:59:58,686 | ERROR | [OoeOAnYRYEpNilLk] Indexing failed with error: A string literal cannot contain NUL (0x00) characters.
+2026-01-23 20:59:58.68
+325e2a5d
+User
+return self._proxied.commit()
+2026-01-23 20:59:58.68
+325e2a5d
+User
+^^^^^^^^^^^^^^^^^^^^
+2026-01-23 20:59:58.68
+325e2a5d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/util/langhelpers.py", line 224, in __exit__
+2026-01-23 20:59:58.68
+325e2a5d
+User
+return connection._execute_clauseelement(
+2026-01-23 20:59:58.68
+325e2a5d
+User
+db.session.commit()
+2026-01-23 20:59:58.68
+325e2a5d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 4331, in flush
+2026-01-23 20:59:58.68
+325e2a5d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/persistence.py", line 93, in save_obj
