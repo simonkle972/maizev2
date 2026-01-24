@@ -79,15 +79,40 @@ def analyze_query(query: str) -> dict:
     
     return analysis
 
-def retrieve_context(ta_id: str, query: str, top_k: int = 8) -> list:
+def retrieve_context(ta_id: str, query: str, top_k: int = 8) -> tuple:
+    """
+    Retrieve relevant chunks for a query.
+    
+    Returns:
+        tuple: (chunks, diagnostics)
+            - chunks: list of chunk dicts with text, score, file_name, etc.
+            - diagnostics: dict with retrieval metrics for logging
+    """
     from models import db, DocumentChunk
     from sqlalchemy import func, literal
     from pgvector.sqlalchemy import Vector
+    import json
     
-    chunk_count = DocumentChunk.query.filter_by(ta_id=ta_id).count()
-    if chunk_count == 0:
+    diagnostics = {
+        "total_chunks_in_ta": 0,
+        "filters_applied": None,
+        "filter_match_count": 0,
+        "retrieval_method": "unfiltered",
+        "is_conceptual": False,
+        "score_top1": 0.0,
+        "score_top8": 0.0,
+        "score_mean": 0.0,
+        "score_spread": 0.0,
+        "chunk_scores": [],
+        "chunk_sources_detail": []
+    }
+    
+    total_chunks = DocumentChunk.query.filter_by(ta_id=ta_id).count()
+    diagnostics["total_chunks_in_ta"] = total_chunks
+    
+    if total_chunks == 0:
         logger.warning(f"No indexed chunks found for TA: {ta_id}")
-        return []
+        return [], diagnostics
     
     client = get_openai_client()
     
@@ -98,6 +123,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8) -> list:
     query_embedding = response.data[0].embedding
     
     query_analysis = analyze_query(query)
+    diagnostics["is_conceptual"] = query_analysis.get("is_conceptual", False)
     
     base_query = db.session.query(
         DocumentChunk.chunk_text,
@@ -111,6 +137,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8) -> list:
     
     filtered_query = base_query
     has_filters = False
+    filter_description = []
     
     if query_analysis["doc_type_filter"] and query_analysis["assignment_filter"]:
         filtered_query = base_query.filter(
@@ -118,41 +145,67 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8) -> list:
             DocumentChunk.assignment_number == query_analysis["assignment_filter"]
         )
         has_filters = True
+        filter_description = [f"doc_type={query_analysis['doc_type_filter']}", f"assignment={query_analysis['assignment_filter']}"]
     elif query_analysis["doc_type_filter"] and query_analysis["unit_filter"]:
         filtered_query = base_query.filter(
             DocumentChunk.doc_type == query_analysis["doc_type_filter"],
             DocumentChunk.instructional_unit_number == query_analysis["unit_filter"]
         )
         has_filters = True
+        filter_description = [f"doc_type={query_analysis['doc_type_filter']}", f"unit={query_analysis['unit_filter']}"]
     elif query_analysis["doc_type_filter"]:
         filtered_query = base_query.filter(
             DocumentChunk.doc_type == query_analysis["doc_type_filter"]
         )
         has_filters = True
+        filter_description = [f"doc_type={query_analysis['doc_type_filter']}"]
     
+    if has_filters:
+        diagnostics["filters_applied"] = ", ".join(filter_description)
+        filter_match_count = filtered_query.count()
+        diagnostics["filter_match_count"] = filter_match_count
+        logger.info(f"[{ta_id}] Filters applied: {diagnostics['filters_applied']}, matching chunks: {filter_match_count}")
+    
+    used_fallback = False
     try:
         results = filtered_query.order_by(
             DocumentChunk.embedding.cosine_distance(query_embedding)
         ).limit(top_k).all()
         
         if not results and has_filters:
-            logger.info("No results with filter, falling back to unfiltered search")
+            logger.info(f"[{ta_id}] No results with filter, falling back to unfiltered search")
             results = base_query.order_by(
                 DocumentChunk.embedding.cosine_distance(query_embedding)
             ).limit(top_k).all()
+            used_fallback = True
     except Exception as e:
         logger.error(f"Vector search failed: {e}")
         results = base_query.order_by(
             DocumentChunk.embedding.cosine_distance(query_embedding)
         ).limit(top_k).all()
+        used_fallback = True
     
-    rows = results
+    if has_filters and not used_fallback:
+        diagnostics["retrieval_method"] = "filtered"
+    elif has_filters and used_fallback:
+        diagnostics["retrieval_method"] = "fallback_unfiltered"
+    else:
+        diagnostics["retrieval_method"] = "unfiltered"
     
     chunks = []
-    for row in rows:
+    scores = []
+    sources_detail = []
+    
+    for i, row in enumerate(results):
+        score = float(row.score) if row.score else 0.0
+        scores.append(score)
+        
+        source_info = f"{row.file_name}|{row.doc_type or 'unknown'}|unit:{row.instructional_unit_number or 'N/A'}"
+        sources_detail.append(source_info)
+        
         chunks.append({
             "text": row.chunk_text,
-            "score": float(row.score) if row.score else 0.0,
+            "score": score,
             "file_name": row.file_name or "unknown",
             "doc_type": row.doc_type or "other",
             "metadata": {
@@ -162,6 +215,14 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8) -> list:
             }
         })
     
-    logger.info(f"Retrieved {len(chunks)} chunks for query: {query[:50]}...")
+    if scores:
+        diagnostics["score_top1"] = round(scores[0], 4) if len(scores) > 0 else 0.0
+        diagnostics["score_top8"] = round(scores[-1], 4) if len(scores) >= top_k else round(scores[-1], 4) if scores else 0.0
+        diagnostics["score_mean"] = round(sum(scores) / len(scores), 4)
+        diagnostics["score_spread"] = round(scores[0] - scores[-1], 4) if len(scores) > 1 else 0.0
+        diagnostics["chunk_scores"] = [round(s, 4) for s in scores]
+        diagnostics["chunk_sources_detail"] = sources_detail
     
-    return chunks
+    logger.info(f"[{ta_id}] Retrieved {len(chunks)} chunks | method={diagnostics['retrieval_method']} | scores: top1={diagnostics['score_top1']}, top8={diagnostics['score_top8']}, spread={diagnostics['score_spread']}")
+    
+    return chunks, diagnostics

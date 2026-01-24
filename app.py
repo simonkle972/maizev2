@@ -491,13 +491,19 @@ def chat_api(slug):
             db.session.commit()
     
     try:
+        import time
         from src.retriever import retrieve_context
         from src.response_generator import generate_response
+        from src.qa_logger import log_qa_entry
+        
+        start_time = time.time()
         
         recent_messages = ChatMessage.query.filter_by(session_id=session_id).order_by(ChatMessage.created_at.desc()).limit(10).all()
         conversation_history = list(reversed(recent_messages))
         
-        chunks = retrieve_context(ta.id, query, top_k=8)
+        retrieval_start = time.time()
+        chunks, retrieval_diagnostics = retrieve_context(ta.id, query, top_k=8)
+        retrieval_latency_ms = int((time.time() - retrieval_start) * 1000)
         
         context = "\n\n---\n\n".join([
             f"[From: {c['file_name']}]\n{c['text']}" 
@@ -512,6 +518,7 @@ def chat_api(slug):
                 history_parts.append(f"{role}: {msg.content[:300]}...")
             history_text = "\n".join(history_parts)
         
+        generation_start = time.time()
         response_text = generate_response(
             query=query,
             context=context,
@@ -519,23 +526,45 @@ def chat_api(slug):
             conversation_history=history_text,
             course_name=ta.course_name
         )
+        generation_latency_ms = int((time.time() - generation_start) * 1000)
         
         user_message = ChatMessage(session_id=session_id, role="user", content=query)
+        sources = [c['file_name'] for c in chunks[:3]]
         assistant_message = ChatMessage(
             session_id=session_id, 
             role="assistant", 
             content=response_text,
-            sources=[c['file_name'] for c in chunks[:3]]
+            sources=sources
         )
         db.session.add(user_message)
         db.session.add(assistant_message)
         chat_session.last_activity = datetime.utcnow()
         db.session.commit()
         
+        total_latency_ms = int((time.time() - start_time) * 1000)
+        token_count = len(response_text.split())
+        
+        log_qa_entry(
+            ta_id=str(ta.id),
+            ta_slug=ta.slug,
+            ta_name=ta.name,
+            course_name=ta.course_name,
+            session_id=session_id,
+            query=query,
+            answer=response_text,
+            sources=sources,
+            chunk_count=len(chunks),
+            latency_ms=total_latency_ms,
+            retrieval_latency_ms=retrieval_latency_ms,
+            generation_latency_ms=generation_latency_ms,
+            token_count=token_count,
+            retrieval_diagnostics=retrieval_diagnostics
+        )
+        
         return jsonify({
             "response": response_text,
             "session_id": session_id,
-            "sources": [c['file_name'] for c in chunks[:3]]
+            "sources": sources
         })
         
     except Exception as e:
@@ -612,7 +641,7 @@ def chat_stream_api(slug):
                 history_text = "\n".join(history_parts)
             
             retrieval_start = time.time()
-            chunks = retrieve_context(ta_id, query, top_k=8)
+            chunks, retrieval_diagnostics = retrieve_context(ta_id, query, top_k=8)
             retrieval_latency_ms = int((time.time() - retrieval_start) * 1000)
             chunk_count = len(chunks)
             
@@ -668,7 +697,8 @@ def chat_stream_api(slug):
                 latency_ms=total_latency_ms,
                 retrieval_latency_ms=retrieval_latency_ms,
                 generation_latency_ms=generation_latency_ms,
-                token_count=token_count
+                token_count=token_count,
+                retrieval_diagnostics=retrieval_diagnostics
             )
             
             yield f"data: {json.dumps({'type': 'done', 'session_id': session_id})}\n\n"

@@ -27,7 +27,18 @@ QA_LOG_HEADERS = [
     "latency_ms",
     "retrieval_latency_ms",
     "generation_latency_ms",
-    "token_count"
+    "token_count",
+    "total_chunks_in_ta",
+    "filters_applied",
+    "filter_match_count",
+    "retrieval_method",
+    "is_conceptual",
+    "score_top1",
+    "score_top8",
+    "score_mean",
+    "score_spread",
+    "chunk_scores",
+    "chunk_sources_detail"
 ]
 
 def _get_access_token() -> Optional[str]:
@@ -95,14 +106,14 @@ def _ensure_headers_exist(service, spreadsheet_id: str, tab_name: str) -> bool:
     try:
         result = service.spreadsheets().values().get(
             spreadsheetId=spreadsheet_id,
-            range=f'{tab_name}!A1:N1'
+            range=f'{tab_name}!A1:Y1'
         ).execute()
         
         values = result.get('values', [])
         if not values or values[0] != QA_LOG_HEADERS:
             service.spreadsheets().values().update(
                 spreadsheetId=spreadsheet_id,
-                range=f'{tab_name}!A1:N1',
+                range=f'{tab_name}!A1:Y1',
                 valueInputOption='RAW',
                 body={'values': [QA_LOG_HEADERS]}
             ).execute()
@@ -127,7 +138,7 @@ def _ensure_headers_exist(service, spreadsheet_id: str, tab_name: str) -> bool:
                 
                 service.spreadsheets().values().update(
                     spreadsheetId=spreadsheet_id,
-                    range=f'{tab_name}!A1:N1',
+                    range=f'{tab_name}!A1:Y1',
                     valueInputOption='RAW',
                     body={'values': [QA_LOG_HEADERS]}
                 ).execute()
@@ -153,11 +164,14 @@ def log_qa_entry(
     latency_ms: int,
     retrieval_latency_ms: int,
     generation_latency_ms: int,
-    token_count: int
+    token_count: int,
+    retrieval_diagnostics: Optional[Dict[str, Any]] = None
 ) -> bool:
     if not Config.QA_LOG_SHEET_ID:
         logger.debug("QA logging disabled - no sheet ID configured")
         return False
+    
+    diag = retrieval_diagnostics or {}
     
     def _do_log():
         try:
@@ -168,6 +182,8 @@ def log_qa_entry(
             
             if not _ensure_headers_exist(service, Config.QA_LOG_SHEET_ID, Config.QA_LOG_TAB_NAME):
                 return
+            
+            import json
             
             row = [
                 datetime.utcnow().isoformat() + 'Z',
@@ -183,12 +199,23 @@ def log_qa_entry(
                 str(latency_ms),
                 str(retrieval_latency_ms),
                 str(generation_latency_ms),
-                str(token_count)
+                str(token_count),
+                str(diag.get("total_chunks_in_ta", "")),
+                diag.get("filters_applied") or "",
+                str(diag.get("filter_match_count", "")),
+                diag.get("retrieval_method", ""),
+                str(diag.get("is_conceptual", "")),
+                str(diag.get("score_top1", "")),
+                str(diag.get("score_top8", "")),
+                str(diag.get("score_mean", "")),
+                str(diag.get("score_spread", "")),
+                json.dumps(diag.get("chunk_scores", [])),
+                json.dumps(diag.get("chunk_sources_detail", []))
             ]
             
             service.spreadsheets().values().append(
                 spreadsheetId=Config.QA_LOG_SHEET_ID,
-                range=f'{Config.QA_LOG_TAB_NAME}!A:N',
+                range=f'{Config.QA_LOG_TAB_NAME}!A:Y',
                 valueInputOption='RAW',
                 insertDataOption='INSERT_ROWS',
                 body={'values': [row]}
