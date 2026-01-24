@@ -24,24 +24,34 @@ def db_commit_with_retry(db, max_retries=3, delay=1.0):
                 raise
     return False
 
+def sanitize_text(text: str) -> str:
+    """Remove null bytes and other problematic characters that PostgreSQL cannot store."""
+    if not text:
+        return ""
+    text = text.replace('\x00', '')
+    text = ''.join(char for char in text if ord(char) >= 32 or char in '\n\r\t')
+    return text
+
 def extract_text_from_file(file_path: str) -> str:
     ext = file_path.rsplit('.', 1)[-1].lower() if '.' in file_path else ''
     
     try:
         if ext == 'pdf':
-            return extract_pdf(file_path)
+            text = extract_pdf(file_path)
         elif ext in ('docx', 'doc'):
-            return extract_docx(file_path)
+            text = extract_docx(file_path)
         elif ext in ('xlsx', 'xls'):
-            return extract_excel(file_path)
+            text = extract_excel(file_path)
         elif ext == 'txt':
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                return f.read()
+                text = f.read()
         elif ext in ('pptx', 'ppt'):
-            return extract_pptx(file_path)
+            text = extract_pptx(file_path)
         else:
             logger.warning(f"Unsupported file type: {ext}")
             return ""
+        
+        return sanitize_text(text)
     except Exception as e:
         logger.error(f"Error extracting text from {file_path}: {e}")
         return ""
@@ -369,7 +379,7 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
                 ta_id=chunk_data["ta_id"],
                 document_id=chunk_data["document_id"],
                 chunk_index=chunk_data["chunk_index"],
-                chunk_text=chunk_data["chunk_text"],
+                chunk_text=sanitize_text(chunk_data["chunk_text"]),
                 doc_type=chunk_data["doc_type"],
                 assignment_number=chunk_data["assignment_number"],
                 instructional_unit_number=chunk_data["instructional_unit_number"],
