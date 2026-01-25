@@ -45,7 +45,8 @@ QA_LOG_HEADERS = [
     "llm_score_top1",
     "llm_score_top8",
     "vector_score_top1",
-    "top_reasons"
+    "top_reasons",
+    "pre_rerank_candidates"
 ]
 
 def _get_access_token() -> Optional[str]:
@@ -113,14 +114,14 @@ def _ensure_headers_exist(service, spreadsheet_id: str, tab_name: str) -> bool:
     try:
         result = service.spreadsheets().values().get(
             spreadsheetId=spreadsheet_id,
-            range=f'{tab_name}!A1:AF1'
+            range=f'{tab_name}!A1:AG1'
         ).execute()
         
         values = result.get('values', [])
         if not values or values[0] != QA_LOG_HEADERS:
             service.spreadsheets().values().update(
                 spreadsheetId=spreadsheet_id,
-                range=f'{tab_name}!A1:AF1',
+                range=f'{tab_name}!A1:AG1',
                 valueInputOption='RAW',
                 body={'values': [QA_LOG_HEADERS]}
             ).execute()
@@ -145,7 +146,7 @@ def _ensure_headers_exist(service, spreadsheet_id: str, tab_name: str) -> bool:
                 
                 service.spreadsheets().values().update(
                     spreadsheetId=spreadsheet_id,
-                    range=f'{tab_name}!A1:AF1',
+                    range=f'{tab_name}!A1:AG1',
                     valueInputOption='RAW',
                     body={'values': [QA_LOG_HEADERS]}
                 ).execute()
@@ -194,6 +195,9 @@ def log_qa_entry(
             
             rerank_info = diag.get("rerank_info", {})
             
+            pre_rerank = diag.get("pre_rerank_candidates", [])
+            pre_rerank_str = json.dumps(pre_rerank) if pre_rerank else "[]"
+            
             row = [
                 datetime.utcnow().isoformat() + 'Z',
                 str(ta_id),
@@ -226,7 +230,8 @@ def log_qa_entry(
                 str(rerank_info.get("llm_score_top1", "")),
                 str(rerank_info.get("llm_score_top8", "")),
                 str(rerank_info.get("vector_score_top1", "")),
-                json.dumps(rerank_info.get("top_reasons", []))
+                json.dumps(rerank_info.get("top_reasons", [])),
+                pre_rerank_str[:30000]
             ]
             
             service.spreadsheets().values().append(

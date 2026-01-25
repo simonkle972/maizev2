@@ -451,6 +451,17 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8) -> tuple:
             }
         })
     
+    pre_rerank_candidates = []
+    for i, chunk in enumerate(initial_chunks):
+        text_preview = chunk["text"][:200].replace("\n", " ").replace("\t", " ").strip()
+        pre_rerank_candidates.append({
+            "idx": i,
+            "file": chunk["file_name"],
+            "score": round(chunk["score"], 4),
+            "text": text_preview
+        })
+    diagnostics["pre_rerank_candidates"] = pre_rerank_candidates
+    
     chunks, rerank_info = llm_rerank(query, initial_chunks, top_k=final_k)
     diagnostics["rerank_applied"] = rerank_info.get("reranked", False)
     diagnostics["rerank_info"] = rerank_info
