@@ -1,0 +1,121 @@
+timestamp,ta_id,ta_slug,ta_name,course_name,session_id,query,answer,sources,chunk_count,latency_ms,retrieval_latency_ms,generation_latency_ms,token_count,total_chunks_in_ta,filters_applied,filter_match_count,retrieval_method,is_conceptual,score_top1,score_top8,score_mean,score_spread,chunk_scores,chunk_sources_detail,rerank_applied,any_boosted,top_boost,rerank_score_top1,rerank_score_top8,vector_score_top1,Human rating,Notes on human rating,Other developer notes
+2026-01-25T15:38:56.921984Z,OoeOAnYRYEpNilLk,mgt404,MGT 404 Economics & Game Theory,MGT 404 Economics & Game Theory,0xmpDTyK3_bn-wEvQIQnfQ,Please help me with problem 2f from the economics problem set 1,"I wasn't able to find specific content for problem 2f from Problem Set 1. However, I can help guide you through how to generally approach problems related to finding new equilibrium prices and quantities, especially when it involves changes like government subsidies or market conditions.
+
+1. **Understanding Equilibrium:** The equilibrium price and quantity occur where the supply and demand curves intersect. This means you'll need the equations for both supply and demand.
+
+2. **Effect of Changes:** If you're considering changes like the end of a subsidy or a change in demand (such as the increase in demand for flights), you'll need to adjust either the demand or supply equation accordingly.
+
+3. **Solving for New Equilibrium:** With the adjusted equations, set the new supply equal to the new demand and solve for the price (p). Once you have the equilibrium price, substitute it back into either the supply or demand equation to find the equilibrium quantity.
+
+4. **Consumer Surplus:** To find the consumer surplus, you calculate the area above the price level and below the demand curve up to the equilibrium quantity. This typically involves finding the difference between the maximum price consumers are willing to pay and the equilibrium price, then multiplying by the equilibrium quantity and dividing by 2 (since it's a triangle).
+
+If you have specific equations or need further clarification on any of these steps, feel free to ask!","MGT404_2025_ProblemSet1.pdf, MGT404_2025_ProblemSet1.pdf, MGT404_2025_ProblemSet1.pdf",8,15711,2667,7862,232,1303,"doc_type=homework, assignment=1",19,filtered,False,0.7467,0.4341,0.6026,0.3126,"[0.7467, 0.7182, 0.7151, 0.655, 0.588, 0.4844, 0.4788, 0.4341]","[""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A""]",True,True,0.3,0.7467,0.4341,0.4467,Bad,Still Not working after keyword-based reranking ,
+2026-01-25T15:42:42.476986Z,OoeOAnYRYEpNilLk,mgt404,MGT 404 Economics & Game Theory,MGT 404 Economics & Game Theory,x1R55RYKTmcFqu8PPcd6iw,Please help me with problem 2d from the economics problem set 1,"Sure, I can help guide you through problem 2d from the problem set. From the course material provided, it seems that this problem involves understanding the effects of a subsidy on the market.
+
+Here's how you can approach this problem:
+
+1. **Understand the Subsidy Impact**: A subsidy generally reduces the cost for producers or increases the price received by producers. This effectively shifts the supply curve downward by the amount of the subsidy.
+
+2. **Identify the New Supply Curve**: If the subsidy is $2 per unit, then the new supply curve can be found by subtracting $2 from each price level on the existing supply curve.
+
+3. **Find the New Equilibrium**: To find the equilibrium price and quantity after the subsidy, you need to set the new supply curve equal to the demand curve and solve for the equilibrium price and quantity.
+
+4. **Calculate Surplus and Deadweight Loss**: Once you have the new equilibrium, you can calculate the consumer surplus and deadweight loss. Consumer surplus is the area above the price level and below the demand curve up to the quantity exchanged. Deadweight loss occurs when the market is not operating at maximum efficiency, often due to the subsidy.
+
+Make sure to apply these steps to the specific equations and numbers given in your problem set. If you have the demand and supply equations, substituting them into these steps will help you find the answers you need. Let me know if you need further clarification on any of these steps!","MGT404_2025_ProblemSet1.pdf, MGT404_2025_ProblemSet1.pdf, MGT404_2025_ProblemSet1.pdf",8,10645,1408,8176,250,1303,"doc_type=homework, assignment=1",19,filtered,False,1.0346,0.6643,0.762,0.3703,"[1.0346, 0.8758, 0.7291, 0.7267, 0.7207, 0.6766, 0.6678, 0.6643]","[""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A""]",True,True,0.45,1.0346,0.6643,0.5846,OK,Got general context but didn't work in original problem equations. Worked better in other post-reranking attempt. Needs more consistency. Perhaps a prompt issue.,
+2026-01-25T15:45:16.166776Z,OoeOAnYRYEpNilLk,mgt404,MGT 404 Economics & Game Theory,MGT 404 Economics & Game Theory,f4Gya7AIeELqq-gqbAbdgw,Please help me with problem 2d from the economics problem set 2,"It looks like problem 2d from your economics problem set involves comparing producer's and consumer's surplus under different pricing scenarios: uniform price, perfect price discrimination, and third-degree price discrimination.
+
+To help you with this:
+
+1. **Uniform Price**: This is a single price charged for all units sold. You can calculate the consumer surplus as the area between the demand curve and the price, up to the quantity sold. The producer surplus is the area above the supply curve and below the price.
+
+2. **Perfect Price Discrimination**: In this scenario, the seller charges each consumer their maximum willingness to pay, capturing the entire area under the demand curve as producer surplus. Consumer surplus is zero.
+
+3. **Third-Degree Price Discrimination**: This involves dividing consumers into groups based on elasticity of demand and charging each group a different price. You'll need to consider how the demand curves differ between these groups and calculate the surpluses accordingly.
+
+You should make use of the demand and supply equations provided in the problem set to calculate these surpluses for each scenario. Look at the areas under the respective curves to determine the surpluses. Remember, the key is understanding how the surpluses shift with different pricing strategies. Let me know if you need further clarification on any specific part!","MGT404_2025_ProblemSet2.pdf, MGT404_2025_ProblemSet2.pdf, MGT404_2025_ProblemSet2.pdf",8,8978,1311,7499,212,1303,"doc_type=homework, assignment=2",14,filtered,False,1.0236,0.5262,0.7122,0.4974,"[1.0236, 0.7609, 0.714, 0.7081, 0.7016, 0.659, 0.6046, 0.5262]","[""MGT404_2025_ProblemSet2.pdf|homework|unit:5"", ""MGT404_2025_ProblemSet2.pdf|homework|unit:5"", ""MGT404_2025_ProblemSet2.pdf|homework|unit:5"", ""MGT404_2025_ProblemSet2.pdf|homework|unit:5"", ""MGT404_2025_ProblemSet2.pdf|homework|unit:5"", ""MGT404_2025_ProblemSet2.pdf|homework|unit:5"", ""MGT404_2025_ProblemSet2.pdf|homework|unit:5"", ""MGT404_2025_ProblemSet2.pdf|homework|unit:5""]",True,True,0.45,1.0236,0.5262,0.5736,Really Bad,Confidently pulled the WRONG content. Retrieved 3d instead of 2d. Still happening after keyword based reranking as it did before,
+2026-01-25T15:47:25.034210Z,LH3or1-b0Pxw1csv,mgt412,MGT 412 Investor,MGT 412 Investor,fCyY_pYO4-4A7O-AFGmcGw,Please explain homework 2 problem 4g,"In Homework 2, problem 4g asks how an individual investor might decide on the right combination of riskless T-Bills, the S&P 500 index, and the MSCI index to hold, given that investors are not provided with a specific number for risk aversion, γ.
+
+To tackle this, consider the following steps that an individual investor might take:
+
+1. **Identify Investment Goals and Risk Tolerance:** The investor needs to determine their financial goals and how much risk they are willing to take. This involves understanding their time horizon, financial needs, and the level of risk they are comfortable with.
+
+2. **Understand the Characteristics of Each Asset:**
+   - **Riskless T-Bills:** These offer a guaranteed return with no risk, making them a safe component of any portfolio.
+   - **S&P 500 Index:** This index provides exposure to the US stock market and can offer higher returns but comes with higher risk.
+   - **MSCI Index:** This index gives exposure to international markets, which can diversify risk but also introduces currency and geopolitical risks.
+
+3. **Diversification:** The investor should consider how these assets can be combined to achieve diversification, which can help reduce risk.
+
+4. **Consider the Efficient Frontier:**
+   - The investor can use modern portfolio theory to identify combinations of assets that offer the maximum expected return for a given level of risk.
+   - They may plot the expected returns and standard deviations of various combinations on an (E, S) diagram to visualize efficient portfolios.
+
+5. **Adjust Based on Personal Preferences:** Finally, the investor should adjust their portfolio based on their personal risk tolerance, investing more in riskless T-Bills if they are risk-averse, or more in the stock indices if they seek higher returns and can tolerate more risk.
+
+This problem emphasizes the importance of understanding personal financial situations and preferences when building a portfolio, especially when specific numerical guidance on risk tolerance is unavailable.","hw2.pdf, hw2.pdf, hw2.pdf",8,9335,1302,7871,309,470,"doc_type=homework, assignment=2",20,filtered,True,0.8581,0.3311,0.5651,0.527,"[0.8581, 0.7422, 0.5793, 0.5474, 0.5353, 0.5317, 0.396, 0.3311]","[""hw2.pdf|homework|unit:4"", ""hw2.pdf|homework|unit:4"", ""hw2.pdf|homework|unit:4"", ""hw2.pdf|homework|unit:4"", ""hw2.pdf|homework|unit:4"", ""hw2.pdf|homework|unit:4"", ""hw2.pdf|homework|unit:4"", ""hw2.pdf|homework|unit:4""]",True,True,0.6,0.8581,0.3311,0.2581,Good ,working well after keyword based reranking ,
+2026-01-25T15:48:18.438464Z,eRzHakv4s5nrJFp1,mgt402,MGT 402 Accounting,MGT 402 Accounting,36vF7gyP8hPJfbZukWS69A,Can you help me understand how to book transaction a) from the Grow Co. 1 assignment in T-accounts?,"Certainly! For transaction a) where sales were $501.7 million, all made on account, you'll want to consider how this affects the T-accounts.
+
+1. **Accounts Receivable**: Since the sales were made on account, this means that customers have been billed but have not yet paid. Therefore, you'll record an increase in Accounts Receivable. In the T-account for Accounts Receivable, you'll make a debit entry of $501.7 million.
+
+2. **Sales Revenue**: Sales increase the revenue of the company. In the T-account for Sales Revenue, you'll make a credit entry of $501.7 million.
+
+These entries reflect the fact that the company has recognized revenue and expects to receive cash in the future, increasing its receivables. When you're booking these, remember that debits increase asset accounts like Accounts Receivable, and credits increase revenue accounts like Sales Revenue.","Class 5. Grow Co. I.pdf, Class 5. Grow Co. I.pdf, Class 5. Grow Co. I.pdf",6,5113,1343,3626,133,1553,"filename=Class 5. Grow Co. I.pdf, match_score=0.767",6,filtered,True,0.6794,0.324,0.5297,0.3554,"[0.6794, 0.6588, 0.6453, 0.4935, 0.3774, 0.324]","[""Class 5. Grow Co. I.pdf|homework|unit:5"", ""Class 5. Grow Co. I.pdf|homework|unit:5"", ""Class 5. Grow Co. I.pdf|homework|unit:5"", ""Class 5. Grow Co. I.pdf|homework|unit:5"", ""Class 5. Grow Co. I.pdf|homework|unit:5"", ""Class 5. Grow Co. I.pdf|homework|unit:5""]",False,,,,,,Good,Still working after re-ranking addition,
+2026-01-25T15:48:58.415287Z,eRzHakv4s5nrJFp1,mgt402,MGT 402 Accounting,MGT 402 Accounting,7D_KatcqvaNoAVwRJf4iTw,Can you help me understand how to book transaction h) from the Grow Co. 1 assignment in T-accounts?,"Certainly! Let's go through how to record transaction h) in T-accounts.
+
+Transaction h) states: ""Interest expense was $15.9.""
+
+When recording this transaction in T-accounts, you need to consider the impact on both the Interest Expense account and the Cash account (assuming the interest was paid in cash, if not, it might involve Interest Payable).
+
+1. **Interest Expense**: This account increases with expenses. So, you will debit the Interest Expense account for $15.9 million to reflect the cost of the interest incurred during the period.
+
+2. **Cash**: If the interest was paid in cash, then you would credit the Cash account for $15.9 million, as cash is being decreased by the payment of the interest. If it was not paid in cash but accrued, you would instead credit Interest Payable.
+
+Here's a basic outline of the T-accounts:
+
+- **Interest Expense (Debit side):** Record $15.9 million.
+- **Cash (Credit side):** Record $15.9 million, if paid. Otherwise, if accrued, credit Interest Payable.
+
+This entry reflects the expense incurred and the corresponding cash outflow (or accrual) related to it. Make sure to adjust based on whether the interest was actually paid or just accrued.","Class 5. Grow Co. I.pdf, Class 5. Grow Co. I.pdf, Class 5. Grow Co. I.pdf",6,7485,2110,5234,190,1553,"filename=Class 5. Grow Co. I.pdf, match_score=0.767",6,filtered,True,0.663,0.327,0.5234,0.336,"[0.663, 0.6451, 0.6304, 0.4927, 0.3822, 0.327]","[""Class 5. Grow Co. I.pdf|homework|unit:5"", ""Class 5. Grow Co. I.pdf|homework|unit:5"", ""Class 5. Grow Co. I.pdf|homework|unit:5"", ""Class 5. Grow Co. I.pdf|homework|unit:5"", ""Class 5. Grow Co. I.pdf|homework|unit:5"", ""Class 5. Grow Co. I.pdf|homework|unit:5""]",False,,,,,,Good,Still working after re-ranking addition,
+2026-01-25T15:50:15.161908Z,OoeOAnYRYEpNilLk,mgt404,MGT 404 Economics & Game Theory,MGT 404 Economics & Game Theory,F6xbSdwiiJ7xq1hiNYoizw,Please help me with problem 1a from the game theory extra problem set,"Sure! Let's look at problem 1a from the game theory extra problem set. The problem involves finding player 1's dominant strategy in a simultaneous-move game with the following payoff matrix:
+
+```
+          L     C     R
+T     125   250   100
+M     100   300   200
+B     0     500   400
+```
+
+To find a dominant strategy for player 1, we need to check if there is a strategy (T, M, or B) that gives player 1 a higher payoff regardless of what player 2 chooses (L, C, or R).
+
+Here's how you can approach this:
+
+1. Compare the payoffs for each of player 1's strategies (T, M, B) across all of player 2's possible actions (L, C, R).
+2. A strategy is dominant if it results in a higher payoff for player 1, no matter which column (L, C, or R) player 2 chooses.
+
+Try going through each strategy for player 1 and compare them to see if one strategy consistently gives a higher payoff across all of player 2's choices. Let me know what you find!","Game Theory Extra Problem Set.pdf, Game Theory Extra Problem Set.pdf, Game Theory Extra Problem Set.pdf",8,6648,2635,3872,173,1303,"filename=Game Theory Extra Problem Set.pdf, match_score=1.0",21,filtered,False,1.1628,0.722,0.89,0.4408,"[1.1628, 1.0152, 0.9599, 0.8401, 0.8364, 0.8283, 0.7556, 0.722]","[""Game Theory Extra Problem Set.pdf|homework|unit:N/A"", ""Game Theory Extra Problem Set.pdf|homework|unit:N/A"", ""Game Theory Extra Problem Set.pdf|homework|unit:N/A"", ""Game Theory Extra Problem Set.pdf|homework|unit:N/A"", ""Game Theory Extra Problem Set.pdf|homework|unit:N/A"", ""Game Theory Extra Problem Set.pdf|homework|unit:N/A"", ""Game Theory Extra Problem Set.pdf|homework|unit:N/A"", ""Game Theory Extra Problem Set.pdf|homework|unit:N/A""]",True,True,0.65,1.1628,0.722,0.6628,Ok,Bad part: pulled some wrong numbers out of decision matrix. Unclear why but this is problematic,
+2026-01-25T15:52:27.086262Z,OoeOAnYRYEpNilLk,mgt404,MGT 404 Economics & Game Theory,MGT 404 Economics & Game Theory,j7vWn7VMy8uxNaeDcly8QQ,Please help me with problem 7a from the game theory extra problem set,"It seems like the course materials you provided don't include specific details for problem 7a. However, based on the context, I can guide you on how to approach a typical game theory problem involving price competition.
+
+In a price competition scenario like the one described with pizza shops, they are likely engaging in a Bertrand competition. This typically involves firms choosing prices simultaneously with the goal to maximize profits, often resulting in a Nash Equilibrium where prices equal marginal costs if products are identical and there are no capacity constraints.
+
+For problem 7a, you would typically:
+
+1. Identify the payoff matrix for each firm based on the prices they set and the expected demand at those prices.
+2. Determine if there is a dominant strategy for each firm (a strategy that results in the highest payoff regardless of what the other firm does).
+3. Find the Nash Equilibrium, where no firm can benefit by changing its price unilaterally.
+
+If you have more details on the specific setup or numbers involved in problem 7, please provide them, and I can give more tailored guidance.","Game Theory Extra Problem Set.pdf, Game Theory Extra Problem Set.pdf, Game Theory Extra Problem Set.pdf",8,10586,4717,5705,183,1303,"filename=Game Theory Extra Problem Set.pdf, match_score=1.0",21,filtered,False,1.1171,0.7041,0.8638,0.413,"[1.1171, 1.0108, 0.9353, 0.8087, 0.8083, 0.7911, 0.735, 0.7041]","[""Game Theory Extra Problem Set.pdf|homework|unit:N/A"", ""Game Theory Extra Problem Set.pdf|homework|unit:N/A"", ""Game Theory Extra Problem Set.pdf|homework|unit:N/A"", ""Game Theory Extra Problem Set.pdf|homework|unit:N/A"", ""Game Theory Extra Problem Set.pdf|homework|unit:N/A"", ""Game Theory Extra Problem Set.pdf|homework|unit:N/A"", ""Game Theory Extra Problem Set.pdf|homework|unit:N/A"", ""Game Theory Extra Problem Set.pdf|homework|unit:N/A""]",True,True,0.65,1.1171,0.7041,0.6171,Really Bad,Worked before re-ranking addition. Now no longer working,
+2026-01-25T15:53:17.998899Z,OoeOAnYRYEpNilLk,mgt404,MGT 404 Economics & Game Theory,MGT 404 Economics & Game Theory,qciLo5B9HQy6-Dr2fTupGw,Please help me with problem 2a from the economics problem set 1,"It seems like you're asking about problem 2a from Problem Set 1 in your economics course, which deals with finding the equilibrium in 2021 based on the given supply and demand functions for domestic flights in the U.S. 
+
+To find the equilibrium price and quantity, you need to set the supply function equal to the demand function and solve for the price \( p \). The given functions are:
+
+- Supply function: \( Q_s(p) = 300 + 70p \)
+- Demand function: \( Q_d(p) = 600 - 30p \)
+
+At equilibrium, quantity supplied equals quantity demanded, so:
+
+\[ 300 + 70p = 600 - 30p \]
+
+From here, you can solve for \( p \) to find the equilibrium price. After finding \( p \), substitute it back into either the supply or demand equation to find the equilibrium quantity.
+
+Remember, the equilibrium occurs where the supply and demand curves intersect, meaning the quantity demanded equals the quantity supplied at a specific price level.","MGT404_2025_ProblemSet1.pdf, MGT404_2025_ProblemSet1.pdf, MGT404_2025_ProblemSet1.pdf",8,5394,884,4367,164,1303,"doc_type=homework, assignment=1",19,filtered,False,0.7339,0.4443,0.5739,0.2896,"[0.7339, 0.7238, 0.6601, 0.5952, 0.5011, 0.4868, 0.446, 0.4443]","[""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A""]",True,True,0.3,0.7339,0.4443,0.4339,Good,Still working after re-ranking addition,
