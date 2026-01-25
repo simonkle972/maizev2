@@ -1,0 +1,38 @@
+Alright Let's get back to retrieval. I am attaching a sample of 6 failed queries that didn't yield the optimal response along with my human take on what went wrong and your new logged fields.
+
+Also as a reminder we just completed Phase 1 of our project to improve which was increased visibility only. I am pasting the full phased plan you developed again below. Recall that it was based on the learnings doc from the prior app.
+
+let me know what your take is on these attached logs in relation to our phases.
+
+Phase Plan:
+Current Retrieval Pipeline:
+
+Regex-based query analysis → pre-retrieval metadata filtering → vector search → return top 8 chunks
+One unified path with fallback (if filtered returns nothing, search all)
+Embedding: text-embedding-3-small (1536 dimensions)
+Chunk size: 512, overlap: 50
+This is already well-aligned with the synthesis lessons - single path, pre-retrieval filtering, no branching. That's good.
+
+For Pattern 1, the likely culprit is:
+
+Only 8 chunks retrieved - in a 50-doc corpus with 1500+ chunks, the correct content might rank #9-15
+No reranking - pure vector similarity can miss when multiple chunks score similarly
+No visibility - we don't log similarity scores, so we can't tell if correct content was retrieved but ranked poorly
+Proposed Plan for Pattern 1
+Principle: Add light layers, don't add branches
+
+Phase 1: Add Observability (Diagnose Before Fixing)
+Before changing retrieval logic, log more data so we can see what's actually happening:
+
+Log similarity scores of retrieved chunks
+Log whether filters were applied and what they were
+Add a "retrieval diagnostics" mode that returns top 20 chunks so we can manually inspect
+Phase 2: Retrieve More, Rerank to Select
+Instead of retrieving 8 and using all 8:
+
+Retrieve 20-25 chunks via vector search
+Use a lightweight reranker (could be LLM-based or cross-encoder) to select the best 8
+This keeps the single pipeline but improves precision
+Phase 3: (If needed) Upgrade Embedding Model
+Switch from text-embedding-3-small to text-embedding-3-large (better semantic precision)
+Requires re-indexing all TAs

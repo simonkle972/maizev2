@@ -1,0 +1,202 @@
+MAIZE PROJECT — SYNTHESIS OF PRIOR DEVELOPMENT
+===========================================
+
+This document is a synthesis of two master documents produced during the first
+development cycle of the Maize Teaching Assistant project:
+
+1) Replit Technical Architecture Summary
+2) ChatGPT Summary of Purpose & Key Learnings
+
+It is written from the perspective of a new product manager / chief engineer
+taking over the project after a clean break.
+
+This document is NOT:
+- a redesign proposal
+- an MVP specification
+- a technical implementation plan
+
+It IS:
+- a consolidation of what Maize was intended to be
+- an accurate account of what the system became in practice
+- a distilled set of lessons that must constrain any future rebuild
+
+
+------------------------------------------------------------
+SECTION 1 — WHAT MAIZE WAS TRYING TO BE
+------------------------------------------------------------
+
+Maize was conceived as a course-specific AI teaching assistant platform.
+
+Core idea:
+- One TA per course
+- Professors upload course materials
+- Students interact with a chat interface
+- The system behaves like a knowledgeable human TA
+
+From the student perspective:
+- Ask questions in natural language
+- Ask both structured and conceptual questions
+- Do not need to know how documents are organized
+- Expect explanations, not just quotes
+- Expect the system to “know the course”
+
+From the instructor / admin perspective:
+- Create and manage TAs with minimal setup
+- Upload messy, imperfect documents
+- Avoid manual tuning per course
+- Reindex and update materials as needed
+- Prefer robustness and transparency over cleverness
+
+The product vision remained consistent throughout development.
+Execution challenges did not invalidate the core idea.
+
+
+------------------------------------------------------------
+SECTION 2 — WHAT THE SYSTEM BECAME IN PRACTICE
+------------------------------------------------------------
+
+Over time, Maize evolved into a highly conditional system.
+
+Key characteristics:
+
+- Multiple distinct retrieval paths (5+)
+- Each path activated by query classification
+- Different logic, filters, and fallbacks per path
+- Some paths bypassed retrieval entirely
+- Others applied hard filters after retrieval
+
+As a result:
+- There was no single, predictable query pipeline
+- Understanding behavior required tracing branches
+- Debugging relied on logs rather than reasoning
+
+
+------------------------------------------------------------
+SECTION 3 — METADATA AND SCHEMA REALITY
+------------------------------------------------------------
+
+The system became deeply dependent on metadata.
+
+Fields included:
+- doc_type
+- assignment_number
+- problem_number
+- sub_part
+- instructional_unit_number
+- instructional_unit_label
+- document_subtype
+- year / week / ordinal / alpha identifiers
+- structure graphs layered on top
+
+Problems encountered:
+- Metadata schema evolved continuously
+- Older indices lacked newer fields
+- Filters silently failed when fields were missing
+- No enforced migration or invalidation boundary
+
+Outcome:
+- Logical inconsistency across TAs
+- Same code produced different behavior per course
+- Failures were often silent
+
+
+------------------------------------------------------------
+SECTION 4 — CHUNKING MISALIGNMENT
+------------------------------------------------------------
+
+Chunks were treated implicitly as semantic units.
+
+In reality:
+- Chunks are an indexing artifact
+- They do not map cleanly to problems, concepts, or pedagogy
+- Aggregating chunks often produced incoherence
+- Correct explanations frequently lived outside the “expected” document
+
+Lesson:
+Chunk-level reasoning should remain an implementation detail, not a conceptual one.
+
+
+------------------------------------------------------------
+SECTION 5 — CORE LESSONS (CONVERGENCE)
+------------------------------------------------------------
+
+Despite different lenses, both source documents converge on the same truths.
+
+
+5.1 Generalization Cannot Be Layered On
+
+What worked for a single clean course did not generalize.
+
+Incremental patches:
+- Increased conditional logic
+- Preserved hidden assumptions
+- Delayed necessary architectural resets
+
+Generalization requires redesign, not accumulation.
+
+
+5.2 Post-Retrieval Filtering Is Fundamentally Flawed
+
+Filtering after vector retrieval means:
+- Relevant documents may never be seen
+- Correct filters can still yield empty results
+- Failures appear random or content-related
+
+Some failures are architectural, not tunable.
+
+
+5.3 Query Classification as Control Flow Is Fragile
+
+Routing queries into different pipelines based on classification:
+- Amplified misclassification errors
+- Increased branching complexity
+- Made behavior hard to reason about
+
+Classification should parameterize behavior, not determine execution paths.
+
+
+5.4 Normalization of Instructional Units Was a Breakthrough
+
+Normalizing references like:
+- Lecture 5 / Week 5 / Class 5 → instructional_unit_number = 5
+- Preserving the label separately
+
+This worked because it:
+- Matched user language
+- Reduced user burden
+- Separated meaning from phrasing
+
+This pattern is foundational and worth preserving.
+
+
+5.5 Silent Failure Is the Most Dangerous Outcome
+
+Observed failure modes:
+- Confident but incorrect answers
+- Empty or partial retrievals
+- Degradation indistinguishable from data issues
+
+Educational systems should fail loudly when assumptions are violated.
+
+
+------------------------------------------------------------
+SECTION 6 — WHAT THIS DOCUMENT ENABLES
+------------------------------------------------------------
+
+This synthesis provides:
+- A shared mental model of the first development cycle
+- Clear separation between valid ideas and invalid assumptions
+- A clean stopping point for the initial architecture
+
+It intentionally does NOT:
+- Propose an MVP
+- Recommend technologies
+- Reuse existing code
+- Advocate specific designs
+
+The next step should answer only one question:
+
+“If we rebuilt Maize from scratch for a single course, in a way that is guaranteed
+to generalize, what is the smallest system that must exist?”
+
+This document is the prerequisite for that work.
