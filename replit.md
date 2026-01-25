@@ -74,7 +74,7 @@ maize/
   - LLM understands specific problem references (e.g., "problem 2f" vs "3d")
   - Returns top 8 most relevant chunks based on LLM judgment
   - Includes reasoning for each chunk score for observability
-  - QA logging: rerank_applied, rerank_method, rerank_latency_ms, llm_score_top1, llm_score_top8, vector_score_top1, top_reasons (32 columns, A-AF)
+  - QA logging: rerank_applied, rerank_method, rerank_latency_ms, llm_score_top1, llm_score_top8, vector_score_top1, top_reasons, pre_rerank_candidates (33 columns, A-AG)
   - Robust fallback: pads with vector-order chunks if LLM returns incomplete results
 - Document-Aware Query Matching (Jan 2026)
   - Added fallback mechanism when regex patterns don't detect structured queries
