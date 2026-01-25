@@ -89,123 +89,132 @@ INITIAL_RETRIEVAL_K = 20
 FINAL_K = 8
 
 
-def extract_subproblem_markers(query: str) -> list:
+def llm_rerank(query: str, chunks: list, top_k: int = FINAL_K) -> tuple:
     """
-    Extract sub-problem markers from query (e.g., "2f" -> ["2f", "f)", "(f)", "part f"]).
-    """
-    markers = []
-    query_lower = query.lower()
+    Rerank chunks using GPT-4o-mini for semantic relevance scoring.
     
-    problem_subpart = re.findall(r'problem\s*(\d+)([a-z])', query_lower)
-    for prob_num, subpart in problem_subpart:
-        markers.extend([
-            f"{prob_num}{subpart}",
-            f"{subpart})",
-            f"({subpart})",
-            f"part {subpart}",
-            f"{subpart}.",
-        ])
-    
-    standalone_subpart = re.findall(r'\b(\d+)([a-z])\b', query_lower)
-    for prob_num, subpart in standalone_subpart:
-        if f"{prob_num}{subpart}" not in markers:
-            markers.extend([
-                f"{prob_num}{subpart}",
-                f"{subpart})",
-                f"({subpart})",
-                f"part {subpart}",
-            ])
-    
-    return markers
-
-
-def keyword_rerank(query: str, chunks: list, top_k: int = FINAL_K) -> tuple:
-    """
-    Rerank chunks based on keyword overlap with query.
-    
-    Prioritizes:
-    1. Sub-problem markers (e.g., "2f", "f)", "(f)")
-    2. Important query terms
-    3. Original vector similarity score
+    The LLM evaluates each chunk's relevance to the specific query,
+    understanding context like "problem 2f" vs "problem 3d".
     
     Returns:
         tuple: (reranked_chunks, rerank_info)
     """
+    import time
+    import json
+    
     if not chunks:
-        return [], {"reranked": False, "reason": "no_chunks"}
+        return [], {"reranked": False, "reason": "no_chunks", "method": "none"}
     
     if len(chunks) <= top_k:
-        return chunks, {"reranked": False, "reason": "chunks_under_limit"}
+        return chunks, {"reranked": False, "reason": "chunks_under_limit", "method": "none"}
     
-    query_lower = query.lower()
+    rerank_start = time.time()
     
-    subproblem_markers = extract_subproblem_markers(query)
+    preview_len = 300 if len(chunks) > 15 else 400
     
-    query_tokens = set(re.findall(r'[a-z0-9]+', query_lower))
-    stop_words = {'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'to', 'for',
-                  'with', 'by', 'from', 'as', 'this', 'that', 'it', 'i', 'me', 'my',
-                  'help', 'please', 'understand', 'can', 'you', 'how', 'what', 'why'}
-    query_keywords = query_tokens - stop_words
+    chunk_summaries = []
+    for i, chunk in enumerate(chunks):
+        text_preview = chunk["text"][:preview_len].replace("\n", " ").strip()
+        chunk_summaries.append(f"[{i}] {chunk['file_name']}: {text_preview}...")
     
-    scored_chunks = []
+    chunks_text = "\n\n".join(chunk_summaries)
     
-    for chunk in chunks:
-        chunk_text_lower = chunk["text"].lower()
+    prompt = f"""You are a teaching assistant helping match student queries to course material chunks.
+
+STUDENT QUERY: "{query}"
+
+CANDIDATE CHUNKS (numbered 0 to {len(chunks)-1}):
+{chunks_text}
+
+TASK: Score each chunk's relevance to the SPECIFIC query on a scale of 0-10.
+- Pay close attention to specific problem/question numbers (e.g., "problem 2f" means ONLY 2f, not 2d or 3f)
+- Score 10 = chunk directly contains the answer or exact problem referenced
+- Score 5 = chunk is related but doesn't have the specific content
+- Score 0 = chunk is irrelevant
+
+Return a JSON object with:
+- "scores": array of {{"index": N, "score": N, "reason": "brief reason"}} for each chunk
+- "top_indices": array of the {top_k} most relevant chunk indices in order
+
+Example: {{"scores": [{{"index": 0, "score": 8, "reason": "Contains problem 2f setup"}}], "top_indices": [3, 0, 5, 1, 7, 2, 4, 6]}}"""
+
+    try:
+        client = get_openai_client()
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0,
+            max_tokens=2000,
+            response_format={"type": "json_object"}
+        )
         
-        subproblem_boost = 0.0
-        matched_markers = []
-        for marker in subproblem_markers:
-            if marker in chunk_text_lower:
-                subproblem_boost += 0.3
-                matched_markers.append(marker)
-        subproblem_boost = min(subproblem_boost, 0.6)
+        rerank_latency_ms = int((time.time() - rerank_start) * 1000)
         
-        keyword_matches = sum(1 for kw in query_keywords if kw in chunk_text_lower and len(kw) >= 3)
-        keyword_boost = min(keyword_matches * 0.05, 0.2)
+        result_text = response.choices[0].message.content or "{}"
+        result = json.loads(result_text)
         
-        original_score = chunk.get("score", 0.0)
-        combined_score = original_score + subproblem_boost + keyword_boost
+        scores_list = result.get("scores", [])
+        top_indices = result.get("top_indices", [])
         
-        scored_chunks.append({
-            **chunk,
-            "combined_score": combined_score,
-            "subproblem_boost": subproblem_boost,
-            "keyword_boost": keyword_boost,
-            "matched_markers": matched_markers
-        })
-    
-    scored_chunks.sort(key=lambda x: x["combined_score"], reverse=True)
-    
-    reranked = scored_chunks[:top_k]
-    
-    any_boosted = any(c.get("subproblem_boost", 0) > 0 or c.get("keyword_boost", 0) > 0 for c in reranked)
-    
-    rerank_scores = [c["combined_score"] for c in reranked]
-    original_scores = [c["score"] for c in reranked]
-    
-    rerank_info = {
-        "reranked": True,
-        "initial_count": len(chunks),
-        "final_count": len(reranked),
-        "subproblem_markers_searched": subproblem_markers[:5],
-        "any_boosted": any_boosted,
-        "top_boost": max(c.get("subproblem_boost", 0) + c.get("keyword_boost", 0) for c in reranked) if reranked else 0,
-        "rerank_score_top1": round(rerank_scores[0], 4) if rerank_scores else 0,
-        "rerank_score_top8": round(rerank_scores[-1], 4) if rerank_scores else 0,
-        "vector_score_top1": round(original_scores[0], 4) if original_scores else 0
-    }
-    
-    if any_boosted:
-        logger.info(f"Reranking boosted chunks. Markers: {subproblem_markers[:3]}, top_boost: {rerank_info['top_boost']:.2f}")
-    
-    for c in reranked:
-        c["rerank_score"] = c["combined_score"]
-        c.pop("combined_score", None)
-        c.pop("subproblem_boost", None)
-        c.pop("keyword_boost", None)
-        c.pop("matched_markers", None)
-    
-    return reranked, rerank_info
+        score_map = {item["index"]: item for item in scores_list}
+        
+        if top_indices and len(top_indices) >= top_k:
+            reranked_indices = [i for i in top_indices[:top_k] if 0 <= i < len(chunks)]
+        else:
+            scored = [(item["index"], item["score"]) for item in scores_list if 0 <= item.get("index", -1) < len(chunks)]
+            scored.sort(key=lambda x: x[1], reverse=True)
+            reranked_indices = [idx for idx, _ in scored[:top_k]]
+        
+        if len(reranked_indices) < top_k:
+            used_indices = set(reranked_indices)
+            for i in range(len(chunks)):
+                if i not in used_indices:
+                    reranked_indices.append(i)
+                    if len(reranked_indices) >= top_k:
+                        break
+        
+        reranked = []
+        llm_scores = []
+        reasons = []
+        
+        for idx in reranked_indices:
+            chunk = chunks[idx].copy()
+            score_info = score_map.get(idx, {})
+            chunk["llm_relevance_score"] = score_info.get("score", 0)
+            chunk["llm_reason"] = score_info.get("reason", "")
+            reranked.append(chunk)
+            llm_scores.append(score_info.get("score", 0))
+            reasons.append(score_info.get("reason", "")[:50])
+        
+        vector_scores = [chunks[idx].get("score", 0) for idx in reranked_indices]
+        
+        rerank_info = {
+            "reranked": True,
+            "method": "llm",
+            "initial_count": len(chunks),
+            "final_count": len(reranked),
+            "rerank_latency_ms": rerank_latency_ms,
+            "llm_score_top1": llm_scores[0] if llm_scores else 0,
+            "llm_score_top8": llm_scores[-1] if llm_scores else 0,
+            "vector_score_top1": round(vector_scores[0], 4) if vector_scores else 0,
+            "top_reasons": reasons[:3],
+            "reranked_indices": reranked_indices[:8]
+        }
+        
+        logger.info(f"LLM reranked {len(chunks)} -> {len(reranked)} chunks in {rerank_latency_ms}ms | top_score={llm_scores[0] if llm_scores else 0}")
+        
+        return reranked, rerank_info
+        
+    except Exception as e:
+        logger.error(f"LLM rerank failed: {e}, falling back to vector order")
+        rerank_latency_ms = int((time.time() - rerank_start) * 1000)
+        
+        return chunks[:top_k], {
+            "reranked": False,
+            "method": "fallback_vector",
+            "reason": str(e)[:100],
+            "rerank_latency_ms": rerank_latency_ms
+        }
 
 
 _openai_client = None
@@ -220,7 +229,7 @@ def get_openai_client():
             raise ValueError("OPENAI_API_KEY not configured")
     return _openai_client
 
-def analyze_query(query: str, ta_id: str = None) -> dict:
+def analyze_query(query: str, ta_id: str = "") -> dict:
     """
     Analyze a query to extract structured filters.
     
@@ -442,15 +451,12 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8) -> tuple:
             }
         })
     
-    chunks, rerank_info = keyword_rerank(query, initial_chunks, top_k=final_k)
+    chunks, rerank_info = llm_rerank(query, initial_chunks, top_k=final_k)
     diagnostics["rerank_applied"] = rerank_info.get("reranked", False)
     diagnostics["rerank_info"] = rerank_info
     
-    if rerank_info.get("reranked"):
-        logger.info(f"[{ta_id}] Reranked {len(initial_chunks)} -> {len(chunks)} chunks | boosted={rerank_info.get('any_boosted', False)} | top_boost={rerank_info.get('top_boost', 0):.2f}")
-    
     if diagnostics["rerank_applied"]:
-        scores = [c.get("rerank_score", c.get("score", 0.0)) for c in chunks]
+        scores = [c.get("llm_relevance_score", c.get("score", 0.0)) for c in chunks]
     else:
         scores = [c.get("score", 0.0) for c in chunks]
     

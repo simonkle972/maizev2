@@ -40,11 +40,12 @@ QA_LOG_HEADERS = [
     "chunk_scores",
     "chunk_sources_detail",
     "rerank_applied",
-    "any_boosted",
-    "top_boost",
-    "rerank_score_top1",
-    "rerank_score_top8",
-    "vector_score_top1"
+    "rerank_method",
+    "rerank_latency_ms",
+    "llm_score_top1",
+    "llm_score_top8",
+    "vector_score_top1",
+    "top_reasons"
 ]
 
 def _get_access_token() -> Optional[str]:
@@ -112,14 +113,14 @@ def _ensure_headers_exist(service, spreadsheet_id: str, tab_name: str) -> bool:
     try:
         result = service.spreadsheets().values().get(
             spreadsheetId=spreadsheet_id,
-            range=f'{tab_name}!A1:AE1'
+            range=f'{tab_name}!A1:AF1'
         ).execute()
         
         values = result.get('values', [])
         if not values or values[0] != QA_LOG_HEADERS:
             service.spreadsheets().values().update(
                 spreadsheetId=spreadsheet_id,
-                range=f'{tab_name}!A1:AE1',
+                range=f'{tab_name}!A1:AF1',
                 valueInputOption='RAW',
                 body={'values': [QA_LOG_HEADERS]}
             ).execute()
@@ -144,7 +145,7 @@ def _ensure_headers_exist(service, spreadsheet_id: str, tab_name: str) -> bool:
                 
                 service.spreadsheets().values().update(
                     spreadsheetId=spreadsheet_id,
-                    range=f'{tab_name}!A1:AE1',
+                    range=f'{tab_name}!A1:AF1',
                     valueInputOption='RAW',
                     body={'values': [QA_LOG_HEADERS]}
                 ).execute()
@@ -220,16 +221,17 @@ def log_qa_entry(
                 json.dumps(diag.get("chunk_scores", [])),
                 json.dumps(diag.get("chunk_sources_detail", [])),
                 str(diag.get("rerank_applied", "")),
-                str(rerank_info.get("any_boosted", "")),
-                str(rerank_info.get("top_boost", "")),
-                str(rerank_info.get("rerank_score_top1", "")),
-                str(rerank_info.get("rerank_score_top8", "")),
-                str(rerank_info.get("vector_score_top1", ""))
+                str(rerank_info.get("method", "")),
+                str(rerank_info.get("rerank_latency_ms", "")),
+                str(rerank_info.get("llm_score_top1", "")),
+                str(rerank_info.get("llm_score_top8", "")),
+                str(rerank_info.get("vector_score_top1", "")),
+                json.dumps(rerank_info.get("top_reasons", []))
             ]
             
             service.spreadsheets().values().append(
                 spreadsheetId=Config.QA_LOG_SHEET_ID,
-                range=f'{Config.QA_LOG_TAB_NAME}!A:AE',
+                range=f'{Config.QA_LOG_TAB_NAME}!A:AF',
                 valueInputOption='RAW',
                 insertDataOption='INSERT_ROWS',
                 body={'values': [row]}
