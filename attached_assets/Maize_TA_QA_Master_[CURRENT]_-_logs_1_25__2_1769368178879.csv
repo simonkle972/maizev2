@@ -1,0 +1,106 @@
+timestamp,ta_id,ta_slug,ta_name,course_name,session_id,query,answer,sources,chunk_count,latency_ms,retrieval_latency_ms,generation_latency_ms,token_count,total_chunks_in_ta,filters_applied,filter_match_count,retrieval_method,is_conceptual,score_top1,score_top8,score_mean,score_spread,chunk_scores,chunk_sources_detail,rerank_applied,rerank_method,rerank_latency_ms,llm_score_top1,llm_score_top8,vector_score_top1,top_reasons,Human rating,Notes on human rating,Other developer notes
+2026-01-25T18:18:43.506275Z,OoeOAnYRYEpNilLk,mgt404,MGT 404 Economics & Game Theory,MGT 404 Economics & Game Theory,Q0Zq6jMmXeL33C3z2lkI4w,Please help me with problem 2f from the economics problem set 1,"I couldn't find specific content for problem 2f in the provided material. However, I can help you with understanding the general concepts related to supply and demand, subsidies, and how they might affect market outcomes, which could be helpful in approaching this type of problem.
+
+When dealing with subsidies, it typically affects the supply curve by effectively lowering the cost of production for suppliers. This can lead to a shift in the supply curve, usually to the right, indicating an increase in supply at every price level. The market equilibrium can change as a result, affecting both the equilibrium price and quantity.
+
+To tackle such problems, consider how the subsidy shifts the supply curve and then find the new equilibrium by setting the new supply function equal to the demand function. You might also need to consider the impact on consumer surplus, producer surplus, and any deadweight loss.
+
+If you have more details or specific questions about the problem, feel free to share, and I'll do my best to guide you!","MGT404_2025_ProblemSet1.pdf, MGT404_2025_ProblemSet1.pdf, MGT404_2025_ProblemSet1.pdf",8,20124,6969,7724,171,1303,"doc_type=homework, assignment=1",19,filtered,False,5,0,0.625,5,"[5, 0, 0, 0, 0, 0, 0, 0]","[""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A""]",True,llm,4495,5,0,0.3661,"[""Mentions problem 2 but does not specify 2f."", ""Does not contain any specific problem content."", ""Does not contain any specific problem content.""]",Bad,LLM reranking is still not able to find the correct content,
+2026-01-25T18:27:12.075709Z,OoeOAnYRYEpNilLk,mgt404,MGT 404 Economics & Game Theory,MGT 404 Economics & Game Theory,A6P_YSY7qvABwkbjehzxPQ,Please help me with problem 2d from the economics problem set 1,"Problem 2d from the problem set is asking you to determine the effective supply curve after a $2 per-unit subsidy is provided to the airline industry as part of a Covid rescue plan.
+
+To tackle this, you should consider how subsidies affect supply curves. A per-unit subsidy effectively lowers the cost of production for suppliers, which typically shifts the supply curve downward by the amount of the subsidy.
+
+Here's a step-by-step approach to help you:
+
+1. **Understand the Original Supply Curve**: You have the original supply function for domestic flights in the U.S. given as \( Q_s(p) = 300 + 70p \).
+
+2. **Effect of the Subsidy**: A $2 per-unit subsidy means that the cost to suppliers is effectively reduced by $2 for each unit. This means you can adjust the supply curve by this amount.
+
+3. **Adjust the Supply Curve**: To find the new supply curve, you can modify the price variable in the supply function. The new effective price that suppliers face is \( p + 2 \) because the subsidy effectively increases their revenue by $2 per unit sold. Substitute this into the original supply equation.
+
+4. **Write the New Supply Equation**: Substitute \( p = p' - 2 \) into the supply function \( Q_s(p) = 300 + 70p \) to get the new supply function.
+
+By following these steps, you should be able to derive the effective supply curve after the subsidy. This will help you see how the subsidy shifts the original supply curve.","MGT404_2025_ProblemSet1.pdf, MGT404_2025_ProblemSet1.pdf, MGT404_2025_ProblemSet1.pdf",8,18087,11087,6830,250,1303,"doc_type=homework, assignment=1",19,filtered,False,10,0,1.25,10,"[10, 0, 0, 0, 0, 0, 0, 0]","[""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet1.pdf|homework|unit:N/A""]",True,llm,10149,10,0,0.4291,"[""Directly contains problem 2d and its questions."", ""Does not contain any specific problem content."", ""Does not contain any specific problem content.""]",Good,Could be more specific but decent,
+2026-01-25T18:29:04.538287Z,OoeOAnYRYEpNilLk,mgt404,MGT 404 Economics & Game Theory,MGT 404 Economics & Game Theory,z7_ZNDX9MkEArMemRena2w,Please help me with problem 2d from the economics problem set 2,"It looks like you're working on Problem 2, part (d), but unfortunately, I couldn't find the specific content or description for problem 2d in the provided materials. However, I can help guide you through the general approach for solving problems related to competitive markets and equilibrium if you provide more details or context about the problem. 
+
+For problems involving equilibrium in competitive markets, you typically need to:
+
+1. **Set Supply Equal to Demand**: Find the point where the quantity supplied equals the quantity demanded to determine the equilibrium price and quantity.
+
+2. **Use Given Equations**: Use the domestic demand and supply equations provided to solve for these equilibrium conditions.
+
+If you have any specific equations or additional details from the problem, feel free to share them, and I can guide you further!","MGT404_2025_ProblemSet2.pdf, MGT404_2025_ProblemSet2.pdf, MGT404_2025_ProblemSet2.pdf",8,14417,9807,3507,132,1303,"doc_type=homework, assignment=2",14,filtered,False,0,0,0.0,0,"[0, 0, 0, 0, 0, 0, 0, 0]","[""MGT404_2025_ProblemSet2.pdf|homework|unit:5"", ""MGT404_2025_ProblemSet2.pdf|homework|unit:5"", ""MGT404_2025_ProblemSet2.pdf|homework|unit:5"", ""MGT404_2025_ProblemSet2.pdf|homework|unit:5"", ""MGT404_2025_ProblemSet2.pdf|homework|unit:5"", ""MGT404_2025_ProblemSet2.pdf|homework|unit:5"", ""MGT404_2025_ProblemSet2.pdf|homework|unit:5"", ""MGT404_2025_ProblemSet2.pdf|homework|unit:5""]",True,llm,8429,0,0,0.5735,"[""Does not contain problem 2d."", ""Does not contain problem 2d."", ""Does not contain problem 2d.""]",Bad,No longer pulling 3d on accident like keyword reranker did but still not able to find correct content,
+2026-01-25T18:31:51.159463Z,OoeOAnYRYEpNilLk,mgt404,MGT 404 Economics & Game Theory,MGT 404 Economics & Game Theory,56Qlg7r2mPA85LTvVjkW2Q,Please help me with problem 7a from the game theory extra problem set,"Certainly! Problem 7a from the Game Theory Extra Problem Set seems to be about price competition between two pizza shops in Manhattan. In this scenario, it's important to understand a few key concepts related to game theory and price competition.
+
+1. **Game Description**: The two pizza shops, Bombay/6 Ave. Pizza and Joey Pepperoni’s Pizza, are competing for 450 potential customers, each willing to pay up to $2 for a slice of pizza.
+
+2. **Dominant Strategies**: You need to determine if either shop has a dominant strategy. A dominant strategy is one that yields a better outcome for a player, no matter what the other player does. Consider whether lowering prices would consistently attract more customers and whether there's a price point that neither shop would want to deviate from.
+
+3. **Nash Equilibrium**: This is a situation where neither shop can improve its payoff by unilaterally changing its strategy, given the other shop's strategy. You'll need to think about the pricing strategies that would lead to such a stable outcome.
+
+To tackle this problem, consider the incentives for each shop. If one shop lowers its price, it might attract more customers, but it also reduces its profit margin. Both shops will need to balance attracting customers with maintaining profitability.
+
+Try setting up a payoff matrix with potential pricing strategies for each shop and see if you can identify any dominant strategies or Nash equilibria within that matrix. Remember, the goal is to predict the prices they'll charge based on the Nash equilibrium concept.","Game Theory Extra Problem Set.pdf, Game Theory Extra Problem Set.pdf, Game Theory Extra Problem Set.pdf",8,24134,17479,6484,252,1303,"filename=Game Theory Extra Problem Set.pdf, match_score=1.0",21,filtered,False,10,0,2.5,10,"[10, 10, 0, 0, 0, 0, 0, 0]","[""Game Theory Extra Problem Set.pdf|homework|unit:N/A"", ""Game Theory Extra Problem Set.pdf|homework|unit:N/A"", ""Game Theory Extra Problem Set.pdf|homework|unit:N/A"", ""Game Theory Extra Problem Set.pdf|homework|unit:N/A"", ""Game Theory Extra Problem Set.pdf|homework|unit:N/A"", ""Game Theory Extra Problem Set.pdf|homework|unit:N/A"", ""Game Theory Extra Problem Set.pdf|homework|unit:N/A"", ""Game Theory Extra Problem Set.pdf|homework|unit:N/A""]",True,llm,15665,10,0,0.6171,"[""Directly contains problem 7a from the game theory "", ""Directly contains problem 7a from the game theory "", ""Does not contain problem 7a; discusses a different""]",Good,now working after LLM reranker addition,
+2026-01-25T18:40:17.332019Z,OoeOAnYRYEpNilLk,mgt404,MGT 404 Economics & Game Theory,MGT 404 Economics & Game Theory,YVYfKknk2-mvWC3d7NLYng,Please help me with problem 1e from the economics problem set 3,"In problem 1e from the problem set, the question involves determining how much Producer A is willing to pay for a certification that would prove their drones have a 5% failure rate. This certification is valuable because it would allow Producer A to regain 50% of the market share.
+
+To help you think about this problem:
+
+1. **Market Value of Certification**: Consider the total market value if Producer A can regain 50% of the market. With 1 million potential customers, calculate how many additional customers this certification would bring back to Producer A.
+
+2. **Revenue Per Additional Customer**: Given that Producer A prices their drones at the consumer's willingness to pay, calculate the revenue per drone sold.
+
+3. **Total Additional Revenue**: Multiply the number of additional customers by the revenue per drone to find the total additional revenue that Producer A would gain from regaining this market share.
+
+4. **Willingness to Pay for Certification**: Producer A would logically be willing to pay up to the amount of additional revenue they would gain from the certification.
+
+These steps should guide you in calculating how much the certification is worth to Producer A. Remember to consider costs and pricing as given in the problem set.","MGT404_2025_ProblemSet3.pdf, MGT404_2025_ProblemSet3.pdf, MGT404_2025_ProblemSet3.pdf",8,13991,8705,5109,203,1303,"doc_type=homework, assignment=3",12,filtered,False,10,0,1.25,10,"[10, 0, 0, 0, 0, 0, 0, 0]","[""MGT404_2025_ProblemSet3.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet3.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet3.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet3.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet3.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet3.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet3.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet3.pdf|homework|unit:N/A""]",True,llm,7928,10,0,0.2572,"[""Directly contains problem 1e."", ""Does not contain any specific problem content."", ""Does not contain any specific problem content.""]",Good,Wasn't tried before so no comp available but late sub-problem e was correctly pulled,
+2026-01-25T18:42:24.865846Z,OoeOAnYRYEpNilLk,mgt404,MGT 404 Economics & Game Theory,MGT 404 Economics & Game Theory,qc8F8GyycrJzJ3ARZkNxMg,Please help me with problem 2c from the economics problem set 3,"Problem 2c from the problem set involves finding the Nash Equilibrium for the game between R&J Electronics and 4th Street Photo. To find the Nash Equilibrium, you'll need to analyze the payoff matrix provided for different discount strategies.
+
+Here's a general approach to help you:
+
+1. **Identify Strategies**: List all possible strategies for both players. Based on the matrix provided, these are the percentages for the sale amounts.
+
+2. **Best Responses**: For each strategy of one player, determine the best response of the other player. This means checking which strategy gives the highest payoff given the opponent's choice.
+
+3. **Nash Equilibrium**: A Nash Equilibrium occurs where each player's strategy is the best response to the other's strategy. In other words, no player can benefit by unilaterally changing their strategy.
+
+To find the specific Nash Equilibrium, look at the matrix and identify the cells where neither player would want to deviate from their chosen strategy, given the other player's strategy. Use the values provided to determine this.
+
+Remember, you are looking for a strategy combination where both R&J Electronics and 4th Street Photo are choosing their optimal responses at the same time. If you find multiple such combinations, check if the problem specifies any additional conditions like setting X to a certain value, which might help narrow down the possibilities.","MGT404_2025_ProblemSet3.pdf, MGT404_2025_ProblemSet3.pdf, MGT404_2025_ProblemSet3.pdf",8,16865,9342,7341,219,1303,"doc_type=homework, assignment=3",12,filtered,False,10,0,1.25,10,"[10, 0, 0, 0, 0, 0, 0, 0]","[""MGT404_2025_ProblemSet3.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet3.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet3.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet3.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet3.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet3.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet3.pdf|homework|unit:N/A"", ""MGT404_2025_ProblemSet3.pdf|homework|unit:N/A""]",True,llm,8777,10,0,0.2992,"[""Directly contains problem 2 setup, including part "", ""General information about the problem set, no spec"", ""General grading information, no specific content r""]",Good,Wasn't tried before so no comp available but late sub-problem e was correctly pulled,
+2026-01-25T18:44:45.468755Z,OoeOAnYRYEpNilLk,mgt404,MGT 404 Economics & Game Theory,MGT 404 Economics & Game Theory,qc8F8GyycrJzJ3ARZkNxMg,Can you walk me through it with the actual numbers from the problem?,"To walk you through finding the Nash Equilibrium for the problem involving R&J Electronics and 4th Street Photo, let's focus on the general approach using the provided payoff matrix:
+
+### Step-by-step Guide:
+
+1. **Identify Strategies:**
+   - Both R&J Electronics and 4th Street Photo have strategies based on the sale amounts, specifically 10%, 20%, and 30%.
+
+2. **Payoff Matrix:**
+   - The payoff matrix is given as:
+     ```
+     R&J Electronics
+     4th Street Photo
+             10%       20%       30%
+     10%   50,35    40,30    20,15
+     20%   52,20    45,27    25,15
+     30%   47,5     35,X     30,10
+     ```
+   - In this matrix, the first number in each pair is R&J's profit, and the second is 4th Street Photo's profit.
+
+3. **Determine Best Responses:**
+   - For each strategy of 4th Street Photo, determine R&J Electronics' best response, i.e., the strategy yielding the highest payoff for R&J.
+   - Similarly, for each strategy of R&J Electronics, determine 4th Street Photo's best response.
+
+4. **Finding Nash Equilibrium:**
+   - A Nash Equilibrium occurs where both players' strategies are the best response to each other.
+   - Look for strategy pairs where neither player can benefit by unilaterally changing their strategy.
+
+### Example Explanation Without Specific Numbers:
+- For example, if 4th Street Photo chooses a 10% strategy, you would compare R&J's payoffs for choosing 10%, 20%, and 30% to find the highest payoff.
+- Repeat this for 4th Street Photo's 20% and 30% strategies.
+- Do the same for 4th Street Photo, considering R&J's strategies.
+
+### Tips:
+- Focus on each strategy by circling or highlighting payoffs to make comparisons easier.
+- Identify any dominated strategies, which could simplify your analysis.
+
+Remember, the key is to find the combination where both players are optimizing given the other's strategy. If you have specific numbers or need more clarification on this, feel free to provide additional context or questions!","MGT_404 2024_final_exam_with_solutions (1).pdf, MGT404_2025_ProblemSet3 - solutions .docx, Notes_Class 1.pdf",8,26003,16681,9151,300,1303,,0,unfiltered,False,5,0,4.375,5,"[5, 5, 5, 5, 5, 5, 5, 0]","[""MGT_404 2024_final_exam_with_solutions (1).pdf|exam|unit:N/A"", ""MGT404_2025_ProblemSet3 - solutions .docx|solutions|unit:N/A"", ""Notes_Class 1.pdf|lecture|unit:1"", ""MGT_404 2024_final_exam_with_solutions (1).pdf|exam|unit:N/A"", ""MGT404_2025_ProblemSet3.pdf|homework|unit:N/A"", ""MGT_404 2024_final_exam_with_solutions (1).pdf|exam|unit:N/A"", ""MGT_404 2024_final_exam_with_solutions (1).pdf|exam|unit:N/A"", ""404_Lec 10.pdf|lecture|unit:10""]",True,llm,14273,5,0,0.3302,"[""Mentions constructing a game matrix with profit nu"", ""Discusses profits in a matrix but lacks specific n"", ""Mentions a bidding matrix but does not provide spe""]",Good,Wasn't tried before so no comp available but late sub-problem e was correctly pulled,
