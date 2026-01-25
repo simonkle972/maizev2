@@ -1,4 +1,5 @@
 import os
+import re
 import logging
 from openai import OpenAI
 from sqlalchemy import text
@@ -6,25 +7,114 @@ from config import Config
 
 logger = logging.getLogger(__name__)
 
+
+def tokenize_for_matching(text: str) -> set:
+    """
+    Tokenize text for document matching.
+    Returns set of lowercase alphanumeric tokens, removing common words.
+    """
+    text_lower = text.lower()
+    tokens = re.findall(r'[a-z0-9]+', text_lower)
+    
+    stop_words = {
+        'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+        'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
+        'should', 'may', 'might', 'can', 'of', 'in', 'on', 'at', 'to', 'for',
+        'with', 'by', 'from', 'as', 'this', 'that', 'these', 'those', 'it',
+        'i', 'me', 'my', 'we', 'our', 'you', 'your', 'he', 'she', 'they',
+        'help', 'please', 'understand', 'explain', 'how', 'what', 'why',
+        'problem', 'question', 'answer', 'pdf', 'docx', 'xlsx', 'pptx', 'txt'
+    }
+    
+    return set(t for t in tokens if t not in stop_words and len(t) > 1)
+
+
+def find_matching_documents(query: str, ta_id: str, threshold: float = 0.4) -> list:
+    """
+    Find documents whose filenames match terms in the query.
+    
+    Args:
+        query: The user's query string
+        ta_id: The teaching assistant ID
+        threshold: Minimum match score (0-1) to return a document
+        
+    Returns:
+        List of dicts with 'filename', 'score', 'original_filename'
+        sorted by score descending. Empty if no matches above threshold.
+    """
+    from models import Document
+    
+    documents = Document.query.filter_by(ta_id=ta_id).all()
+    if not documents:
+        return []
+    
+    query_tokens = tokenize_for_matching(query)
+    if not query_tokens:
+        return []
+    
+    matches = []
+    
+    for doc in documents:
+        filename = doc.original_filename or doc.filename
+        filename_tokens = tokenize_for_matching(filename)
+        
+        if not filename_tokens:
+            continue
+        
+        overlap = query_tokens & filename_tokens
+        
+        if overlap:
+            score = len(overlap) / len(filename_tokens)
+            
+            long_matches = sum(1 for t in overlap if len(t) >= 4)
+            if long_matches > 0:
+                score = min(1.0, score + 0.1 * long_matches)
+            
+            if score >= threshold:
+                matches.append({
+                    'filename': filename,
+                    'score': round(score, 3),
+                    'original_filename': doc.original_filename,
+                    'matched_tokens': list(overlap)
+                })
+    
+    matches.sort(key=lambda x: x['score'], reverse=True)
+    
+    if matches:
+        logger.info(f"[{ta_id}] Document matching found {len(matches)} matches: {[(m['filename'], m['score']) for m in matches[:3]]}")
+    
+    return matches
+
 _openai_client = None
 
 def get_openai_client():
     global _openai_client
     if _openai_client is None:
-        _openai_client = OpenAI(api_key=Config.OPENAI_API_KEY)
+        api_key = Config.OPENAI_API_KEY
+        if api_key:
+            _openai_client = OpenAI(api_key=api_key)
+        else:
+            raise ValueError("OPENAI_API_KEY not configured")
     return _openai_client
 
-def analyze_query(query: str) -> dict:
+def analyze_query(query: str, ta_id: str = None) -> dict:
+    """
+    Analyze a query to extract structured filters.
+    
+    Uses regex patterns for common patterns, then falls back to
+    document filename matching if no structured elements found.
+    """
     query_lower = query.lower()
     
     analysis = {
         "doc_type_filter": None,
         "assignment_filter": None,
         "unit_filter": None,
+        "filename_filter": None,
+        "filename_match_score": None,
+        "filename_matched_tokens": None,
         "is_conceptual": False
     }
-    
-    import re
     
     hw_patterns = [
         r'homework\s*(\d+)',
@@ -67,6 +157,15 @@ def analyze_query(query: str) -> dict:
             analysis["doc_type_filter"] = "lecture"
             analysis["unit_filter"] = int(match.group(1))
             break
+    
+    if ta_id and not analysis["doc_type_filter"] and not analysis["assignment_filter"]:
+        doc_matches = find_matching_documents(query, ta_id)
+        if doc_matches:
+            best_match = doc_matches[0]
+            analysis["filename_filter"] = best_match["filename"]
+            analysis["filename_match_score"] = best_match["score"]
+            analysis["filename_matched_tokens"] = best_match.get("matched_tokens", [])
+            logger.info(f"[{ta_id}] Filename match fallback: '{best_match['filename']}' (score={best_match['score']}, tokens={best_match.get('matched_tokens', [])})")
     
     conceptual_markers = [
         'what is', 'what are', 'explain', 'why', 'how does', 
@@ -122,7 +221,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8) -> tuple:
     )
     query_embedding = response.data[0].embedding
     
-    query_analysis = analyze_query(query)
+    query_analysis = analyze_query(query, ta_id)
     diagnostics["is_conceptual"] = query_analysis.get("is_conceptual", False)
     
     base_query = db.session.query(
@@ -159,6 +258,12 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8) -> tuple:
         )
         has_filters = True
         filter_description = [f"doc_type={query_analysis['doc_type_filter']}"]
+    elif query_analysis["filename_filter"]:
+        filtered_query = base_query.filter(
+            DocumentChunk.file_name == query_analysis["filename_filter"]
+        )
+        has_filters = True
+        filter_description = [f"filename={query_analysis['filename_filter']}", f"match_score={query_analysis.get('filename_match_score', 'N/A')}"]
     
     if has_filters:
         diagnostics["filters_applied"] = ", ".join(filter_description)
