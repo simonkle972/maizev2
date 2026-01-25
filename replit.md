@@ -74,6 +74,7 @@ maize/
   - Boosts chunks containing sub-problem markers (e.g., "2f" → searches for "f)", "(f)", "part f")
   - Preserves rerank_score for observability, logs boost values
   - Addresses Pattern B failures where sub-problems ranked #9-15 in pure vector search
+  - QA logging now includes: rerank_applied, any_boosted, top_boost, rerank_score_top1, rerank_score_top8, vector_score_top1 (31 columns total, A-AE)
 - Document-Aware Query Matching (Jan 2026)
   - Added fallback mechanism when regex patterns don't detect structured queries
   - Tokenizes query and document filenames, scores overlap to find matches
