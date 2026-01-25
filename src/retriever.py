@@ -85,6 +85,129 @@ def find_matching_documents(query: str, ta_id: str, threshold: float = 0.4) -> l
     
     return matches
 
+INITIAL_RETRIEVAL_K = 20
+FINAL_K = 8
+
+
+def extract_subproblem_markers(query: str) -> list:
+    """
+    Extract sub-problem markers from query (e.g., "2f" -> ["2f", "f)", "(f)", "part f"]).
+    """
+    markers = []
+    query_lower = query.lower()
+    
+    problem_subpart = re.findall(r'problem\s*(\d+)([a-z])', query_lower)
+    for prob_num, subpart in problem_subpart:
+        markers.extend([
+            f"{prob_num}{subpart}",
+            f"{subpart})",
+            f"({subpart})",
+            f"part {subpart}",
+            f"{subpart}.",
+        ])
+    
+    standalone_subpart = re.findall(r'\b(\d+)([a-z])\b', query_lower)
+    for prob_num, subpart in standalone_subpart:
+        if f"{prob_num}{subpart}" not in markers:
+            markers.extend([
+                f"{prob_num}{subpart}",
+                f"{subpart})",
+                f"({subpart})",
+                f"part {subpart}",
+            ])
+    
+    return markers
+
+
+def keyword_rerank(query: str, chunks: list, top_k: int = FINAL_K) -> tuple:
+    """
+    Rerank chunks based on keyword overlap with query.
+    
+    Prioritizes:
+    1. Sub-problem markers (e.g., "2f", "f)", "(f)")
+    2. Important query terms
+    3. Original vector similarity score
+    
+    Returns:
+        tuple: (reranked_chunks, rerank_info)
+    """
+    if not chunks:
+        return [], {"reranked": False, "reason": "no_chunks"}
+    
+    if len(chunks) <= top_k:
+        return chunks, {"reranked": False, "reason": "chunks_under_limit"}
+    
+    query_lower = query.lower()
+    
+    subproblem_markers = extract_subproblem_markers(query)
+    
+    query_tokens = set(re.findall(r'[a-z0-9]+', query_lower))
+    stop_words = {'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'to', 'for',
+                  'with', 'by', 'from', 'as', 'this', 'that', 'it', 'i', 'me', 'my',
+                  'help', 'please', 'understand', 'can', 'you', 'how', 'what', 'why'}
+    query_keywords = query_tokens - stop_words
+    
+    scored_chunks = []
+    
+    for chunk in chunks:
+        chunk_text_lower = chunk["text"].lower()
+        
+        subproblem_boost = 0.0
+        matched_markers = []
+        for marker in subproblem_markers:
+            if marker in chunk_text_lower:
+                subproblem_boost += 0.3
+                matched_markers.append(marker)
+        subproblem_boost = min(subproblem_boost, 0.6)
+        
+        keyword_matches = sum(1 for kw in query_keywords if kw in chunk_text_lower and len(kw) >= 3)
+        keyword_boost = min(keyword_matches * 0.05, 0.2)
+        
+        original_score = chunk.get("score", 0.0)
+        combined_score = original_score + subproblem_boost + keyword_boost
+        
+        scored_chunks.append({
+            **chunk,
+            "combined_score": combined_score,
+            "subproblem_boost": subproblem_boost,
+            "keyword_boost": keyword_boost,
+            "matched_markers": matched_markers
+        })
+    
+    scored_chunks.sort(key=lambda x: x["combined_score"], reverse=True)
+    
+    reranked = scored_chunks[:top_k]
+    
+    any_boosted = any(c.get("subproblem_boost", 0) > 0 or c.get("keyword_boost", 0) > 0 for c in reranked)
+    
+    rerank_scores = [c["combined_score"] for c in reranked]
+    original_scores = [c["score"] for c in reranked]
+    
+    rerank_info = {
+        "reranked": True,
+        "initial_count": len(chunks),
+        "final_count": len(reranked),
+        "subproblem_markers_searched": subproblem_markers[:5],
+        "any_boosted": any_boosted,
+        "top_boost": max(c.get("subproblem_boost", 0) + c.get("keyword_boost", 0) for c in reranked) if reranked else 0,
+        "rerank_score_top1": round(rerank_scores[0], 4) if rerank_scores else 0,
+        "rerank_score_top8": round(rerank_scores[-1], 4) if rerank_scores else 0,
+        "vector_score_top1": round(original_scores[0], 4) if original_scores else 0
+    }
+    
+    if any_boosted:
+        logger.info(f"Reranking boosted chunks. Markers: {subproblem_markers[:3]}, top_boost: {rerank_info['top_boost']:.2f}")
+    
+    for c in reranked:
+        c["rerank_score"] = c["combined_score"]
+        c.pop("combined_score", None)
+        c.pop("subproblem_boost", None)
+        c.pop("keyword_boost", None)
+        c.pop("matched_markers", None)
+    
+    return reranked, rerank_info
+
+
 _openai_client = None
 
 def get_openai_client():
@@ -192,6 +315,9 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8) -> tuple:
     from pgvector.sqlalchemy import Vector
     import json
     
+    initial_k = INITIAL_RETRIEVAL_K
+    final_k = top_k
+    
     diagnostics = {
         "total_chunks_in_ta": 0,
         "filters_applied": None,
@@ -203,7 +329,9 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8) -> tuple:
         "score_mean": 0.0,
         "score_spread": 0.0,
         "chunk_scores": [],
-        "chunk_sources_detail": []
+        "chunk_sources_detail": [],
+        "rerank_applied": False,
+        "rerank_info": None
     }
     
     total_chunks = DocumentChunk.query.filter_by(ta_id=ta_id).count()
@@ -275,19 +403,19 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8) -> tuple:
     try:
         results = filtered_query.order_by(
             DocumentChunk.embedding.cosine_distance(query_embedding)
-        ).limit(top_k).all()
+        ).limit(initial_k).all()
         
         if not results and has_filters:
             logger.info(f"[{ta_id}] No results with filter, falling back to unfiltered search")
             results = base_query.order_by(
                 DocumentChunk.embedding.cosine_distance(query_embedding)
-            ).limit(top_k).all()
+            ).limit(initial_k).all()
             used_fallback = True
     except Exception as e:
         logger.error(f"Vector search failed: {e}")
         results = base_query.order_by(
             DocumentChunk.embedding.cosine_distance(query_embedding)
-        ).limit(top_k).all()
+        ).limit(initial_k).all()
         used_fallback = True
     
     if has_filters and not used_fallback:
@@ -297,18 +425,12 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8) -> tuple:
     else:
         diagnostics["retrieval_method"] = "unfiltered"
     
-    chunks = []
-    scores = []
-    sources_detail = []
+    initial_chunks = []
     
     for i, row in enumerate(results):
         score = float(row.score) if row.score else 0.0
-        scores.append(score)
         
-        source_info = f"{row.file_name}|{row.doc_type or 'unknown'}|unit:{row.instructional_unit_number or 'N/A'}"
-        sources_detail.append(source_info)
-        
-        chunks.append({
+        initial_chunks.append({
             "text": row.chunk_text,
             "score": score,
             "file_name": row.file_name or "unknown",
@@ -320,14 +442,31 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8) -> tuple:
             }
         })
     
+    chunks, rerank_info = keyword_rerank(query, initial_chunks, top_k=final_k)
+    diagnostics["rerank_applied"] = rerank_info.get("reranked", False)
+    diagnostics["rerank_info"] = rerank_info
+    
+    if rerank_info.get("reranked"):
+        logger.info(f"[{ta_id}] Reranked {len(initial_chunks)} -> {len(chunks)} chunks | boosted={rerank_info.get('any_boosted', False)} | top_boost={rerank_info.get('top_boost', 0):.2f}")
+    
+    if diagnostics["rerank_applied"]:
+        scores = [c.get("rerank_score", c.get("score", 0.0)) for c in chunks]
+    else:
+        scores = [c.get("score", 0.0) for c in chunks]
+    
+    sources_detail = [
+        f"{c['file_name']}|{c['doc_type'] or 'unknown'}|unit:{c['metadata'].get('instructional_unit_number') or 'N/A'}"
+        for c in chunks
+    ]
+    
     if scores:
         diagnostics["score_top1"] = round(scores[0], 4) if len(scores) > 0 else 0.0
-        diagnostics["score_top8"] = round(scores[-1], 4) if len(scores) >= top_k else round(scores[-1], 4) if scores else 0.0
+        diagnostics["score_top8"] = round(scores[-1], 4) if len(scores) >= final_k else round(scores[-1], 4) if scores else 0.0
         diagnostics["score_mean"] = round(sum(scores) / len(scores), 4)
         diagnostics["score_spread"] = round(scores[0] - scores[-1], 4) if len(scores) > 1 else 0.0
         diagnostics["chunk_scores"] = [round(s, 4) for s in scores]
         diagnostics["chunk_sources_detail"] = sources_detail
     
-    logger.info(f"[{ta_id}] Retrieved {len(chunks)} chunks | method={diagnostics['retrieval_method']} | scores: top1={diagnostics['score_top1']}, top8={diagnostics['score_top8']}, spread={diagnostics['score_spread']}")
+    logger.info(f"[{ta_id}] Retrieved {len(chunks)} chunks | method={diagnostics['retrieval_method']} | reranked={diagnostics['rerank_applied']} | scores: top1={diagnostics['score_top1']}, spread={diagnostics['score_spread']}")
     
     return chunks, diagnostics
