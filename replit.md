@@ -68,6 +68,12 @@ maize/
 - PPTX (lecture slides)
 
 ## Recent Changes
+- Phase 2: Keyword-Based Reranking (Jan 2026)
+  - Retrieves 20 chunks initially instead of 8
+  - Applies keyword reranker to select best 8 for context
+  - Boosts chunks containing sub-problem markers (e.g., "2f" → searches for "f)", "(f)", "part f")
+  - Preserves rerank_score for observability, logs boost values
+  - Addresses Pattern B failures where sub-problems ranked #9-15 in pure vector search
 - Document-Aware Query Matching (Jan 2026)
   - Added fallback mechanism when regex patterns don't detect structured queries
   - Tokenizes query and document filenames, scores overlap to find matches
