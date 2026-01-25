@@ -1,0 +1,144 @@
+2026-01-25 00:12:25.28
+7fe0f1eb
+User
+2026-01-25 05:12:25,287 | INFO | [eRzHakv4s5nrJFp1] Filters applied: filename=Class 5. Grow Co. I.pdf, match_score=0.767, matching chunks: 6
+2026-01-25 00:12:25.34
+7fe0f1eb
+User
+2026-01-25 05:12:25,344 | INFO | [eRzHakv4s5nrJFp1] Retrieved 6 chunks | method=filtered | reranked=False | scores: top1=0.6793, spread=0.3553
+2026-01-25 00:12:26.50
+7fe0f1eb
+User
+2026-01-25 05:12:26,503 | INFO | HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-01-25 00:12:35.68
+7fe0f1eb
+User
+2026-01-25 05:12:35,684 | INFO | Logged QA entry for query: Can you help me understand how to book transaction...
+2026-01-25 00:12:47.04
+7fe0f1eb
+User
+2026-01-25 05:12:47,048 | INFO | HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2026-01-25 00:12:47.61
+7fe0f1eb
+User
+2026-01-25 05:12:47,616 | INFO | [eRzHakv4s5nrJFp1] Document matching found 3 matches: [('Class 5. Grow Co. I.pdf', 0.767), ('Class 7. Grow Co. II.pdf', 0.6), ('In-class SCF assignment.pdf', 0.433)]
+2026-01-25 00:12:47.62
+7fe0f1eb
+User
+2026-01-25 05:12:47,620 | INFO | [eRzHakv4s5nrJFp1] Filename match fallback: 'Class 5. Grow Co. I.pdf' (score=0.767, tokens=['co', 'grow'])
+2026-01-25 00:12:47.66
+7fe0f1eb
+User
+2026-01-25 05:12:47,666 | INFO | [eRzHakv4s5nrJFp1] Filters applied: filename=Class 5. Grow Co. I.pdf, match_score=0.767, matching chunks: 6
+2026-01-25 00:12:47.71
+7fe0f1eb
+User
+2026-01-25 05:12:47,712 | INFO | [eRzHakv4s5nrJFp1] Retrieved 6 chunks | method=filtered | reranked=False | scores: top1=0.6629, spread=0.3359
+2026-01-25 00:12:48.51
+7fe0f1eb
+User
+2026-01-25 05:12:48,518 | INFO | HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-01-25 00:13:03.02
+7fe0f1eb
+User
+2026-01-25 05:13:03,024 | INFO | Logged QA entry for query: Can you help me understand how to book transaction...
+2026-01-25 00:13:13.84
+7fe0f1eb
+User
+2026-01-25 05:13:13,842 | INFO | HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2026-01-25 00:13:15.13
+7fe0f1eb
+User
+2026-01-25 05:13:15,136 | INFO | [OoeOAnYRYEpNilLk] Document matching found 7 matches: [('Game Theory Extra Problem Set.pdf', 1.0), ('Game Theory_Class 4.pdf', 0.867), ('Game Theory_Class 3.pdf', 0.867)]
+2026-01-25 00:13:15.14
+7fe0f1eb
+User
+2026-01-25 05:13:15,140 | INFO | [OoeOAnYRYEpNilLk] Filename match fallback: 'Game Theory Extra Problem Set.pdf' (score=1.0, tokens=['theory', 'game', 'set', 'extra'])
+2026-01-25 00:13:15.19
+7fe0f1eb
+User
+2026-01-25 05:13:15,198 | INFO | [OoeOAnYRYEpNilLk] Filters applied: filename=Game Theory Extra Problem Set.pdf, match_score=1.0, matching chunks: 21
+2026-01-25 00:13:15.25
+7fe0f1eb
+User
+2026-01-25 05:13:15,259 | INFO | [OoeOAnYRYEpNilLk] Retrieved 8 chunks | method=filtered | reranked=True | scores: top1=1.1628, spread=0.4408
+2026-01-25 00:13:15.25
+7fe0f1eb
+User
+2026-01-25 05:13:15,259 | INFO | [OoeOAnYRYEpNilLk] Reranked 20 -> 8 chunks | boosted=True | top_boost=0.65
+2026-01-25 00:13:15.25
+7fe0f1eb
+User
+2026-01-25 05:13:15,259 | INFO | Reranking boosted chunks. Markers: ['1a', 'a)', '(a)'], top_boost: 0.65
+2026-01-25 00:13:15.56
+7fe0f1eb
+User
+2026-01-25 05:13:15,566 | INFO | HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-01-25 00:13:27.95
+7fe0f1eb
+User
+2026-01-25 05:13:27,959 | INFO | Logged QA entry for query: Please help me with problem 1a from the game theor...
+2026-01-25 00:16:17.12
+7fe0f1eb
+User
+2026-01-25 05:16:17,126 | INFO | HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2026-01-25 00:16:18.46
+7fe0f1eb
+User
+2026-01-25 05:16:18,464 | INFO | [OoeOAnYRYEpNilLk] Document matching found 7 matches: [('Game Theory Extra Problem Set.pdf', 1.0), ('Game Theory_Class 4.pdf', 0.867), ('Game Theory_Class 3.pdf', 0.867)]
+2026-01-25 00:16:18.46
+7fe0f1eb
+User
+2026-01-25 05:16:18,468 | INFO | [OoeOAnYRYEpNilLk] Filename match fallback: 'Game Theory Extra Problem Set.pdf' (score=1.0, tokens=['theory', 'game', 'set', 'extra'])
+2026-01-25 00:16:18.53
+7fe0f1eb
+User
+2026-01-25 05:16:18,533 | INFO | [OoeOAnYRYEpNilLk] Filters applied: filename=Game Theory Extra Problem Set.pdf, match_score=1.0, matching chunks: 21
+2026-01-25 00:16:18.60
+7fe0f1eb
+User
+2026-01-25 05:16:18,605 | INFO | [OoeOAnYRYEpNilLk] Retrieved 8 chunks | method=filtered | reranked=True | scores: top1=1.1171, spread=0.413
+2026-01-25 00:16:18.60
+7fe0f1eb
+User
+2026-01-25 05:16:18,605 | INFO | [OoeOAnYRYEpNilLk] Reranked 20 -> 8 chunks | boosted=True | top_boost=0.65
+2026-01-25 00:16:18.60
+7fe0f1eb
+User
+2026-01-25 05:16:18,605 | INFO | Reranking boosted chunks. Markers: ['7a', 'a)', '(a)'], top_boost: 0.65
+2026-01-25 00:16:19.52
+7fe0f1eb
+User
+2026-01-25 05:16:19,520 | INFO | HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-01-25 00:16:54.40
+7fe0f1eb
+User
+2026-01-25 05:16:54,405 | INFO | Logged QA entry for query: Please help me with problem 7a from the game theor...
+2026-01-25 00:17:42.45
+7fe0f1eb
+User
+2026-01-25 05:17:42,459 | INFO | HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2026-01-25 00:17:42.52
+7fe0f1eb
+User
+2026-01-25 05:17:42,527 | INFO | [OoeOAnYRYEpNilLk] Filters applied: doc_type=homework, assignment=1, matching chunks: 19
+2026-01-25 00:17:42.62
+7fe0f1eb
+User
+2026-01-25 05:17:42,620 | INFO | Reranking boosted chunks. Markers: ['2a', 'a)', '(a)'], top_boost: 0.30
+2026-01-25 00:17:42.62
+7fe0f1eb
+User
+2026-01-25 05:17:42,620 | INFO | [OoeOAnYRYEpNilLk] Reranked 19 -> 8 chunks | boosted=True | top_boost=0.30
+2026-01-25 00:17:42.62
+7fe0f1eb
+User
+2026-01-25 05:17:42,621 | INFO | [OoeOAnYRYEpNilLk] Retrieved 8 chunks | method=filtered | reranked=True | scores: top1=0.7339, spread=0.2896
+2026-01-25 00:17:43.39
+7fe0f1eb
+User
+2026-01-25 05:17:43,399 | INFO | HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-01-25 00:18:10.57
+7fe0f1eb
+User
+2026-01-25 05:18:10,576 | INFO | Logged QA entry for query: Please help me with problem 2a from the economics ...
