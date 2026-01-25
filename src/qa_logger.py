@@ -231,7 +231,7 @@ def log_qa_entry(
             
             service.spreadsheets().values().append(
                 spreadsheetId=Config.QA_LOG_SHEET_ID,
-                range=f'{Config.QA_LOG_TAB_NAME}!A:AF',
+                range=f'{Config.QA_LOG_TAB_NAME}!A1',
                 valueInputOption='RAW',
                 insertDataOption='INSERT_ROWS',
                 body={'values': [row]}
