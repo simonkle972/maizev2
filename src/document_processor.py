@@ -170,7 +170,6 @@ Extract the following information as JSON:
     "assignment_number": "1" | "2" | "3" | null (if applicable),
     "instructional_unit_number": 1 | 2 | 3 | null (lecture/class/week number if mentioned),
     "instructional_unit_label": "lecture" | "class" | "week" | "module" | "session" | null,
-    "content_identifier": string | null (the distinctive name or title of this document that a student might reference, e.g., "Grow Co. I", "Delta Inc. Case", "Midterm Review", "Chapter 3 Problems", "Extra Problem Set" - extract from filename or document content),
     "course_code": "MGT404" | null (if visible),
     "year": "2024" | "2025" | null (if mentioned),
     "is_solutions": true | false (whether this contains solutions/answers)
@@ -204,7 +203,6 @@ Return ONLY valid JSON, no other text."""
                     "assignment_number": None,
                     "instructional_unit_number": None,
                     "instructional_unit_label": None,
-                    "content_identifier": None,
                     "course_code": None,
                     "year": None,
                     "is_solutions": False
@@ -310,10 +308,9 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
         doc.assignment_number = metadata.get("assignment_number")
         doc.instructional_unit_number = metadata.get("instructional_unit_number")
         doc.instructional_unit_label = metadata.get("instructional_unit_label")
-        doc.content_identifier = metadata.get("content_identifier")
         doc.extraction_metadata = metadata
         doc.metadata_extracted = True
-        logger.info(f"[{ta_id}] [{doc.id}] Saving metadata... content_identifier={doc.content_identifier}")
+        logger.info(f"[{ta_id}] [{doc.id}] Saving metadata...")
         db_commit_with_retry(db)
         logger.info(f"[{ta_id}] [{doc.id}] Metadata saved")
         
@@ -329,7 +326,6 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
                 "assignment_number": doc.assignment_number or "",
                 "instructional_unit_number": doc.instructional_unit_number or 0,
                 "instructional_unit_label": doc.instructional_unit_label or "",
-                "content_identifier": doc.content_identifier or "",
                 "file_name": doc.original_filename
             })
     
@@ -388,7 +384,6 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
                 assignment_number=chunk_data["assignment_number"],
                 instructional_unit_number=chunk_data["instructional_unit_number"],
                 instructional_unit_label=chunk_data["instructional_unit_label"],
-                content_identifier=chunk_data.get("content_identifier", ""),
                 file_name=chunk_data["file_name"],
                 embedding=all_embeddings[j]
             )
