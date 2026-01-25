@@ -69,6 +69,12 @@ maize/
 - PPTX (lecture slides)
 
 ## Recent Changes
+- Context Injection for Chunking (Jan 2026)
+  - Added structural context to chunk embeddings to improve retrieval
+  - Chunks now prefixed with document name and detected problem/section headers
+  - Example: "[ProblemSet1.pdf > Problem 2: Airline Tickets] c) (0.5 points)..."
+  - Fixes vocabulary mismatch where "problem 2c" query didn't match chunks containing just "c)"
+  - Simple regex patterns detect Problem/Question/Section/Part/Exercise headers
 - Phase 2: LLM-Based Reranking (Jan 2026)
   - Replaced keyword reranking with GPT-4o-mini semantic reranking
   - Retrieves 20 chunks initially, LLM scores each for relevance 0-10

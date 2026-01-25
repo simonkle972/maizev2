@@ -77,6 +77,7 @@ class DocumentChunk(db.Model):
     document_id = db.Column(db.Integer, db.ForeignKey('documents.id'), nullable=False)
     chunk_index = db.Column(db.Integer, nullable=False)
     chunk_text = db.Column(db.Text, nullable=False)
+    chunk_context = db.Column(db.String(256), nullable=True)
     doc_type = db.Column(db.String(64), nullable=True)
     assignment_number = db.Column(db.String(32), nullable=True)
     instructional_unit_number = db.Column(db.Integer, nullable=True)

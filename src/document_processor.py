@@ -2,11 +2,108 @@ import os
 import logging
 import json
 import time
+import re
 from datetime import datetime
 from config import Config
 from sqlalchemy.exc import OperationalError, DBAPIError
 
 logger = logging.getLogger(__name__)
+
+def extract_section_headers(text: str) -> list:
+    """
+    Extract problem/section headers from document text with their positions.
+    Returns list of (start_position, header_text) tuples, sorted by position.
+    
+    Matches patterns like:
+    - "Problem 1: Title"
+    - "Problem 2 (5 points)"
+    - "Question 3:"
+    - "Section I - Title"
+    - "Part A:"
+    """
+    headers = []
+    
+    patterns = [
+        r'(?:^|\n)(Problem\s+\d+[:\s][^\n]{0,60})',
+        r'(?:^|\n)(Question\s+\d+[:\s][^\n]{0,60})',
+        r'(?:^|\n)(Section\s+(?:\d+|[IVX]+)[:\s\-][^\n]{0,60})',
+        r'(?:^|\n)(Part\s+[A-Z][:\s][^\n]{0,60})',
+        r'(?:^|\n)(Exercise\s+\d+[:\s][^\n]{0,60})',
+    ]
+    
+    for pattern in patterns:
+        for match in re.finditer(pattern, text, re.IGNORECASE):
+            header_text = match.group(1).strip()
+            header_text = re.sub(r'\s+', ' ', header_text)
+            if len(header_text) > 80:
+                header_text = header_text[:77] + "..."
+            headers.append((match.start(), header_text))
+    
+    headers.sort(key=lambda x: x[0])
+    return headers
+
+def get_context_for_position(headers: list, position: int) -> str:
+    """
+    Get the most recent header that appears before the given position.
+    Returns the header text or empty string if no header precedes this position.
+    """
+    context = ""
+    for header_pos, header_text in headers:
+        if header_pos <= position:
+            context = header_text
+        else:
+            break
+    return context
+
+def chunk_text_with_context(text: str, chunk_size: int = 800, overlap: int = 200, doc_filename: str = "") -> list:
+    """
+    Chunk text and prepend structural context to each chunk.
+    Returns list of dicts with 'text' (enriched) and 'original_text' (raw).
+    """
+    headers = extract_section_headers(text)
+    
+    if len(text) <= chunk_size:
+        context = get_context_for_position(headers, 0)
+        enriched = f"[{doc_filename} > {context}] {text}" if context else f"[{doc_filename}] {text}"
+        return [{"text": enriched, "original_text": text, "context": context}]
+    
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = start + chunk_size
+        
+        if end < len(text):
+            break_points = [
+                text.rfind('\n\n', start, end),
+                text.rfind('. ', start, end),
+                text.rfind('\n', start, end),
+                text.rfind(' ', start, end)
+            ]
+            for bp in break_points:
+                if bp > start + chunk_size // 2:
+                    end = bp + 1
+                    break
+        
+        chunk_text = text[start:end].strip()
+        if chunk_text:
+            context = get_context_for_position(headers, start)
+            if context:
+                enriched = f"[{doc_filename} > {context}] {chunk_text}"
+            else:
+                enriched = f"[{doc_filename}] {chunk_text}"
+            chunks.append({
+                "text": enriched,
+                "original_text": chunk_text,
+                "context": context
+            })
+        
+        start = end - overlap
+        if start < 0:
+            start = 0
+        if start >= len(text):
+            break
+    
+    return chunks
 
 def db_commit_with_retry(db, max_retries=3, delay=1.0):
     """Commit database changes with retry logic for connection issues."""
@@ -314,14 +411,16 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
         db_commit_with_retry(db)
         logger.info(f"[{ta_id}] [{doc.id}] Metadata saved")
         
-        chunks = chunk_text(text, Config.CHUNK_SIZE, Config.CHUNK_OVERLAP)
+        chunks = chunk_text_with_context(text, Config.CHUNK_SIZE, Config.CHUNK_OVERLAP, doc.original_filename)
         
-        for i, chunk in enumerate(chunks):
+        for i, chunk_data in enumerate(chunks):
             all_chunk_data.append({
                 "ta_id": ta_id,
                 "document_id": doc.id,
                 "chunk_index": i,
-                "chunk_text": chunk,
+                "chunk_text": chunk_data["original_text"],
+                "chunk_text_enriched": chunk_data["text"],
+                "context": chunk_data.get("context", ""),
                 "doc_type": doc.doc_type or "other",
                 "assignment_number": doc.assignment_number or "",
                 "instructional_unit_number": doc.instructional_unit_number or 0,
@@ -341,7 +440,7 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
     logger.info(f"[{ta_id}] Starting embedding generation ({total_batches} batches)...")
     
     for batch_idx, i in enumerate(range(0, len(all_chunk_data), batch_size)):
-        batch_texts = [c["chunk_text"] for c in all_chunk_data[i:i+batch_size]]
+        batch_texts = [c["chunk_text_enriched"] for c in all_chunk_data[i:i+batch_size]]
         
         if progress_callback and total_batches > 0:
             progress = 50 + int((batch_idx / total_batches) * 40)
@@ -380,6 +479,7 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
                 document_id=chunk_data["document_id"],
                 chunk_index=chunk_data["chunk_index"],
                 chunk_text=sanitize_text(chunk_data["chunk_text"]),
+                chunk_context=chunk_data.get("context", "")[:256] if chunk_data.get("context") else None,
                 doc_type=chunk_data["doc_type"],
                 assignment_number=chunk_data["assignment_number"],
                 instructional_unit_number=chunk_data["instructional_unit_number"],
