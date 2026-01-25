@@ -68,6 +68,15 @@ maize/
 - PPTX (lecture slides)
 
 ## Recent Changes
+- Document-Aware Query Matching (Jan 2026)
+  - Added fallback mechanism when regex patterns don't detect structured queries
+  - Tokenizes query and document filenames, scores overlap to find matches
+  - Handles unusual document names like "Grow Co. 1" that regex can't anticipate
+  - Applies filename filter pre-retrieval (same unified pipeline, new parameter)
+  - Logs match source, score, and matched tokens for observability
+- Text sanitization for indexing (Jan 2026)
+  - Added sanitize_text() to strip null bytes and control characters from PDFs
+  - Fixes PostgreSQL "string literal cannot contain NUL" errors
 - Phase 1 Retrieval Observability (Jan 2026)
   - Added 11 new diagnostic fields to QA logging (now 25 columns total, A-Y)
   - New fields: total_chunks_in_ta, filters_applied, filter_match_count, retrieval_method, is_conceptual, score_top1, score_top8, score_mean, score_spread, chunk_scores, chunk_sources_detail
