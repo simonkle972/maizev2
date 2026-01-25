@@ -34,6 +34,7 @@ maize/
 - **Database**: PostgreSQL (via SQLAlchemy)
 - **Vector Store**: PostgreSQL with pgvector extension (persistent, uses ivfflat indexing)
 - **Embeddings**: OpenAI text-embedding-3-small (1536 dimensions)
+- **Chunking**: chunk_size=800, overlap=200 (increased from 512/50 to reduce sub-problem boundary splits)
 - **LLM**: OpenAI GPT-4o
 - **File Parsing**: PyPDF2, python-docx, openpyxl/pandas
 

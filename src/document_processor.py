@@ -208,7 +208,7 @@ Return ONLY valid JSON, no other text."""
                     "is_solutions": False
                 }
 
-def chunk_text(text: str, chunk_size: int = 512, overlap: int = 50) -> list:
+def chunk_text(text: str, chunk_size: int = 800, overlap: int = 200) -> list:
     if len(text) <= chunk_size:
         return [text]
     
