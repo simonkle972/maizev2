@@ -49,6 +49,27 @@ QA_LOG_HEADERS = [
     "pre_rerank_candidates"
 ]
 
+INDEX_LOG_HEADERS = [
+    "timestamp",
+    "ta_id",
+    "ta_slug",
+    "file_name",
+    "doc_type",
+    "total_pages",
+    "raw_text_length",
+    "chunk_index",
+    "total_chunks",
+    "chunk_text_length",
+    "chunk_context",
+    "chunk_text_preview",
+    "enriched_text_preview",
+    "has_embedding",
+    "status",
+    "error_message"
+]
+
+INDEX_LOG_TAB_NAME = "index_logs"
+
 def _get_access_token() -> Optional[str]:
     global _connection_settings
     
@@ -285,3 +306,182 @@ def test_connection() -> Dict[str, Any]:
     except Exception as e:
         result["message"] = f"Connection failed: {str(e)}"
         return result
+
+
+def _ensure_index_headers_exist(service, spreadsheet_id: str) -> bool:
+    """Ensure index_logs tab exists with correct headers."""
+    try:
+        result = service.spreadsheets().values().get(
+            spreadsheetId=spreadsheet_id,
+            range=f'{INDEX_LOG_TAB_NAME}!A1:P1'
+        ).execute()
+        
+        values = result.get('values', [])
+        if not values or values[0] != INDEX_LOG_HEADERS:
+            service.spreadsheets().values().update(
+                spreadsheetId=spreadsheet_id,
+                range=f'{INDEX_LOG_TAB_NAME}!A1:P1',
+                valueInputOption='RAW',
+                body={'values': [INDEX_LOG_HEADERS]}
+            ).execute()
+            logger.info(f"Created/updated headers in {INDEX_LOG_TAB_NAME}")
+        
+        return True
+        
+    except Exception as e:
+        if 'Unable to parse range' in str(e) or 'not found' in str(e).lower():
+            try:
+                service.spreadsheets().batchUpdate(
+                    spreadsheetId=spreadsheet_id,
+                    body={
+                        'requests': [{
+                            'addSheet': {
+                                'properties': {'title': INDEX_LOG_TAB_NAME}
+                            }
+                        }]
+                    }
+                ).execute()
+                logger.info(f"Created new tab: {INDEX_LOG_TAB_NAME}")
+                
+                service.spreadsheets().values().update(
+                    spreadsheetId=spreadsheet_id,
+                    range=f'{INDEX_LOG_TAB_NAME}!A1:P1',
+                    valueInputOption='RAW',
+                    body={'values': [INDEX_LOG_HEADERS]}
+                ).execute()
+                return True
+                
+            except Exception as create_error:
+                logger.error(f"Failed to create tab {INDEX_LOG_TAB_NAME}: {create_error}")
+                return False
+        else:
+            logger.error(f"Failed to check/create index headers: {e}")
+            return False
+
+
+def log_index_entry(
+    ta_id: str,
+    ta_slug: str,
+    file_name: str,
+    doc_type: str,
+    total_pages: int,
+    raw_text_length: int,
+    chunk_index: int,
+    total_chunks: int,
+    chunk_text_length: int,
+    chunk_context: str,
+    chunk_text_preview: str,
+    enriched_text_preview: str,
+    has_embedding: bool,
+    status: str = "success",
+    error_message: str = ""
+) -> bool:
+    """Log a single chunk's indexing details to Google Sheets index_logs tab."""
+    if not Config.QA_LOG_SHEET_ID:
+        logger.debug("Index logging disabled - no sheet ID configured")
+        return False
+    
+    def _do_log():
+        try:
+            service = _get_sheets_service()
+            if not service:
+                logger.warning("Could not get Google Sheets service for index logging")
+                return
+            
+            if not _ensure_index_headers_exist(service, Config.QA_LOG_SHEET_ID):
+                return
+            
+            row = [
+                datetime.utcnow().isoformat() + 'Z',
+                str(ta_id),
+                ta_slug,
+                file_name,
+                doc_type or "",
+                str(total_pages) if total_pages else "",
+                str(raw_text_length),
+                str(chunk_index),
+                str(total_chunks),
+                str(chunk_text_length),
+                chunk_context[:200] if chunk_context else "",
+                chunk_text_preview[:300] if chunk_text_preview else "",
+                enriched_text_preview[:300] if enriched_text_preview else "",
+                "yes" if has_embedding else "no",
+                status,
+                error_message[:500] if error_message else ""
+            ]
+            
+            service.spreadsheets().values().append(
+                spreadsheetId=Config.QA_LOG_SHEET_ID,
+                range=f'{INDEX_LOG_TAB_NAME}!A:A',
+                valueInputOption='RAW',
+                insertDataOption='INSERT_ROWS',
+                body={'values': [row]}
+            ).execute()
+            
+            logger.debug(f"Logged index entry for {file_name} chunk {chunk_index}")
+            
+        except Exception as e:
+            logger.error(f"Failed to log index entry: {e}")
+    
+    thread = threading.Thread(target=_do_log, daemon=True)
+    thread.start()
+    return True
+
+
+def log_index_batch(entries: list) -> bool:
+    """Log multiple chunk indexing entries at once (more efficient for large documents)."""
+    if not Config.QA_LOG_SHEET_ID:
+        logger.debug("Index logging disabled - no sheet ID configured")
+        return False
+    
+    if not entries:
+        return True
+    
+    def _do_log():
+        try:
+            service = _get_sheets_service()
+            if not service:
+                logger.warning("Could not get Google Sheets service for index logging")
+                return
+            
+            if not _ensure_index_headers_exist(service, Config.QA_LOG_SHEET_ID):
+                return
+            
+            rows = []
+            for entry in entries:
+                row = [
+                    datetime.utcnow().isoformat() + 'Z',
+                    str(entry.get("ta_id", "")),
+                    entry.get("ta_slug", ""),
+                    entry.get("file_name", ""),
+                    entry.get("doc_type", ""),
+                    str(entry.get("total_pages", "")) if entry.get("total_pages") else "",
+                    str(entry.get("raw_text_length", "")),
+                    str(entry.get("chunk_index", "")),
+                    str(entry.get("total_chunks", "")),
+                    str(entry.get("chunk_text_length", "")),
+                    (entry.get("chunk_context", "") or "")[:200],
+                    (entry.get("chunk_text_preview", "") or "")[:300],
+                    (entry.get("enriched_text_preview", "") or "")[:300],
+                    "yes" if entry.get("has_embedding") else "no",
+                    entry.get("status", "success"),
+                    (entry.get("error_message", "") or "")[:500]
+                ]
+                rows.append(row)
+            
+            service.spreadsheets().values().append(
+                spreadsheetId=Config.QA_LOG_SHEET_ID,
+                range=f'{INDEX_LOG_TAB_NAME}!A:A',
+                valueInputOption='RAW',
+                insertDataOption='INSERT_ROWS',
+                body={'values': rows}
+            ).execute()
+            
+            logger.info(f"Logged {len(rows)} index entries to Google Sheets")
+            
+        except Exception as e:
+            logger.error(f"Failed to log index batch: {e}")
+    
+    thread = threading.Thread(target=_do_log, daemon=True)
+    thread.start()
+    return True

@@ -129,12 +129,14 @@ def sanitize_text(text: str) -> str:
     text = ''.join(char for char in text if ord(char) >= 32 or char in '\n\r\t')
     return text
 
-def extract_text_from_file(file_path: str) -> str:
+def extract_text_from_file(file_path: str) -> tuple:
+    """Extract text from file. Returns (text, page_count) - page_count is 0 for non-PDFs."""
     ext = file_path.rsplit('.', 1)[-1].lower() if '.' in file_path else ''
+    page_count = 0
     
     try:
         if ext == 'pdf':
-            text = extract_pdf(file_path)
+            text, page_count = extract_pdf(file_path)
         elif ext in ('docx', 'doc'):
             text = extract_docx(file_path)
         elif ext in ('xlsx', 'xls'):
@@ -146,27 +148,28 @@ def extract_text_from_file(file_path: str) -> str:
             text = extract_pptx(file_path)
         else:
             logger.warning(f"Unsupported file type: {ext}")
-            return ""
+            return "", 0
         
-        return sanitize_text(text)
+        return sanitize_text(text), page_count
     except Exception as e:
         logger.error(f"Error extracting text from {file_path}: {e}")
-        return ""
+        return "", 0
 
-def extract_pdf(file_path: str) -> str:
-    text = _extract_pdf_pypdf2(file_path)
+def extract_pdf(file_path: str) -> tuple:
+    """Extract PDF text and return (text, page_count)."""
+    text, page_count = _extract_pdf_pypdf2(file_path)
     if text and len(text.strip()) > 100:
-        return text
+        return text, page_count
     
     logger.info("PyPDF2 extraction insufficient, trying pdfplumber...")
-    text = _extract_pdf_pdfplumber(file_path)
+    text, page_count = _extract_pdf_pdfplumber(file_path)
     if text and len(text.strip()) > 100:
-        return text
+        return text, page_count
     
-    return ""
+    return "", 0
 
-def _extract_pdf_pdfplumber(file_path: str) -> str:
-    """Extract PDF text using pdfplumber with total time limit."""
+def _extract_pdf_pdfplumber(file_path: str) -> tuple:
+    """Extract PDF text using pdfplumber with total time limit. Returns (text, page_count)."""
     try:
         import pdfplumber
         
@@ -195,25 +198,27 @@ def _extract_pdf_pdfplumber(file_path: str) -> str:
                     logger.warning(f"pdfplumber failed on page {page_num + 1}: {page_e}")
                     continue
                     
-        return "\n\n".join(text_parts)
+        return "\n\n".join(text_parts), total_pages
     except Exception as e:
         logger.warning(f"pdfplumber extraction failed: {e}")
-        return ""
+        return "", 0
 
-def _extract_pdf_pypdf2(file_path: str) -> str:
+def _extract_pdf_pypdf2(file_path: str) -> tuple:
+    """Extract PDF text using PyPDF2. Returns (text, page_count)."""
     try:
         from PyPDF2 import PdfReader
         
         reader = PdfReader(file_path)
         text_parts = []
+        page_count = len(reader.pages)
         for page in reader.pages:
             text = page.extract_text()
             if text:
                 text_parts.append(text)
-        return "\n\n".join(text_parts)
+        return "\n\n".join(text_parts), page_count
     except Exception as e:
         logger.warning(f"PyPDF2 extraction failed: {e}")
-        return ""
+        return "", 0
 
 def extract_docx(file_path: str) -> str:
     from docx import Document
@@ -344,8 +349,12 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
     
     from models import db, Document, TeachingAssistant, DocumentChunk
     from flask import current_app
+    from src.qa_logger import log_index_batch
     
     logger.info(f"[{ta_id}] Starting indexing process...")
+    
+    ta = db.session.get(TeachingAssistant, ta_id)
+    ta_slug = ta.slug if ta else "unknown"
     
     client = OpenAI(api_key=Config.OPENAI_API_KEY)
     
@@ -363,6 +372,7 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
     logger.info(f"[{ta_id}] Found {total_docs} documents to process: {doc_ids}")
     
     all_chunk_data = []
+    index_log_entries = []
     
     for doc_idx, doc_id in enumerate(doc_ids):
         doc = db.session.get(Document, doc_id)
@@ -377,6 +387,7 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
             progress_callback(ta_id, progress)
         
         text = None
+        page_count = 0
         
         logger.info(f"[{ta_id}] [{doc.id}] Extracting text...")
         if doc.file_content:
@@ -384,11 +395,11 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
                 tmp_file.write(doc.file_content)
                 tmp_path = tmp_file.name
             try:
-                text = extract_text_from_file(tmp_path)
+                text, page_count = extract_text_from_file(tmp_path)
             finally:
                 os.unlink(tmp_path)
         elif os.path.exists(doc.storage_path):
-            text = extract_text_from_file(doc.storage_path)
+            text, page_count = extract_text_from_file(doc.storage_path)
         else:
             logger.warning(f"[{ta_id}] [{doc.id}] No file content available - document needs to be re-uploaded")
             continue
@@ -397,7 +408,8 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
             logger.warning(f"[{ta_id}] [{doc.id}] No text extracted")
             continue
         
-        logger.info(f"[{ta_id}] [{doc.id}] Extracted {len(text)} chars")
+        raw_text_length = len(text)
+        logger.info(f"[{ta_id}] [{doc.id}] Extracted {raw_text_length} chars from {page_count} pages")
         
         logger.info(f"[{ta_id}] [{doc.id}] Extracting metadata with LLM...")
         metadata = extract_metadata_with_llm(text, doc.original_filename)
@@ -412,6 +424,7 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
         logger.info(f"[{ta_id}] [{doc.id}] Metadata saved")
         
         chunks = chunk_text_with_context(text, Config.CHUNK_SIZE, Config.CHUNK_OVERLAP, doc.original_filename)
+        total_chunks = len(chunks)
         
         for i, chunk_data in enumerate(chunks):
             all_chunk_data.append({
@@ -427,72 +440,111 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
                 "instructional_unit_label": doc.instructional_unit_label or "",
                 "file_name": doc.original_filename
             })
+            
+            index_log_entries.append({
+                "ta_id": ta_id,
+                "ta_slug": ta_slug,
+                "file_name": doc.original_filename,
+                "doc_type": doc.doc_type or "other",
+                "total_pages": page_count,
+                "raw_text_length": raw_text_length,
+                "chunk_index": i,
+                "total_chunks": total_chunks,
+                "chunk_text_length": len(chunk_data["original_text"]),
+                "chunk_context": chunk_data.get("context", ""),
+                "chunk_text_preview": chunk_data["original_text"][:300],
+                "enriched_text_preview": chunk_data["text"][:300],
+                "has_embedding": False,
+                "status": "pending",
+                "error_message": ""
+            })
     
     if not all_chunk_data:
         raise ValueError("No text content found in any documents")
     
     logger.info(f"[{ta_id}] Document processing complete. Total chunks to embed: {len(all_chunk_data)}")
     
-    all_embeddings = []
-    batch_size = 100
-    total_batches = (len(all_chunk_data) + batch_size - 1) // batch_size
-    
-    logger.info(f"[{ta_id}] Starting embedding generation ({total_batches} batches)...")
-    
-    for batch_idx, i in enumerate(range(0, len(all_chunk_data), batch_size)):
-        batch_texts = [c["chunk_text_enriched"] for c in all_chunk_data[i:i+batch_size]]
+    try:
+        all_embeddings = []
+        batch_size = 100
+        total_batches = (len(all_chunk_data) + batch_size - 1) // batch_size
         
-        if progress_callback and total_batches > 0:
-            progress = 50 + int((batch_idx / total_batches) * 40)
-            progress_callback(ta_id, progress)
+        logger.info(f"[{ta_id}] Starting embedding generation ({total_batches} batches)...")
         
-        logger.info(f"[{ta_id}] Embedding batch {batch_idx + 1}/{total_batches}...")
-        response = client.embeddings.create(
-            model=Config.EMBEDDING_MODEL,
-            input=batch_texts
-        )
-        
-        batch_embeddings = [item.embedding for item in response.data]
-        all_embeddings.extend(batch_embeddings)
-        logger.info(f"[{ta_id}] Embedded batch {batch_idx + 1}/{total_batches} ({len(all_embeddings)} total)")
-    
-    if progress_callback:
-        progress_callback(ta_id, 90)
-    
-    logger.info(f"[{ta_id}] Embeddings complete. Storing chunks in database...")
-    
-    db_batch_size = 500
-    total_db_batches = (len(all_chunk_data) + db_batch_size - 1) // db_batch_size
-    
-    for batch_idx, i in enumerate(range(0, len(all_chunk_data), db_batch_size)):
-        batch_end = min(i + db_batch_size, len(all_chunk_data))
-        
-        if progress_callback and total_db_batches > 0:
-            progress = 90 + int((batch_idx / total_db_batches) * 10)
-            progress_callback(ta_id, progress)
-        
-        logger.info(f"[{ta_id}] Creating chunk objects for batch {batch_idx + 1}/{total_db_batches}...")
-        for j in range(i, batch_end):
-            chunk_data = all_chunk_data[j]
-            chunk_obj = DocumentChunk(
-                ta_id=chunk_data["ta_id"],
-                document_id=chunk_data["document_id"],
-                chunk_index=chunk_data["chunk_index"],
-                chunk_text=sanitize_text(chunk_data["chunk_text"]),
-                chunk_context=chunk_data.get("context", "")[:256] if chunk_data.get("context") else None,
-                doc_type=chunk_data["doc_type"],
-                assignment_number=chunk_data["assignment_number"],
-                instructional_unit_number=chunk_data["instructional_unit_number"],
-                instructional_unit_label=chunk_data["instructional_unit_label"],
-                file_name=chunk_data["file_name"],
-                embedding=all_embeddings[j]
+        for batch_idx, i in enumerate(range(0, len(all_chunk_data), batch_size)):
+            batch_texts = [c["chunk_text_enriched"] for c in all_chunk_data[i:i+batch_size]]
+            
+            if progress_callback and total_batches > 0:
+                progress = 50 + int((batch_idx / total_batches) * 40)
+                progress_callback(ta_id, progress)
+            
+            logger.info(f"[{ta_id}] Embedding batch {batch_idx + 1}/{total_batches}...")
+            response = client.embeddings.create(
+                model=Config.EMBEDDING_MODEL,
+                input=batch_texts
             )
-            db.session.add(chunk_obj)
+            
+            batch_embeddings = [item.embedding for item in response.data]
+            all_embeddings.extend(batch_embeddings)
+            logger.info(f"[{ta_id}] Embedded batch {batch_idx + 1}/{total_batches} ({len(all_embeddings)} total)")
         
-        logger.info(f"[{ta_id}] Committing batch {batch_idx + 1}/{total_db_batches} to database...")
-        db_commit_with_retry(db)
-        logger.info(f"[{ta_id}] Stored batch {batch_idx + 1}/{total_db_batches}: chunks {i+1}-{batch_end} of {len(all_chunk_data)}")
-    
-    logger.info(f"[{ta_id}] Indexing complete! Total chunks: {len(all_chunk_data)}")
-    
-    return {"chunks_indexed": len(all_chunk_data)}
+        if progress_callback:
+            progress_callback(ta_id, 90)
+        
+        logger.info(f"[{ta_id}] Embeddings complete. Storing chunks in database...")
+        
+        db_batch_size = 500
+        total_db_batches = (len(all_chunk_data) + db_batch_size - 1) // db_batch_size
+        
+        for batch_idx, i in enumerate(range(0, len(all_chunk_data), db_batch_size)):
+            batch_end = min(i + db_batch_size, len(all_chunk_data))
+            
+            if progress_callback and total_db_batches > 0:
+                progress = 90 + int((batch_idx / total_db_batches) * 10)
+                progress_callback(ta_id, progress)
+            
+            logger.info(f"[{ta_id}] Creating chunk objects for batch {batch_idx + 1}/{total_db_batches}...")
+            for j in range(i, batch_end):
+                chunk_data = all_chunk_data[j]
+                chunk_obj = DocumentChunk(
+                    ta_id=chunk_data["ta_id"],
+                    document_id=chunk_data["document_id"],
+                    chunk_index=chunk_data["chunk_index"],
+                    chunk_text=sanitize_text(chunk_data["chunk_text"]),
+                    chunk_context=chunk_data.get("context", "")[:256] if chunk_data.get("context") else None,
+                    doc_type=chunk_data["doc_type"],
+                    assignment_number=chunk_data["assignment_number"],
+                    instructional_unit_number=chunk_data["instructional_unit_number"],
+                    instructional_unit_label=chunk_data["instructional_unit_label"],
+                    file_name=chunk_data["file_name"],
+                    embedding=all_embeddings[j]
+                )
+                db.session.add(chunk_obj)
+            
+            logger.info(f"[{ta_id}] Committing batch {batch_idx + 1}/{total_db_batches} to database...")
+            db_commit_with_retry(db)
+            logger.info(f"[{ta_id}] Stored batch {batch_idx + 1}/{total_db_batches}: chunks {i+1}-{batch_end} of {len(all_chunk_data)}")
+        
+        logger.info(f"[{ta_id}] Indexing complete! Total chunks: {len(all_chunk_data)}")
+        
+        for entry in index_log_entries:
+            entry["has_embedding"] = True
+            entry["status"] = "success"
+        
+        logger.info(f"[{ta_id}] Logging {len(index_log_entries)} index entries to Google Sheets...")
+        log_index_batch(index_log_entries)
+        
+        return {"chunks_indexed": len(all_chunk_data)}
+        
+    except Exception as e:
+        logger.error(f"[{ta_id}] Indexing failed during embedding/storage: {e}")
+        
+        for entry in index_log_entries:
+            entry["has_embedding"] = False
+            entry["status"] = "error"
+            entry["error_message"] = str(e)[:500]
+        
+        logger.info(f"[{ta_id}] Logging {len(index_log_entries)} failed index entries to Google Sheets...")
+        log_index_batch(index_log_entries)
+        
+        raise

@@ -69,6 +69,11 @@ maize/
 - PPTX (lecture slides)
 
 ## Recent Changes
+- Index Logging to Google Sheets (Jan 2026)
+  - Added comprehensive indexing diagnostics to `index_logs` tab in Google Sheets
+  - Logs 16 fields per chunk: timestamp, ta_id, ta_slug, file_name, doc_type, total_pages, raw_text_length, chunk_index, total_chunks, chunk_text_length, chunk_context, chunk_text_preview (300 chars), enriched_text_preview (300 chars), has_embedding, status, error_message
+  - Enables diagnosis of text extraction and chunking issues
+  - Batch logging for efficiency (all chunks logged at end of indexing)
 - Context Injection for Chunking (Jan 2026)
   - Added structural context to chunk embeddings to improve retrieval
   - Chunks now prefixed with document name and detected problem/section headers
