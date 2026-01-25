@@ -68,13 +68,14 @@ maize/
 - PPTX (lecture slides)
 
 ## Recent Changes
-- Phase 2: Keyword-Based Reranking (Jan 2026)
-  - Retrieves 20 chunks initially instead of 8
-  - Applies keyword reranker to select best 8 for context
-  - Boosts chunks containing sub-problem markers (e.g., "2f" → searches for "f)", "(f)", "part f")
-  - Preserves rerank_score for observability, logs boost values
-  - Addresses Pattern B failures where sub-problems ranked #9-15 in pure vector search
-  - QA logging now includes: rerank_applied, any_boosted, top_boost, rerank_score_top1, rerank_score_top8, vector_score_top1 (31 columns total, A-AE)
+- Phase 2: LLM-Based Reranking (Jan 2026)
+  - Replaced keyword reranking with GPT-4o-mini semantic reranking
+  - Retrieves 20 chunks initially, LLM scores each for relevance 0-10
+  - LLM understands specific problem references (e.g., "problem 2f" vs "3d")
+  - Returns top 8 most relevant chunks based on LLM judgment
+  - Includes reasoning for each chunk score for observability
+  - QA logging: rerank_applied, rerank_method, rerank_latency_ms, llm_score_top1, llm_score_top8, vector_score_top1, top_reasons (32 columns, A-AF)
+  - Robust fallback: pads with vector-order chunks if LLM returns incomplete results
 - Document-Aware Query Matching (Jan 2026)
   - Added fallback mechanism when regex patterns don't detect structured queries
   - Tokenizes query and document filenames, scores overlap to find matches
