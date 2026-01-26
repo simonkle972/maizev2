@@ -320,7 +320,8 @@ Extract the following information as JSON:
     "instructional_unit_label": "lecture" | "class" | "week" | "module" | "session" | null,
     "course_code": "MGT404" | null (if visible),
     "year": "2024" | "2025" | null (if mentioned),
-    "is_solutions": true | false (whether this contains solutions/answers)
+    "is_solutions": true | false (whether this contains solutions/answers),
+    "content_title": "The actual document title as written in the content (e.g., 'Self-Study Problem Set #2', 'Final Exam 2024'). Extract from headers/title text, not filename."
 }}
 
 Return ONLY valid JSON, no other text."""
@@ -353,7 +354,8 @@ Return ONLY valid JSON, no other text."""
                     "instructional_unit_label": None,
                     "course_code": None,
                     "year": None,
-                    "is_solutions": False
+                    "is_solutions": False,
+                    "content_title": None
                 }
 
 def chunk_text(text: str, chunk_size: int = 800, overlap: int = 200) -> list:
@@ -463,6 +465,7 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
         doc.assignment_number = metadata.get("assignment_number")
         doc.instructional_unit_number = metadata.get("instructional_unit_number")
         doc.instructional_unit_label = metadata.get("instructional_unit_label")
+        doc.content_title = metadata.get("content_title")
         doc.extraction_metadata = metadata
         doc.metadata_extracted = True
         logger.info(f"[{ta_id}] [{doc.id}] Saving metadata...")

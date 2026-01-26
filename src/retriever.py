@@ -59,12 +59,14 @@ def identify_target_documents(chunks: list, query_analysis: dict, ta_id: str) ->
     Strategy:
     1. If there's a filename filter from query analysis, use that document
     2. If there's a doc_type and assignment_number, find matching document
-    3. Otherwise, find the most frequently occurring document in top chunks
+    3. Search by content_title (actual document title from content, not filename)
+    4. Otherwise, find the most frequently occurring document in top chunks
     
     Returns:
         tuple: (list of document IDs, identification_method string)
     """
     from models import Document
+    import re
     
     if query_analysis.get("filename_filter"):
         doc = Document.query.filter_by(
@@ -103,6 +105,38 @@ def identify_target_documents(chunks: list, query_analysis: dict, ta_id: str) ->
         if len(docs) == 1:
             logger.info(f"[{ta_id}] Target doc identified via single doc_type match: {docs[0].original_filename}")
             return [docs[0].id], "single_doc_type_match"
+    
+    # Strategy: Search by content_title (handles misnamed files)
+    # Extract key terms from query that might match document titles
+    query_lower = query_analysis.get("original_query", "").lower() if query_analysis.get("original_query") else ""
+    if not query_lower and chunks:
+        query_lower = ""
+    
+    # Look for problem set/assignment number patterns in the query
+    ps_match = re.search(r'(?:problem\s*set|self[- ]?study(?:\s*problem\s*set)?)\s*#?\s*(\d+)', query_lower)
+    exam_match = re.search(r'(\d{4})?\s*(?:final|midterm|exam)', query_lower)
+    
+    if ps_match:
+        ps_number = ps_match.group(1)
+        # Search content_title for matching problem set number
+        docs = Document.query.filter_by(ta_id=ta_id).all()
+        for doc in docs:
+            if doc.content_title:
+                title_lower = doc.content_title.lower()
+                # Check if content_title contains the same problem set number
+                title_match = re.search(r'(?:problem\s*set|self[- ]?study(?:\s*problem\s*set)?)\s*#?\s*(\d+)', title_lower)
+                if title_match and title_match.group(1) == ps_number:
+                    logger.info(f"[{ta_id}] Target doc identified via content_title match: '{doc.content_title}' (file: {doc.original_filename})")
+                    return [doc.id], "content_title_match"
+    
+    if exam_match:
+        exam_year = exam_match.group(1) if exam_match.group(1) else None
+        docs = Document.query.filter_by(ta_id=ta_id, doc_type="exam").all()
+        if exam_year:
+            for doc in docs:
+                if doc.content_title and exam_year in doc.content_title:
+                    logger.info(f"[{ta_id}] Target doc identified via content_title exam match: '{doc.content_title}'")
+                    return [doc.id], "content_title_exam_match"
     
     if not chunks:
         logger.warning(f"[{ta_id}] No chunks available for document identification")
@@ -599,7 +633,8 @@ def analyze_query(query: str, ta_id: str = "") -> dict:
         "filename_match_score": None,
         "filename_matched_tokens": None,
         "is_conceptual": False,
-        "problem_reference": problem_ref  # New field for validation
+        "problem_reference": problem_ref,
+        "original_query": query  # For content_title matching in document identification
     }
     
     hw_patterns = [

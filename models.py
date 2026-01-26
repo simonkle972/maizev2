@@ -48,6 +48,7 @@ class Document(db.Model):
     instructional_unit_label = db.Column(db.String(64), nullable=True)
     metadata_extracted = db.Column(db.Boolean, default=False)
     extraction_metadata = db.Column(db.JSON, nullable=True)
+    content_title = db.Column(db.String(512), nullable=True)
 
 class ChatSession(db.Model):
     __tablename__ = 'chat_sessions'
