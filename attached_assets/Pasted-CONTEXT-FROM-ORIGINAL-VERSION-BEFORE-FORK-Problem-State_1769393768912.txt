@@ -1,0 +1,39 @@
+CONTEXT FROM ORIGINAL VERSION BEFORE FORK:
+
+Problem Statement
+Students querying specific problem references (e.g., "problem 2f") sometimes weren't getting relevant chunks if the subproblem was too far removed from the original problem text like subproblem f or g would be compared to a or b. 
+
+Root Cause Analysis
+1. Context injection bug: Chunks spanning section boundaries inherited context from the PREVIOUS section, not the section they actually contained
+2. Regex limitation: Header detection pattern (?:^|\n)(Problem\s+\d+...) only matches headers preceded by newlines, but PDF extraction produces headers preceded by tabs (e.g., market.\t\t\tProblem\t2:\t\tAirline)
+What We Built/Tried
+1. Index logging (working): Added 17-column diagnostic logging to Google Sheets index_logs tab showing chunk content, context, and headers found per document
+2. Boundary-aware chunking (partially working): Force chunk breaks at section headers with no overlap across boundaries - logic works in tests but fails on real PDFs due to regex issue
+3. Header position fix: Changed from match.start() to match.start(1) to capture actual header content position
+Current State (hypotheses)
+* Code correctly handles boundary splitting when headers ARE detected
+* Regex fails to detect "Problem 2" in real PDFs because it's preceded by tabs, not newlines
+* Fixing this specific regex will work for this PDF but is fragile for other document formats
+Proposed Approaches (For Fork Testing)
+1. Hybrid retrieval: Keep chunks, add full-document fallback when retrieval confidence is low
+2. Full document context: Skip chunking, pass entire docs to LLM (expensive but reliable)
+3. LLM semantic chunking: Use GPT-4o to intelligently segment documents by meaning
+4. Agentic retrieval: LLM decides retrieval strategy per query, retries if results look poor
+Key Files
+* src/document_processor.py - Chunking and context detection
+* src/retriever.py - Vector search and reranking
+* src/qa_logger.py - Google Sheets logging
+
+
+Detail on proposed approach we will pursue in this app:
+
+User prompt: Let's take a step back and truly evaluate our options here and define our goal: reliable retrieval of information for the purposes of explaining course materials and helping students learn.
+What are our options to proceed and fix ALL the problems we have identified in the past few runs? Let's think outside the box. For example, I have been thinking that I could hand any of these docs to ChatGPT by themselves and it would easily retrieve certain information if asked about it in the same way. Not that this is necessarily a good idea but the app could simply ingest entire raw docs into the LLM and relay the user prompt if it is struggling to retrieve the right chunks, etc based on indexed, continuous string in chunks.
+ Approach in this version: Options for Robust Retrieval
+1. Full Document Context (Your ChatGPT idea)
+* How it works: For small documents (<100k tokens), just pass the entire document to GPT-4o along with the query
+* Pros: 100% reliable retrieval, no chunking issues, handles any format
+* Cons: Expensive at scale (~$0.15-0.50 per query for large docs), slower responses
+* Hybrid variant: Try chunks first, fall back to full doc if retrieval confidence is low
+
+Verdict: Go with Hybrid variant.   For all planning of major code changes like this, review Maize_synthesis doc in attached_assets to avoid previous mistakes.
