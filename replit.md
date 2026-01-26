@@ -69,6 +69,13 @@ maize/
 - PPTX (lecture slides)
 
 ## Recent Changes
+- Post-Retrieval Validation (Jan 2026)
+  - Catches critical bug where LLM reranker confidently scores chunks from WRONG problem (e.g., scoring problem 3d highly when query asks for 2d)
+  - Extracts specific problem reference from query (e.g., "problem 2d" -> "2d")
+  - After reranking, validates that top chunks actually contain the expected reference
+  - If validation fails, triggers hybrid full-document fallback even if LLM scores were high
+  - New diagnostic fields: validation_performed, validation_passed, validation_expected_ref, validation_matches_found
+  - Key insight: High LLM rerank scores don't guarantee correctness; explicit validation catches wrong-problem matches
 - Hybrid Retrieval with Full-Document Fallback (Jan 2026)
   - Addresses core retrieval issue: chunks for distant subproblems (e.g., "problem 2f") often missed
   - When LLM reranking shows low confidence (top score < 6 or low score spread), triggers full-doc fallback

@@ -51,7 +51,11 @@ QA_LOG_HEADERS = [
     "hybrid_fallback_reason",
     "hybrid_doc_filename",
     "hybrid_doc_tokens",
-    "hybrid_doc_id_method"
+    "hybrid_doc_id_method",
+    "validation_performed",
+    "validation_passed",
+    "validation_expected_ref",
+    "validation_matches_found"
 ]
 
 INDEX_LOG_HEADERS = [
@@ -269,7 +273,11 @@ def log_qa_entry(
                 diag.get("hybrid_fallback_reason") or "",
                 diag.get("hybrid_doc_filename") or "",
                 str(diag.get("hybrid_doc_tokens", 0)),
-                diag.get("hybrid_doc_id_method") or ""
+                diag.get("hybrid_doc_id_method") or "",
+                str(diag.get("validation_performed", False)),
+                str(diag.get("validation_passed", "")),
+                diag.get("validation_expected_ref") or "",
+                str(diag.get("validation_matches_found", 0))
             ]
             
             service.spreadsheets().values().append(

@@ -420,6 +420,128 @@ def get_openai_client():
             raise ValueError("OPENAI_API_KEY not configured")
     return _openai_client
 
+def extract_problem_reference(query: str) -> dict:
+    """
+    Extract specific problem/question reference from query.
+    
+    Examples:
+    - "problem 2d" -> {"problem_number": "2", "sub_part": "d", "full_ref": "2d"}
+    - "question 3a" -> {"problem_number": "3", "sub_part": "a", "full_ref": "3a"}  
+    - "problem 7" -> {"problem_number": "7", "sub_part": None, "full_ref": "7"}
+    - "part b of problem 5" -> {"problem_number": "5", "sub_part": "b", "full_ref": "5b"}
+    
+    Returns empty dict if no specific reference found.
+    """
+    query_lower = query.lower()
+    
+    # Pattern 1: "problem 2d", "question 3a", "exercise 1b"
+    match = re.search(r'(?:problem|question|exercise|prob|q)\s*(\d+)\s*([a-z])?(?:\s|$|\.|\,|\?)', query_lower)
+    if match:
+        problem_num = match.group(1)
+        sub_part = match.group(2)
+        full_ref = f"{problem_num}{sub_part}" if sub_part else problem_num
+        return {
+            "problem_number": problem_num,
+            "sub_part": sub_part,
+            "full_ref": full_ref
+        }
+    
+    # Pattern 2: "part d of problem 2", "part (a) of question 3"
+    match = re.search(r'part\s*\(?([a-z])\)?\s*(?:of|from|in)?\s*(?:problem|question|exercise|prob|q)\s*(\d+)', query_lower)
+    if match:
+        sub_part = match.group(1)
+        problem_num = match.group(2)
+        return {
+            "problem_number": problem_num,
+            "sub_part": sub_part,
+            "full_ref": f"{problem_num}{sub_part}"
+        }
+    
+    # Pattern 3: "2d", "3a" standalone with problem context words nearby
+    if any(word in query_lower for word in ['problem', 'question', 'exercise', 'help', 'solve', 'answer']):
+        match = re.search(r'(?:^|\s)(\d+)([a-z])(?:\s|$|\.|\,|\?)', query_lower)
+        if match:
+            problem_num = match.group(1)
+            sub_part = match.group(2)
+            return {
+                "problem_number": problem_num,
+                "sub_part": sub_part,
+                "full_ref": f"{problem_num}{sub_part}"
+            }
+    
+    return {}
+
+
+def validate_chunks_contain_reference(chunks: list, problem_ref: dict) -> dict:
+    """
+    Validate that retrieved chunks actually contain the expected problem reference.
+    
+    This catches cases where the LLM reranker gives high scores to chunks from
+    the wrong problem (e.g., scoring problem 3d highly when query asks for 2d).
+    
+    Returns:
+        dict with:
+        - passed: bool - True if validation passed
+        - reason: str - explanation
+        - matches_found: int - number of chunks containing the reference
+    """
+    if not problem_ref or not problem_ref.get("full_ref"):
+        return {"passed": True, "reason": "no_reference_to_validate", "matches_found": 0}
+    
+    if not chunks:
+        return {"passed": False, "reason": "no_chunks", "matches_found": 0}
+    
+    full_ref = problem_ref["full_ref"]
+    problem_num = problem_ref["problem_number"]
+    sub_part = problem_ref.get("sub_part")
+    
+    # Build patterns to look for in chunk text
+    # We need to find evidence that the chunk is about the RIGHT problem
+    patterns = []
+    
+    if sub_part:
+        # Looking for "2d", "2 d", "2(d)", "2.d", "(d)" when problem 2 is mentioned
+        patterns.extend([
+            rf'(?:problem|question|exercise|prob|q)?\s*{problem_num}\s*[\.\(\s]*{sub_part}[\)\s\.]',  # "2d", "2.d", "2(d)"
+            rf'(?:problem|question|exercise)\s+{problem_num}[^\d].*\({sub_part}\)',  # "problem 2 ... (d)"
+            rf'\({sub_part}\)[^\)]*(?:problem|question)?\s*{problem_num}',  # "(d) ... problem 2" (reverse order)
+            rf'(?:^|\n)\s*\({sub_part}\)',  # "(d)" at start of line (if in context of right problem)
+            rf'(?:^|\n)\s*{sub_part}\)',  # "d)" at start of line
+            rf'part\s*\(?{sub_part}\)?',  # "part d" or "part (d)"
+        ])
+    else:
+        # Just looking for problem number
+        patterns.append(rf'(?:problem|question|exercise|prob|q)\s*{problem_num}(?:\s|$|\.|\,)')
+    
+    matches_found = 0
+    matching_chunks = []
+    
+    for i, chunk in enumerate(chunks[:8]):  # Check top 8 chunks
+        chunk_text = chunk.get("text", "").lower()
+        
+        for pattern in patterns:
+            if re.search(pattern, chunk_text):
+                matches_found += 1
+                matching_chunks.append(i)
+                break
+    
+    # Validation passes if at least one of the top chunks contains the reference
+    if matches_found > 0:
+        return {
+            "passed": True,
+            "reason": f"found_in_{matches_found}_chunks",
+            "matches_found": matches_found,
+            "matching_chunk_indices": matching_chunks
+        }
+    else:
+        return {
+            "passed": False,
+            "reason": f"reference_{full_ref}_not_found_in_top_chunks",
+            "matches_found": 0,
+            "matching_chunk_indices": []
+        }
+
+
 def analyze_query(query: str, ta_id: str = "") -> dict:
     """
     Analyze a query to extract structured filters.
@@ -429,6 +551,9 @@ def analyze_query(query: str, ta_id: str = "") -> dict:
     """
     query_lower = query.lower()
     
+    # Extract specific problem reference for validation
+    problem_ref = extract_problem_reference(query)
+    
     analysis = {
         "doc_type_filter": None,
         "assignment_filter": None,
@@ -436,7 +561,8 @@ def analyze_query(query: str, ta_id: str = "") -> dict:
         "filename_filter": None,
         "filename_match_score": None,
         "filename_matched_tokens": None,
-        "is_conceptual": False
+        "is_conceptual": False,
+        "problem_reference": problem_ref  # New field for validation
     }
     
     hw_patterns = [
@@ -539,7 +665,11 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8) -> tuple:
         "hybrid_fallback_triggered": False,
         "hybrid_fallback_reason": None,
         "hybrid_doc_filename": None,
-        "hybrid_doc_tokens": 0
+        "hybrid_doc_tokens": 0,
+        "validation_performed": False,
+        "validation_passed": None,
+        "validation_expected_ref": None,
+        "validation_matches_found": 0
     }
     
     total_chunks = DocumentChunk.query.filter_by(ta_id=ta_id).count()
@@ -683,10 +813,35 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8) -> tuple:
         diagnostics["chunk_scores"] = [round(s, 4) for s in scores]
         diagnostics["chunk_sources_detail"] = sources_detail
     
+    # Post-retrieval validation: check if chunks contain the expected problem reference
+    problem_ref = query_analysis.get("problem_reference", {})
+    validation_result = {"passed": True, "reason": "no_reference_to_validate", "matches_found": 0}
+    
+    if problem_ref and problem_ref.get("full_ref"):
+        validation_result = validate_chunks_contain_reference(chunks, problem_ref)
+        diagnostics["validation_performed"] = True
+        diagnostics["validation_passed"] = validation_result["passed"]
+        diagnostics["validation_expected_ref"] = problem_ref.get("full_ref")
+        diagnostics["validation_matches_found"] = validation_result["matches_found"]
+        
+        if not validation_result["passed"]:
+            logger.warning(f"[{ta_id}] Validation FAILED: expected reference '{problem_ref['full_ref']}' not found in top chunks")
+    
     confidence = assess_retrieval_confidence(chunks, rerank_info)
     
-    if confidence["is_low_confidence"]:
-        logger.info(f"[{ta_id}] Low confidence detected: {confidence['reason']} (top_score={confidence['top_score']}, spread={confidence['score_spread']})")
+    # Trigger hybrid fallback if: low confidence OR validation failed
+    should_trigger_hybrid = confidence["is_low_confidence"] or (
+        diagnostics["validation_performed"] and not diagnostics["validation_passed"]
+    )
+    
+    if should_trigger_hybrid:
+        # Determine the reason for triggering hybrid
+        if not validation_result["passed"] and diagnostics["validation_performed"]:
+            trigger_reason = f"validation_failed_{validation_result['reason']}"
+            logger.info(f"[{ta_id}] Hybrid triggered by VALIDATION FAILURE: expected '{problem_ref.get('full_ref')}' not in chunks")
+        else:
+            trigger_reason = confidence["reason"]
+            logger.info(f"[{ta_id}] Hybrid triggered by LOW CONFIDENCE: {confidence['reason']} (top_score={confidence['top_score']}, spread={confidence['score_spread']})")
         
         target_doc_ids, id_method = identify_target_documents(chunks, query_analysis, ta_id)
         diagnostics["hybrid_doc_id_method"] = id_method
@@ -699,7 +854,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8) -> tuple:
                 logger.info(f"[{ta_id}] Hybrid fallback: using full document '{filename}' ({token_estimate} tokens)")
                 
                 diagnostics["hybrid_fallback_triggered"] = True
-                diagnostics["hybrid_fallback_reason"] = confidence["reason"]
+                diagnostics["hybrid_fallback_reason"] = trigger_reason
                 diagnostics["hybrid_doc_filename"] = filename
                 diagnostics["hybrid_doc_tokens"] = token_estimate
                 diagnostics["retrieval_method"] = "hybrid_full_doc"
