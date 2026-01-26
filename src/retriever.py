@@ -424,17 +424,63 @@ def extract_problem_reference(query: str) -> dict:
     """
     Extract specific problem/question reference from query.
     
-    Examples:
+    Handles both standard and inverted patterns to support natural speech:
+    
+    Standard patterns:
     - "problem 2d" -> {"problem_number": "2", "sub_part": "d", "full_ref": "2d"}
     - "question 3a" -> {"problem_number": "3", "sub_part": "a", "full_ref": "3a"}  
     - "problem 7" -> {"problem_number": "7", "sub_part": None, "full_ref": "7"}
     - "part b of problem 5" -> {"problem_number": "5", "sub_part": "b", "full_ref": "5b"}
     
+    Inverted patterns (sub-part mentioned first, section/problem later):
+    - "question a from section 1" -> {"problem_number": "1", "sub_part": "a", "full_ref": "1a"}
+    - "part c) from section 2" -> {"problem_number": "2", "sub_part": "c", "full_ref": "2c"}
+    - "question d) from problem 3" -> {"problem_number": "3", "sub_part": "d", "full_ref": "3d"}
+    
     Returns empty dict if no specific reference found.
     """
     query_lower = query.lower()
     
-    # Pattern 1: "problem 2d", "question 3a", "exercise 1b"
+    # IMPORTANT: Pattern order matters! More specific patterns must come BEFORE generic ones.
+    # Otherwise "part b of problem 5" matches "problem 5" first (without sub_part).
+    
+    # Pattern 1: "part d of problem 2", "part (a) of question 3" (SPECIFIC - check first)
+    match = re.search(r'part\s*\(?([a-z])\)?\s*(?:of|from|in)?\s*(?:problem|question|exercise|prob|q)\s*(\d+)', query_lower)
+    if match:
+        sub_part = match.group(1)
+        problem_num = match.group(2)
+        return {
+            "problem_number": problem_num,
+            "sub_part": sub_part,
+            "full_ref": f"{problem_num}{sub_part}"
+        }
+    
+    # Pattern 2: INVERTED - "question a) from section 1", "part c from section 2", "question d) from problem 3"
+    # Captures sub-part first, then section/problem number later (SPECIFIC - check before generic)
+    match = re.search(r'(?:question|part|q)\s*\(?([a-z])\)?\s*(?:of|from|in)\s*(?:section|problem|question|part|exercise)\s*(\d+)', query_lower)
+    if match:
+        sub_part = match.group(1)
+        problem_num = match.group(2)
+        logger.info(f"Extracted inverted reference: section {problem_num}, sub-part {sub_part} -> {problem_num}{sub_part}")
+        return {
+            "problem_number": problem_num,
+            "sub_part": sub_part,
+            "full_ref": f"{problem_num}{sub_part}"
+        }
+    
+    # Pattern 3: "section 1 question a", "section 2, part b" (section first, then sub-part)
+    match = re.search(r'section\s*(\d+)\s*(?:,?\s*)?(?:question|part|q)\s*\(?([a-z])\)?', query_lower)
+    if match:
+        problem_num = match.group(1)
+        sub_part = match.group(2)
+        logger.info(f"Extracted section-first reference: section {problem_num}, sub-part {sub_part} -> {problem_num}{sub_part}")
+        return {
+            "problem_number": problem_num,
+            "sub_part": sub_part,
+            "full_ref": f"{problem_num}{sub_part}"
+        }
+    
+    # Pattern 4: Standard - "problem 2d", "question 3a", "exercise 1b" (GENERIC - check after specific patterns)
     match = re.search(r'(?:problem|question|exercise|prob|q)\s*(\d+)\s*([a-z])?(?:\s|$|\.|\,|\?)', query_lower)
     if match:
         problem_num = match.group(1)
@@ -446,19 +492,8 @@ def extract_problem_reference(query: str) -> dict:
             "full_ref": full_ref
         }
     
-    # Pattern 2: "part d of problem 2", "part (a) of question 3"
-    match = re.search(r'part\s*\(?([a-z])\)?\s*(?:of|from|in)?\s*(?:problem|question|exercise|prob|q)\s*(\d+)', query_lower)
-    if match:
-        sub_part = match.group(1)
-        problem_num = match.group(2)
-        return {
-            "problem_number": problem_num,
-            "sub_part": sub_part,
-            "full_ref": f"{problem_num}{sub_part}"
-        }
-    
-    # Pattern 3: "2d", "3a" standalone with problem context words nearby
-    if any(word in query_lower for word in ['problem', 'question', 'exercise', 'help', 'solve', 'answer']):
+    # Pattern 5: "2d", "3a" standalone with problem context words nearby
+    if any(word in query_lower for word in ['problem', 'question', 'exercise', 'help', 'solve', 'answer', 'section']):
         match = re.search(r'(?:^|\s)(\d+)([a-z])(?:\s|$|\.|\,|\?)', query_lower)
         if match:
             problem_num = match.group(1)
@@ -496,22 +531,24 @@ def validate_chunks_contain_reference(chunks: list, problem_ref: dict) -> dict:
     sub_part = problem_ref.get("sub_part")
     
     # Build patterns to look for in chunk text
-    # We need to find evidence that the chunk is about the RIGHT problem
+    # We need to find evidence that the chunk is about the RIGHT problem/section
     patterns = []
     
     if sub_part:
-        # Looking for "2d", "2 d", "2(d)", "2.d", "(d)" when problem 2 is mentioned
+        # Looking for "2d", "2 d", "2(d)", "2.d", "(d)" when problem/section 2 is mentioned
+        # IMPORTANT: All patterns must require BOTH the section/problem number AND the sub-part
+        # to avoid false positives (e.g., matching "section 1" when looking for "1a")
         patterns.extend([
-            rf'(?:problem|question|exercise|prob|q)?\s*{problem_num}\s*[\.\(\s]*{sub_part}[\)\s\.]',  # "2d", "2.d", "2(d)"
-            rf'(?:problem|question|exercise)\s+{problem_num}[^\d].*\({sub_part}\)',  # "problem 2 ... (d)"
-            rf'\({sub_part}\)[^\)]*(?:problem|question)?\s*{problem_num}',  # "(d) ... problem 2" (reverse order)
-            rf'(?:^|\n)\s*\({sub_part}\)',  # "(d)" at start of line (if in context of right problem)
-            rf'(?:^|\n)\s*{sub_part}\)',  # "d)" at start of line
-            rf'part\s*\(?{sub_part}\)?',  # "part d" or "part (d)"
+            rf'(?:problem|question|exercise|section|prob|q)?\s*{problem_num}\s*[\.\(\s]*{sub_part}[\)\s\.]',  # "2d", "2.d", "2(d)"
+            rf'(?:problem|question|exercise|section)\s+{problem_num}[^\d].*\({sub_part}\)',  # "problem 2 ... (d)", "section 1 ... (a)"
+            rf'\({sub_part}\)[^\)]*(?:problem|question|section)?\s*{problem_num}',  # "(d) ... problem 2" (reverse order)
+            rf'(?:^|\n)\s*{sub_part}\)',  # "d)" at start of line - requires sub-part presence
+            rf'section\s+{problem_num}.*{sub_part}\)',  # "section 1 ... a)" - requires sub-part
+            rf'section\s+{problem_num}.*\({sub_part}\)',  # "section 1 ... (a)" - requires sub-part
         ])
     else:
-        # Just looking for problem number
-        patterns.append(rf'(?:problem|question|exercise|prob|q)\s*{problem_num}(?:\s|$|\.|\,)')
+        # Just looking for problem/section number (no sub-part to validate)
+        patterns.append(rf'(?:problem|question|exercise|section|prob|q)\s*{problem_num}(?:\s|$|\.|\,)')
     
     matches_found = 0
     matching_chunks = []
