@@ -72,7 +72,9 @@ maize/
 - Post-Retrieval Validation (Jan 2026)
   - Catches critical bug where LLM reranker confidently scores chunks from WRONG problem (e.g., scoring problem 3d highly when query asks for 2d)
   - Extracts specific problem reference from query (e.g., "problem 2d" -> "2d")
-  - After reranking, validates that top chunks actually contain the expected reference
+  - Supports natural speech patterns with inverted references: "question a from section 1" -> "1a"
+  - Pattern priority ensures specific patterns match before generic ones (e.g., "part b of problem 5" -> "5b")
+  - After reranking, validates that top chunks actually contain BOTH section/problem number AND sub-part
   - If validation fails, triggers hybrid full-document fallback even if LLM scores were high
   - New diagnostic fields: validation_performed, validation_passed, validation_expected_ref, validation_matches_found
   - Key insight: High LLM rerank scores don't guarantee correctness; explicit validation catches wrong-problem matches
