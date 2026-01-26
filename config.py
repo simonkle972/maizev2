@@ -27,7 +27,8 @@ class Config:
     METADATA_SCHEMA_VERSION = "1.0"
     
     QA_LOG_SHEET_ID = os.getenv("qa_log_googlesheet", "")
-    QA_LOG_TAB_NAME = "qa_logs"
+    QA_LOG_TAB_NAME = "qa_logs_v2"
+    INDEX_LOG_TAB_NAME = "index_logs_v2"
     
     HYBRID_RETRIEVAL_ENABLED = True
     HYBRID_CONFIDENCE_THRESHOLD = 6

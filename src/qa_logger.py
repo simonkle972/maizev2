@@ -74,7 +74,7 @@ INDEX_LOG_HEADERS = [
     "headers_found"
 ]
 
-INDEX_LOG_TAB_NAME = "index_logs"
+INDEX_LOG_TAB_NAME = Config.INDEX_LOG_TAB_NAME
 
 def _get_access_token() -> Optional[str]:
     global _connection_settings
