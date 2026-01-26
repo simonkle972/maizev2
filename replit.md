@@ -69,6 +69,13 @@ maize/
 - PPTX (lecture slides)
 
 ## Recent Changes
+- Boundary-Aware Chunking (Jan 2026)
+  - Fixed critical bug where all chunks were labeled "Problem 1" even when containing Problem 2 content
+  - Root cause: chunks spanning section boundaries inherited context from the PREVIOUS section
+  - Solution: Force chunk breaks at section headers (Problem X, Question X, etc.)
+  - When a header is detected within a chunk window, end chunk at boundary and start next chunk exactly at header
+  - No overlap applied across section boundaries to prevent context contamination
+  - Chunks now correctly labeled with the section they belong to
 - Index Logging to Google Sheets (Jan 2026)
   - Added comprehensive indexing diagnostics to `index_logs` tab in Google Sheets
   - Logs 16 fields per chunk: timestamp, ta_id, ta_slug, file_name, doc_type, total_pages, raw_text_length, chunk_index, total_chunks, chunk_text_length, chunk_context, chunk_text_preview (300 chars), enriched_text_preview (300 chars), has_embedding, status, error_message
