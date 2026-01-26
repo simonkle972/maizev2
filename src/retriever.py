@@ -1,11 +1,202 @@
 import os
 import re
 import logging
+import tempfile
 from openai import OpenAI
 from sqlalchemy import text
 from config import Config
 
 logger = logging.getLogger(__name__)
+
+
+def get_full_document_text(document_id: int) -> tuple:
+    """
+    Retrieve and extract full text from a document.
+    
+    Args:
+        document_id: The document ID to retrieve
+        
+    Returns:
+        tuple: (text, filename, token_estimate) or (None, None, 0) if failed
+    """
+    from models import Document
+    from src.document_processor import extract_text_from_file
+    
+    doc = Document.query.get(document_id)
+    if not doc:
+        logger.warning(f"Document {document_id} not found")
+        return None, None, 0
+    
+    text = None
+    
+    if doc.file_content:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=f".{doc.file_type}") as tmp_file:
+            tmp_file.write(doc.file_content)
+            tmp_path = tmp_file.name
+        try:
+            text, _ = extract_text_from_file(tmp_path)
+        finally:
+            os.unlink(tmp_path)
+    elif doc.storage_path and os.path.exists(doc.storage_path):
+        text, _ = extract_text_from_file(doc.storage_path)
+    else:
+        logger.warning(f"Document {document_id} has no file_content and storage_path is missing or invalid: {doc.storage_path}")
+        return None, None, 0
+    
+    if not text:
+        logger.warning(f"Could not extract text from document {document_id} (extraction returned empty)")
+        return None, None, 0
+    
+    token_estimate = len(text) // 4
+    
+    return text, doc.original_filename, token_estimate
+
+
+def identify_target_documents(chunks: list, query_analysis: dict, ta_id: str) -> tuple:
+    """
+    Identify which document(s) should be retrieved in full for fallback.
+    
+    Strategy:
+    1. If there's a filename filter from query analysis, use that document
+    2. If there's a doc_type and assignment_number, find matching document
+    3. Otherwise, find the most frequently occurring document in top chunks
+    
+    Returns:
+        tuple: (list of document IDs, identification_method string)
+    """
+    from models import Document
+    
+    if query_analysis.get("filename_filter"):
+        doc = Document.query.filter_by(
+            ta_id=ta_id,
+            original_filename=query_analysis["filename_filter"]
+        ).first()
+        if doc:
+            logger.info(f"[{ta_id}] Target doc identified via filename_filter: {doc.original_filename}")
+            return [doc.id], "filename_filter"
+    
+    if query_analysis.get("doc_type_filter") and query_analysis.get("assignment_filter"):
+        doc = Document.query.filter_by(
+            ta_id=ta_id,
+            doc_type=query_analysis["doc_type_filter"],
+            assignment_number=query_analysis["assignment_filter"]
+        ).first()
+        if doc:
+            logger.info(f"[{ta_id}] Target doc identified via metadata: {doc.original_filename}")
+            return [doc.id], "metadata_filter"
+    
+    if query_analysis.get("doc_type_filter") and query_analysis.get("unit_filter"):
+        doc = Document.query.filter_by(
+            ta_id=ta_id,
+            doc_type=query_analysis["doc_type_filter"],
+            instructional_unit_number=query_analysis["unit_filter"]
+        ).first()
+        if doc:
+            logger.info(f"[{ta_id}] Target doc identified via unit metadata: {doc.original_filename}")
+            return [doc.id], "unit_filter"
+    
+    if query_analysis.get("doc_type_filter"):
+        docs = Document.query.filter_by(
+            ta_id=ta_id,
+            doc_type=query_analysis["doc_type_filter"]
+        ).all()
+        if len(docs) == 1:
+            logger.info(f"[{ta_id}] Target doc identified via single doc_type match: {docs[0].original_filename}")
+            return [docs[0].id], "single_doc_type_match"
+    
+    if not chunks:
+        logger.warning(f"[{ta_id}] No chunks available for document identification")
+        return [], "no_chunks"
+    
+    doc_counts = {}
+    for chunk in chunks[:8]:
+        filename = chunk.get("file_name", "")
+        if filename:
+            doc_counts[filename] = doc_counts.get(filename, 0) + 1
+    
+    if not doc_counts:
+        logger.warning(f"[{ta_id}] No document filenames found in chunks")
+        return [], "no_filenames_in_chunks"
+    
+    top_filename = max(doc_counts.keys(), key=lambda k: doc_counts[k])
+    
+    doc = Document.query.filter_by(
+        ta_id=ta_id,
+        original_filename=top_filename
+    ).first()
+    
+    if doc:
+        logger.info(f"[{ta_id}] Target doc identified via chunk frequency: {doc.original_filename}")
+        return [doc.id], "chunk_frequency"
+    
+    logger.warning(f"[{ta_id}] Could not find document for filename: {top_filename}")
+    return [], "document_not_found"
+
+
+def assess_retrieval_confidence(chunks: list, rerank_info: dict) -> dict:
+    """
+    Assess confidence in chunk-based retrieval results.
+    
+    Returns a dict with:
+    - is_low_confidence: bool - True if we should trigger full-doc fallback
+    - reason: str - explanation of confidence assessment
+    - top_score: float - highest LLM relevance score (or vector score if no rerank)
+    - score_spread: float - difference between top and bottom scores
+    """
+    if not Config.HYBRID_RETRIEVAL_ENABLED:
+        return {
+            "is_low_confidence": False,
+            "reason": "hybrid_disabled",
+            "top_score": 0,
+            "score_spread": 0
+        }
+    
+    if not chunks:
+        return {
+            "is_low_confidence": True,
+            "reason": "no_chunks_retrieved",
+            "top_score": 0,
+            "score_spread": 0
+        }
+    
+    if not rerank_info.get("reranked", False):
+        vector_scores = [c.get("score", 0) for c in chunks]
+        top_vector = vector_scores[0] if vector_scores else 0
+        
+        if len(chunks) < 5 or top_vector < 0.75:
+            return {
+                "is_low_confidence": True,
+                "reason": f"no_rerank_low_vector_score_{top_vector:.3f}_or_few_chunks_{len(chunks)}",
+                "top_score": top_vector,
+                "score_spread": 0
+            }
+        return {
+            "is_low_confidence": False,
+            "reason": "no_rerank_but_adequate_vector_scores",
+            "top_score": top_vector,
+            "score_spread": 0
+        }
+    
+    llm_scores = [c.get("llm_relevance_score", 0) for c in chunks]
+    top_score = llm_scores[0] if llm_scores else 0
+    score_spread = (llm_scores[0] - llm_scores[-1]) if len(llm_scores) > 1 else 0
+    
+    is_low_confidence = False
+    reason = "adequate_confidence"
+    
+    if top_score < Config.HYBRID_CONFIDENCE_THRESHOLD:
+        is_low_confidence = True
+        reason = f"top_score_{top_score}_below_threshold_{Config.HYBRID_CONFIDENCE_THRESHOLD}"
+    elif score_spread < Config.HYBRID_SCORE_SPREAD_THRESHOLD and top_score < 8:
+        is_low_confidence = True
+        reason = f"low_spread_{score_spread}_and_moderate_top_{top_score}"
+    
+    return {
+        "is_low_confidence": is_low_confidence,
+        "reason": reason,
+        "top_score": top_score,
+        "score_spread": score_spread
+    }
 
 
 def tokenize_for_matching(text: str) -> set:
@@ -312,11 +503,15 @@ def analyze_query(query: str, ta_id: str = "") -> dict:
 
 def retrieve_context(ta_id: str, query: str, top_k: int = 8) -> tuple:
     """
-    Retrieve relevant chunks for a query.
+    Retrieve relevant chunks for a query with hybrid fallback.
+    
+    When chunk-based retrieval shows low confidence (poor LLM rerank scores),
+    falls back to retrieving the full document text for more reliable results.
     
     Returns:
         tuple: (chunks, diagnostics)
             - chunks: list of chunk dicts with text, score, file_name, etc.
+              If hybrid fallback triggered, returns a single "chunk" with full doc text
             - diagnostics: dict with retrieval metrics for logging
     """
     from models import db, DocumentChunk
@@ -340,7 +535,11 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8) -> tuple:
         "chunk_scores": [],
         "chunk_sources_detail": [],
         "rerank_applied": False,
-        "rerank_info": None
+        "rerank_info": None,
+        "hybrid_fallback_triggered": False,
+        "hybrid_fallback_reason": None,
+        "hybrid_doc_filename": None,
+        "hybrid_doc_tokens": 0
     }
     
     total_chunks = DocumentChunk.query.filter_by(ta_id=ta_id).count()
@@ -483,6 +682,50 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8) -> tuple:
         diagnostics["score_spread"] = round(scores[0] - scores[-1], 4) if len(scores) > 1 else 0.0
         diagnostics["chunk_scores"] = [round(s, 4) for s in scores]
         diagnostics["chunk_sources_detail"] = sources_detail
+    
+    confidence = assess_retrieval_confidence(chunks, rerank_info)
+    
+    if confidence["is_low_confidence"]:
+        logger.info(f"[{ta_id}] Low confidence detected: {confidence['reason']} (top_score={confidence['top_score']}, spread={confidence['score_spread']})")
+        
+        target_doc_ids, id_method = identify_target_documents(chunks, query_analysis, ta_id)
+        diagnostics["hybrid_doc_id_method"] = id_method
+        
+        if target_doc_ids:
+            doc_id = target_doc_ids[0]
+            full_text, filename, token_estimate = get_full_document_text(doc_id)
+            
+            if full_text and token_estimate <= Config.HYBRID_MAX_DOC_TOKENS:
+                logger.info(f"[{ta_id}] Hybrid fallback: using full document '{filename}' ({token_estimate} tokens)")
+                
+                diagnostics["hybrid_fallback_triggered"] = True
+                diagnostics["hybrid_fallback_reason"] = confidence["reason"]
+                diagnostics["hybrid_doc_filename"] = filename
+                diagnostics["hybrid_doc_tokens"] = token_estimate
+                diagnostics["retrieval_method"] = "hybrid_full_doc"
+                
+                hybrid_chunks = [{
+                    "text": full_text,
+                    "score": 10.0,
+                    "file_name": filename,
+                    "doc_type": chunks[0].get("doc_type", "other") if chunks else "other",
+                    "metadata": chunks[0].get("metadata", {}) if chunks else {},
+                    "is_full_document": True,
+                    "llm_relevance_score": 10.0,
+                    "llm_reason": "Full document fallback due to low chunk confidence"
+                }]
+                
+                logger.info(f"[{ta_id}] Hybrid fallback complete | doc={filename} | tokens={token_estimate}")
+                return hybrid_chunks, diagnostics
+            elif token_estimate > Config.HYBRID_MAX_DOC_TOKENS:
+                logger.warning(f"[{ta_id}] Document too large for hybrid fallback: {token_estimate} tokens > {Config.HYBRID_MAX_DOC_TOKENS}")
+                diagnostics["hybrid_fallback_reason"] = f"doc_too_large_{token_estimate}_tokens"
+            elif not full_text:
+                logger.warning(f"[{ta_id}] Failed to extract text from document {doc_id}")
+                diagnostics["hybrid_fallback_reason"] = f"extraction_failed_doc_{doc_id}"
+        else:
+            logger.warning(f"[{ta_id}] No target document identified for hybrid fallback (method={id_method})")
+            diagnostics["hybrid_fallback_reason"] = f"no_target_doc_{id_method}"
     
     logger.info(f"[{ta_id}] Retrieved {len(chunks)} chunks | method={diagnostics['retrieval_method']} | reranked={diagnostics['rerank_applied']} | scores: top1={diagnostics['score_top1']}, spread={diagnostics['score_spread']}")
     

@@ -28,3 +28,8 @@ class Config:
     
     QA_LOG_SHEET_ID = os.getenv("qa_log_googlesheet", "")
     QA_LOG_TAB_NAME = "qa_logs"
+    
+    HYBRID_RETRIEVAL_ENABLED = True
+    HYBRID_CONFIDENCE_THRESHOLD = 6
+    HYBRID_MAX_DOC_TOKENS = 80000
+    HYBRID_SCORE_SPREAD_THRESHOLD = 2

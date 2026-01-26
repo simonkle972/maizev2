@@ -69,6 +69,15 @@ maize/
 - PPTX (lecture slides)
 
 ## Recent Changes
+- Hybrid Retrieval with Full-Document Fallback (Jan 2026)
+  - Addresses core retrieval issue: chunks for distant subproblems (e.g., "problem 2f") often missed
+  - When LLM reranking shows low confidence (top score < 6 or low score spread), triggers full-doc fallback
+  - Identifies target document from query analysis or most-frequent document in retrieved chunks
+  - Extracts full document text and passes to LLM instead of chunks
+  - Configurable thresholds: HYBRID_CONFIDENCE_THRESHOLD=6, HYBRID_SCORE_SPREAD_THRESHOLD=2, HYBRID_MAX_DOC_TOKENS=80000
+  - New diagnostic fields in QA logs: hybrid_fallback_triggered, hybrid_fallback_reason, hybrid_doc_filename, hybrid_doc_tokens
+  - Key insight: ChatGPT with full document reliably answers any question; this replicates that for low-confidence retrievals
+  - Preserves chunk-based retrieval for high-confidence queries (cheaper, faster)
 - Boundary-Aware Chunking (Jan 2026)
   - Fixed critical bug where all chunks were labeled "Problem 1" even when containing Problem 2 content
   - Root cause: chunks spanning section boundaries inherited context from the PREVIOUS section

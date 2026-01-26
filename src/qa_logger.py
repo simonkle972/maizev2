@@ -46,7 +46,12 @@ QA_LOG_HEADERS = [
     "llm_score_top8",
     "vector_score_top1",
     "top_reasons",
-    "pre_rerank_candidates"
+    "pre_rerank_candidates",
+    "hybrid_fallback_triggered",
+    "hybrid_fallback_reason",
+    "hybrid_doc_filename",
+    "hybrid_doc_tokens",
+    "hybrid_doc_id_method"
 ]
 
 INDEX_LOG_HEADERS = [
@@ -133,21 +138,27 @@ def _get_sheets_service():
     return build('sheets', 'v4', credentials=credentials, cache_discovery=False)
 
 def _ensure_headers_exist(service, spreadsheet_id: str, tab_name: str) -> bool:
+    num_cols = len(QA_LOG_HEADERS)
+    end_col = chr(ord('A') + (num_cols - 1) % 26)
+    if num_cols > 26:
+        end_col = chr(ord('A') + (num_cols - 1) // 26 - 1) + chr(ord('A') + (num_cols - 1) % 26)
+    header_range = f'{tab_name}!A1:{end_col}1'
+    
     try:
         result = service.spreadsheets().values().get(
             spreadsheetId=spreadsheet_id,
-            range=f'{tab_name}!A1:AG1'
+            range=header_range
         ).execute()
         
         values = result.get('values', [])
         if not values or values[0] != QA_LOG_HEADERS:
             service.spreadsheets().values().update(
                 spreadsheetId=spreadsheet_id,
-                range=f'{tab_name}!A1:AG1',
+                range=header_range,
                 valueInputOption='RAW',
                 body={'values': [QA_LOG_HEADERS]}
             ).execute()
-            logger.info(f"Created/updated headers in {tab_name}")
+            logger.info(f"Created/updated headers in {tab_name} ({num_cols} columns)")
         
         return True
         
@@ -168,7 +179,7 @@ def _ensure_headers_exist(service, spreadsheet_id: str, tab_name: str) -> bool:
                 
                 service.spreadsheets().values().update(
                     spreadsheetId=spreadsheet_id,
-                    range=f'{tab_name}!A1:AG1',
+                    range=header_range,
                     valueInputOption='RAW',
                     body={'values': [QA_LOG_HEADERS]}
                 ).execute()
@@ -253,7 +264,12 @@ def log_qa_entry(
                 str(rerank_info.get("llm_score_top8", "")),
                 str(rerank_info.get("vector_score_top1", "")),
                 json.dumps(rerank_info.get("top_reasons", [])),
-                pre_rerank_str[:30000]
+                pre_rerank_str[:30000],
+                str(diag.get("hybrid_fallback_triggered", False)),
+                diag.get("hybrid_fallback_reason") or "",
+                diag.get("hybrid_doc_filename") or "",
+                str(diag.get("hybrid_doc_tokens", 0)),
+                diag.get("hybrid_doc_id_method") or ""
             ]
             
             service.spreadsheets().values().append(
