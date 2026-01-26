@@ -12,7 +12,10 @@ logger = logging.getLogger(__name__)
 def extract_section_headers(text: str) -> list:
     """
     Extract problem/section headers from document text with their positions.
-    Returns list of (start_position, header_text) tuples, sorted by position.
+    Returns list of (header_content_start, header_text) tuples, sorted by position.
+    
+    The position returned is the start of the actual header content (group 1),
+    not the newline/start anchor, so boundary splitting includes the header.
     
     Matches patterns like:
     - "Problem 1: Title"
@@ -37,7 +40,9 @@ def extract_section_headers(text: str) -> list:
             header_text = re.sub(r'\s+', ' ', header_text)
             if len(header_text) > 80:
                 header_text = header_text[:77] + "..."
-            headers.append((match.start(), header_text))
+            # Use start of group 1 (actual header content), not match.start() (which includes newline)
+            header_content_start = match.start(1)
+            headers.append((header_content_start, header_text))
     
     headers.sort(key=lambda x: x[0])
     return headers
@@ -57,10 +62,15 @@ def get_context_for_position(headers: list, position: int) -> str:
 
 def chunk_text_with_context(text: str, chunk_size: int = 800, overlap: int = 200, doc_filename: str = "") -> list:
     """
-    Chunk text and prepend structural context to each chunk.
+    Chunk text with boundary-aware splitting at section headers.
+    Forces chunk breaks at section boundaries (Problem X, Question X, etc.) so chunks
+    don't span multiple problems/sections.
     Returns list of dicts with 'text' (enriched) and 'original_text' (raw).
     """
     headers = extract_section_headers(text)
+    
+    # Cache sorted header positions once
+    sorted_header_positions = sorted(pos for pos, _ in headers)
     
     if len(text) <= chunk_size:
         context = get_context_for_position(headers, 0)
@@ -69,10 +79,27 @@ def chunk_text_with_context(text: str, chunk_size: int = 800, overlap: int = 200
     
     chunks = []
     start = 0
+    header_idx = 0  # Track position in sorted headers
+    
     while start < len(text):
+        # Advance header index past any headers at or before start
+        while header_idx < len(sorted_header_positions) and sorted_header_positions[header_idx] <= start:
+            header_idx += 1
+        next_boundary = sorted_header_positions[header_idx] if header_idx < len(sorted_header_positions) else None
+        
+        # Calculate tentative end position
         end = start + chunk_size
         
-        if end < len(text):
+        # Track if we're breaking at a boundary
+        breaking_at_boundary = False
+        
+        # If there's a section boundary within this chunk, force break there
+        if next_boundary is not None and next_boundary < end and next_boundary > start:
+            # End this chunk at the boundary position (not including the header)
+            end = next_boundary
+            breaking_at_boundary = True
+        elif end < len(text):
+            # No boundary in range - use natural break points as before
             break_points = [
                 text.rfind('\n\n', start, end),
                 text.rfind('. ', start, end),
@@ -84,8 +111,14 @@ def chunk_text_with_context(text: str, chunk_size: int = 800, overlap: int = 200
                     end = bp + 1
                     break
         
+        # Guard against zero-length chunks or no progress
+        if end <= start:
+            end = min(start + chunk_size, len(text))
+        
         chunk_text = text[start:end].strip()
+        
         if chunk_text:
+            # Get context for this chunk position
             context = get_context_for_position(headers, start)
             if context:
                 enriched = f"[{doc_filename} > {context}] {chunk_text}"
@@ -96,10 +129,23 @@ def chunk_text_with_context(text: str, chunk_size: int = 800, overlap: int = 200
                 "original_text": chunk_text,
                 "context": context
             })
+            
+            # Move to next position
+            if breaking_at_boundary:
+                # CRITICAL: Start exactly at the boundary with NO overlap
+                # This ensures the next chunk gets the correct section context
+                start = next_boundary
+            else:
+                start = end - overlap
+                if start < 0:
+                    start = 0
+        else:
+            # Empty chunk - advance to avoid infinite loop
+            if next_boundary is not None and next_boundary > start:
+                start = next_boundary
+            else:
+                start = end if end > start else start + 1
         
-        start = end - overlap
-        if start < 0:
-            start = 0
         if start >= len(text):
             break
     
