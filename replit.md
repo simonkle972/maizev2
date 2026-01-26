@@ -69,6 +69,13 @@ maize/
 - PPTX (lecture slides)
 
 ## Recent Changes
+- Content-Based Document Identification (Jan 2026)
+  - Addresses document misidentification when filenames don't match content (e.g., "ss#1.pdf" contains "Self-Study Problem Set #2")
+  - Extracts actual document title from content during indexing using LLM (`content_title` field)
+  - Query like "problem 4 from Self-Study Problem Set #2" now matches by content_title, not filename
+  - New Document column: `content_title` (extracted from document headers/title text)
+  - Fallback chain: filename_filter → metadata_filter → content_title_match → chunk_frequency
+  - Key insight: Filenames are unreliable; document content is authoritative
 - Post-Retrieval Validation (Jan 2026)
   - Catches critical bug where LLM reranker confidently scores chunks from WRONG problem (e.g., scoring problem 3d highly when query asks for 2d)
   - Extracts specific problem reference from query (e.g., "problem 2d" -> "2d")
