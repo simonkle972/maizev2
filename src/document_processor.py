@@ -469,6 +469,11 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
         db_commit_with_retry(db)
         logger.info(f"[{ta_id}] [{doc.id}] Metadata saved")
         
+        # Log headers found for diagnostic purposes
+        headers_found = extract_section_headers(text)
+        headers_summary = "; ".join([f"{h[1][:40]}" for h in headers_found[:5]])
+        logger.info(f"[{ta_id}] [{doc.id}] Found {len(headers_found)} headers: {headers_summary}")
+        
         chunks = chunk_text_with_context(text, Config.CHUNK_SIZE, Config.CHUNK_OVERLAP, doc.original_filename)
         total_chunks = len(chunks)
         
@@ -502,7 +507,8 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
                 "enriched_text_preview": chunk_data["text"][:300],
                 "has_embedding": False,
                 "status": "pending",
-                "error_message": ""
+                "error_message": "",
+                "headers_found": headers_summary if i == 0 else ""  # Only log on first chunk
             })
     
     if not all_chunk_data:

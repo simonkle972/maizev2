@@ -65,7 +65,8 @@ INDEX_LOG_HEADERS = [
     "enriched_text_preview",
     "has_embedding",
     "status",
-    "error_message"
+    "error_message",
+    "headers_found"
 ]
 
 INDEX_LOG_TAB_NAME = "index_logs"
@@ -320,7 +321,7 @@ def _ensure_index_headers_exist(service, spreadsheet_id: str) -> bool:
         if not values or values[0] != INDEX_LOG_HEADERS:
             service.spreadsheets().values().update(
                 spreadsheetId=spreadsheet_id,
-                range=f'{INDEX_LOG_TAB_NAME}!A1:P1',
+                range=f'{INDEX_LOG_TAB_NAME}!A1:Q1',
                 valueInputOption='RAW',
                 body={'values': [INDEX_LOG_HEADERS]}
             ).execute()
@@ -465,7 +466,8 @@ def log_index_batch(entries: list) -> bool:
                     (entry.get("enriched_text_preview", "") or "")[:300],
                     "yes" if entry.get("has_embedding") else "no",
                     entry.get("status", "success"),
-                    (entry.get("error_message", "") or "")[:500]
+                    (entry.get("error_message", "") or "")[:500],
+                    (entry.get("headers_found", "") or "")[:500]  # New diagnostic column
                 ]
                 rows.append(row)
             
