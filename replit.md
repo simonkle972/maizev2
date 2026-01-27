@@ -77,6 +77,14 @@ maize/
   - Reduced LLM temperature from 0.7 to 0.3 for more consistent responses
   - Key insight: All classification/filtering logic should have parity across retrieval flows
   - Note: Year filter uses filename; content_title parity not yet implemented (would require JOIN)
+- Hybrid Document ID Year Parity Fix (Jan 2026)
+  - Fixed bug where hybrid fallback identified wrong exam due to content_title matching
+  - Root cause: 2024 exam had "MGT 404 2023" in header (instructor typo), both exams matched "2023" in content
+  - Solution: identify_target_documents() now uses year_filter from query_analysis (not re-extraction)
+  - New priority: When year_filter + doc_type=exam, match by filename (authoritative) before content_title
+  - Content_title matching now only fallback when no year_filter provided
+  - New identification method logged: "filename_year_match"
+  - Key insight: Filename is authoritative for year; content may have errors
 - Hybrid Mode Prompt Enhancement (Jan 2026)
   - When full-document fallback is triggered, adds special instructions to the LLM response generator
   - HYBRID_FULL_DOC_INSTRUCTIONS tells LLM: "You have the COMPLETE document - search thoroughly"

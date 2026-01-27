@@ -129,10 +129,18 @@ def identify_target_documents(chunks: list, query_analysis: dict, ta_id: str) ->
                     logger.info(f"[{ta_id}] Target doc identified via content_title match: '{doc.content_title}' (file: {doc.original_filename})")
                     return [doc.id], "content_title_match"
     
+    year_filter = query_analysis.get("year_filter")
+    if year_filter and query_analysis.get("doc_type_filter") == "exam":
+        docs = Document.query.filter_by(ta_id=ta_id, doc_type="exam").all()
+        for doc in docs:
+            if doc.original_filename and year_filter in doc.original_filename:
+                logger.info(f"[{ta_id}] Target doc identified via filename year match: '{doc.original_filename}' (year={year_filter})")
+                return [doc.id], "filename_year_match"
+    
     if exam_match:
         exam_year = exam_match.group(1) if exam_match.group(1) else None
         docs = Document.query.filter_by(ta_id=ta_id, doc_type="exam").all()
-        if exam_year:
+        if exam_year and not year_filter:
             for doc in docs:
                 if doc.content_title and exam_year in doc.content_title:
                     logger.info(f"[{ta_id}] Target doc identified via content_title exam match: '{doc.content_title}'")
