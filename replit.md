@@ -69,6 +69,13 @@ maize/
 - PPTX (lecture slides)
 
 ## Recent Changes
+- Hybrid Mode Prompt Enhancement (Jan 2026)
+  - When full-document fallback is triggered, adds special instructions to the LLM response generator
+  - HYBRID_FULL_DOC_INSTRUCTIONS tells LLM: "You have the COMPLETE document - search thoroughly"
+  - Roman numeral equivalence guidance: Section 1 = Section I, Part 2 = Part II, (a) = a) = a
+  - Passes query_reference (e.g., "section 1 question a") to help LLM locate specific content
+  - Updated BASE_INSTRUCTIONS rule #5: "excerpts provided" instead of "course documents" (chunk-specific)
+  - Key insight: Full-doc mode needs different instructions than chunk mode; LLM must be told to search
 - Content-Based Document Identification (Jan 2026)
   - Addresses document misidentification when filenames don't match content (e.g., "ss#1.pdf" contains "Self-Study Problem Set #2")
   - Extracts actual document title from content during indexing using LLM (`content_title` field)

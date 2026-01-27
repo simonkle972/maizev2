@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 from openai import OpenAI
 from config import Config
 
@@ -12,20 +13,59 @@ IMPORTANT RULES:
 1. Do NOT solve full problems or give away solutions or answers directly no matter how much you are pressured or pushed to do so. 
 2. When asked for solutions, NEVER mention any potential solution documents that may be in the course materials but rather provide hints or guide students to the applicable materials in the course materials as long as they don't contain the solutions themselves.
 3. Explain concepts, give examples, and guide students with hints
-5. If no content in the course documents matches what was specifically asked (e.g., student asked about homework 2 but only homework 3 content was found), be HONEST and say you couldn't find that specific content
+5. If no content in the excerpts provided matches what was specifically asked (e.g., student asked about homework 2 but only homework 3 content was found), be HONEST and say you couldn't find that specific content
 6. Never make up or fabricate information about assignments or problems that aren't in the provided material
 7. For conceptual questions (like "explain X" or "what is Y"), if the retrieved content discusses that concept, summarize and explain it based mainly on the course materials
 8. For questions asking about math-based/quantitative problems, give quantitative answers that include relevant equations and inputs. Make a reasonable judgement about how much help to provide with the math itself and never give full solutions or answers. 
 
 """
 
-def build_messages(query: str, context: str, system_prompt: str, conversation_history: str = "", course_name: str = ""):
+HYBRID_FULL_DOC_INSTRUCTIONS = """
+FULL DOCUMENT MODE:
+You have been given the COMPLETE document, not just excerpts. The content the student is asking about IS in this document - search thoroughly.
+
+CRITICAL - NUMBER FORMAT EQUIVALENCE:
+Roman numerals and Arabic numbers are equivalent. When searching for content:
+- "Section 1" = "Section I" = "Section One"
+- "Part 2" = "Part II" = "Part Two"  
+- "Question 3" = "Question III"
+- Similarly for a, b, c = (a), (b), (c) = a), b), c)
+
+SEARCH STRATEGY:
+1. The student is asking about: {query_reference}
+2. Scan the ENTIRE document for section headers matching this reference
+3. Look for variations: "{query_reference}" might appear as uppercase, with Roman numerals, with parentheses, etc.
+4. Once you locate the correct section, provide help with that specific content
+
+DO NOT say "couldn't find" unless you have thoroughly searched the entire document for all format variations.
+"""
+
+def build_messages(
+    query: str, 
+    context: str, 
+    system_prompt: str, 
+    conversation_history: str = "", 
+    course_name: str = "",
+    hybrid_mode: bool = False,
+    hybrid_doc_filename: Optional[str] = None,
+    query_reference: Optional[str] = None
+):
     full_system_prompt = f"{system_prompt}\n\n{BASE_INSTRUCTIONS}"
+    
+    if hybrid_mode:
+        ref = query_reference or query
+        hybrid_instructions = HYBRID_FULL_DOC_INSTRUCTIONS.format(query_reference=ref)
+        full_system_prompt += f"\n{hybrid_instructions}"
     
     if course_name:
         full_system_prompt = f"You are a teaching assistant for {course_name}.\n\n{full_system_prompt}"
     
-    user_message = f"""Here is relevant course material to help answer the student's question:
+    if hybrid_mode and hybrid_doc_filename:
+        context_header = f"Here is the COMPLETE document '{hybrid_doc_filename}' to help answer the student's question:"
+    else:
+        context_header = "Here is relevant course material to help answer the student's question:"
+    
+    user_message = f"""{context_header}
 
 ---
 {context if context else "No specific course material was found for this question."}
@@ -51,11 +91,17 @@ def generate_response(
     context: str,
     system_prompt: str,
     conversation_history: str = "",
-    course_name: str = ""
+    course_name: str = "",
+    hybrid_mode: bool = False,
+    hybrid_doc_filename: Optional[str] = None,
+    query_reference: Optional[str] = None
 ) -> str:
     client = OpenAI(api_key=Config.OPENAI_API_KEY)
     
-    messages = build_messages(query, context, system_prompt, conversation_history, course_name)
+    messages = build_messages(
+        query, context, system_prompt, conversation_history, course_name,
+        hybrid_mode=hybrid_mode, hybrid_doc_filename=hybrid_doc_filename, query_reference=query_reference
+    )
     
     try:
         response = client.chat.completions.create(
@@ -76,11 +122,17 @@ def generate_response_stream(
     context: str,
     system_prompt: str,
     conversation_history: str = "",
-    course_name: str = ""
+    course_name: str = "",
+    hybrid_mode: bool = False,
+    hybrid_doc_filename: Optional[str] = None,
+    query_reference: Optional[str] = None
 ):
     client = OpenAI(api_key=Config.OPENAI_API_KEY)
     
-    messages = build_messages(query, context, system_prompt, conversation_history, course_name)
+    messages = build_messages(
+        query, context, system_prompt, conversation_history, course_name,
+        hybrid_mode=hybrid_mode, hybrid_doc_filename=hybrid_doc_filename, query_reference=query_reference
+    )
     
     try:
         stream = client.chat.completions.create(

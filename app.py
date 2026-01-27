@@ -519,12 +519,19 @@ def chat_api(slug):
             history_text = "\n".join(history_parts)
         
         generation_start = time.time()
+        hybrid_mode = retrieval_diagnostics.get("hybrid_fallback_triggered", False)
+        hybrid_doc_filename = retrieval_diagnostics.get("hybrid_doc_filename")
+        query_reference = retrieval_diagnostics.get("validation_expected_ref")
+        
         response_text = generate_response(
             query=query,
             context=context,
             system_prompt=ta.system_prompt,
             conversation_history=history_text,
-            course_name=ta.course_name
+            course_name=ta.course_name,
+            hybrid_mode=hybrid_mode,
+            hybrid_doc_filename=hybrid_doc_filename,
+            query_reference=query_reference
         )
         generation_latency_ms = int((time.time() - generation_start) * 1000)
         
@@ -657,13 +664,20 @@ def chat_stream_api(slug):
             
             yield f"data: {json.dumps({'type': 'status', 'message': 'Generating response...'})}\n\n"
             
+            hybrid_mode = retrieval_diagnostics.get("hybrid_fallback_triggered", False)
+            hybrid_doc_filename = retrieval_diagnostics.get("hybrid_doc_filename")
+            query_reference = retrieval_diagnostics.get("validation_expected_ref")
+            
             generation_start = time.time()
             for token in generate_response_stream(
                 query=query,
                 context=context,
                 system_prompt=ta_system_prompt,
                 conversation_history=history_text,
-                course_name=ta_course_name
+                course_name=ta_course_name,
+                hybrid_mode=hybrid_mode,
+                hybrid_doc_filename=hybrid_doc_filename,
+                query_reference=query_reference
             ):
                 full_response += token
                 yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
