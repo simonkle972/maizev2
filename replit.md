@@ -69,6 +69,14 @@ maize/
 - PPTX (lecture slides)
 
 ## Recent Changes
+- Year Filtering Parity (Jan 2026)
+  - Added year extraction to analyze_query() using regex \b(20\d{2})\b
+  - Year filter now applied in pre-retrieval (filters chunks by file_name.contains(year))
+  - Achieves parity: year filtering was previously only in hybrid document identification
+  - Now "2023 final" queries return filters_applied: "doc_type=exam, year=2023"
+  - Reduced LLM temperature from 0.7 to 0.3 for more consistent responses
+  - Key insight: All classification/filtering logic should have parity across retrieval flows
+  - Note: Year filter uses filename; content_title parity not yet implemented (would require JOIN)
 - Hybrid Mode Prompt Enhancement (Jan 2026)
   - When full-document fallback is triggered, adds special instructions to the LLM response generator
   - HYBRID_FULL_DOC_INSTRUCTIONS tells LLM: "You have the COMPLETE document - search thoroughly"

@@ -629,6 +629,7 @@ def analyze_query(query: str, ta_id: str = "") -> dict:
         "doc_type_filter": None,
         "assignment_filter": None,
         "unit_filter": None,
+        "year_filter": None,
         "filename_filter": None,
         "filename_match_score": None,
         "filename_matched_tokens": None,
@@ -663,6 +664,11 @@ def analyze_query(query: str, ta_id: str = "") -> dict:
         if match:
             analysis["doc_type_filter"] = "exam"
             break
+    
+    year_match = re.search(r'\b(20\d{2})\b', query_lower)
+    if year_match:
+        analysis["year_filter"] = year_match.group(1)
+        logger.info(f"[{ta_id}] Year filter extracted: {analysis['year_filter']}")
     
     lecture_patterns = [
         r'lecture\s*(\d+)',
@@ -802,6 +808,15 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8) -> tuple:
         )
         has_filters = True
         filter_description = [f"filename={query_analysis['filename_filter']}", f"match_score={query_analysis.get('filename_match_score', 'N/A')}"]
+    
+    if query_analysis["year_filter"]:
+        year = query_analysis["year_filter"]
+        filtered_query = filtered_query.filter(
+            DocumentChunk.file_name.contains(year)
+        )
+        has_filters = True
+        filter_description.append(f"year={year}")
+        logger.info(f"[{ta_id}] Year filter applied: {year}")
     
     if has_filters:
         diagnostics["filters_applied"] = ", ".join(filter_description)

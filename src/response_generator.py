@@ -107,7 +107,7 @@ def generate_response(
         response = client.chat.completions.create(
             model=Config.LLM_MODEL,
             messages=messages,
-            temperature=0.7,
+            temperature=0.3,
             max_tokens=1500
         )
         
@@ -138,7 +138,7 @@ def generate_response_stream(
         stream = client.chat.completions.create(
             model=Config.LLM_MODEL,
             messages=messages,
-            temperature=0.7,
+            temperature=0.3,
             max_tokens=1500,
             stream=True
         )
