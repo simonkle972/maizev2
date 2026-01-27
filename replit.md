@@ -77,6 +77,15 @@ maize/
   - Reduced LLM temperature from 0.7 to 0.3 for more consistent responses
   - Key insight: All classification/filtering logic should have parity across retrieval flows
   - Note: Year filter uses filename; content_title parity not yet implemented (would require JOIN)
+- Document Classification Fix: Remove "solutions" as doc_type (Jan 2026)
+  - Removed "solutions" as a standalone doc_type from LLM classifier
+  - Root cause: Exam files with "solutions" in name were classified as "solutions" instead of "exam"
+  - This caused year filters to fail (doc_type=exam wouldn't match the 2023 exam)
+  - Valid doc_types: homework, exam, lecture, reading, syllabus, other
+  - is_solutions field captures whether document contains solutions/answers
+  - LLM prompt now explicitly instructs: classify by PRIMARY type, not solutions modifier
+  - Key insight: "solutions" is a modifier, not a document type
+  - Note: Existing files classified as "solutions" need re-indexing
 - Hybrid Document ID Year Parity Fix (Jan 2026)
   - Fixed bug where hybrid fallback identified wrong exam due to content_title matching
   - Root cause: 2024 exam had "MGT 404 2023" in header (instructor typo), both exams matched "2023" in content

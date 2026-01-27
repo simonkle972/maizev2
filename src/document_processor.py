@@ -314,7 +314,7 @@ Document preview:
 
 Extract the following information as JSON:
 {{
-    "doc_type": "homework" | "exam" | "lecture" | "solutions" | "reading" | "syllabus" | "other",
+    "doc_type": "homework" | "exam" | "lecture" | "reading" | "syllabus" | "other",
     "assignment_number": "1" | "2" | "3" | null (if applicable),
     "instructional_unit_number": 1 | 2 | 3 | null (lecture/class/week number if mentioned),
     "instructional_unit_label": "lecture" | "class" | "week" | "module" | "session" | null,
@@ -323,6 +323,11 @@ Extract the following information as JSON:
     "is_solutions": true | false (whether this contains solutions/answers),
     "content_title": "The actual document title as written in the content (e.g., 'Self-Study Problem Set #2', 'Final Exam 2024'). Extract from headers/title text, not filename."
 }}
+
+IMPORTANT: Classify by the PRIMARY document type, not whether it has solutions.
+- "exam_solutions.pdf" or "final_exam_with_solutions.pdf" → doc_type: "exam", is_solutions: true
+- "homework_answers.pdf" or "problem_set_solutions.pdf" → doc_type: "homework", is_solutions: true
+- "lecture_notes.pdf" → doc_type: "lecture"
 
 Return ONLY valid JSON, no other text."""
 
