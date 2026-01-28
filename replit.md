@@ -23,7 +23,8 @@ Key architectural decisions include:
 - **Context Injection**: Structural context (e.g., document name, problem/section headers) is injected into chunks before embedding to improve retrieval accuracy for specific queries.
 - **Post-Retrieval Validation**: An explicit validation step checks if the retrieved chunks align with the specific problem references in the user's query, triggering a full-document fallback if discrepancies are found, even with high LLM reranking scores.
 - **UI/UX**: The platform features an admin panel for TA creation and document management, and a student chat interface. It includes dynamic status indicators, in-page notifications, LaTeX math rendering with KaTeX, and drag-and-drop multi-file upload.
-- **Technology Stack**: Python 3.11, Flask, SQLAlchemy, PostgreSQL with pgvector, OpenAI `text-embedding-3-small` for embeddings (1536 dimensions), OpenAI GPT-4o for LLM tasks, PyPDF2, python-docx, openpyxl for file parsing.
+- **Technology Stack**: Python 3.11, Flask, SQLAlchemy, PostgreSQL with pgvector, OpenAI `text-embedding-3-small` for embeddings (1536 dimensions), OpenAI GPT-4o for LLM tasks, PyPDF2, docx2python (for DOCX with list numbering preservation), antiword/catdoc (for legacy .doc files), openpyxl for file parsing.
+- **Document Extraction**: Uses docx2python library for DOCX files to preserve list numbering (a, b, c, 1, 2, 3), tables, footnotes, and document structure. This ensures sub-part labels in problem sets are correctly indexed for accurate LLM navigation.
 
 ## External Dependencies
 - **OpenAI API**: Used for generating embeddings (`text-embedding-3-small`) and all Large Language Model (LLM) operations (`GPT-4o`).
