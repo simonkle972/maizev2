@@ -230,7 +230,7 @@ def log_qa_entry(
             
             import json
             
-            rerank_info = diag.get("rerank_info", {})
+            rerank_info = diag.get("rerank_info") or {}
             
             pre_rerank = diag.get("pre_rerank_candidates", [])
             pre_rerank_str = json.dumps(pre_rerank) if pre_rerank else "[]"
