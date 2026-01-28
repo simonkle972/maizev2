@@ -1,195 +1,31 @@
 # Maize - AI Teaching Assistant Platform
 
 ## Overview
-Maize is a multi-tenant AI-powered teaching assistant platform. Instructors create TAs for their courses, upload course materials (PDFs, DOCX, spreadsheets), and students interact with a chat interface to get help understanding concepts without receiving direct answers.
-
-## Project Structure
-```
-maize/
-├── app.py                    # Main Flask app with all routes
-├── config.py                 # Configuration and environment variables
-├── models.py                 # SQLAlchemy models (TeachingAssistant, Document, ChatSession, ChatMessage)
-├── src/
-│   ├── document_processor.py # Document ingestion, text extraction, chunking, LLM metadata extraction
-│   ├── retriever.py          # Vector search with ChromaDB, pre-retrieval filtering
-│   ├── response_generator.py # GPT-4o response generation with context
-│   └── query_analyzer.py     # Query understanding and classification
-├── templates/
-│   ├── landing.html          # Home page at /
-│   ├── admin.html            # Admin panel at /admin
-│   ├── chat.html             # Student chat interface at /<slug>
-│   └── 404.html              # Not found page
-├── static/css/style.css      # All CSS styles
-├── data/courses/             # Per-TA document storage
-└── chroma_db/                # Vector indices per TA
-```
-
-## Key URLs
-- `/` - Landing page
-- `/admin` - Admin panel (requires admin key)
-- `/<slug>` - Student chat interface for a TA (e.g., `/financecourse`)
-
-## Technology Stack
-- **Backend**: Python 3.11, Flask
-- **Database**: PostgreSQL (via SQLAlchemy)
-- **Vector Store**: PostgreSQL with pgvector extension (persistent, uses ivfflat indexing)
-- **Embeddings**: OpenAI text-embedding-3-small (1536 dimensions)
-- **Chunking**: chunk_size=800, overlap=200 (increased from 512/50 to reduce sub-problem boundary splits)
-- **LLM**: OpenAI GPT-4o
-- **File Parsing**: PyPDF2, python-docx, openpyxl/pandas
-
-## Key Design Decisions (Lessons from Prior Build)
-1. **One Retrieval Path**: Unified pipeline with parameterized behavior, not multiple conditional code paths
-2. **Pre-retrieval Filtering**: PostgreSQL metadata filters applied BEFORE vector search, not after
-3. **Full LLM Metadata Extraction**: Consistent approach using GPT-4o for document classification
-4. **Instructional Unit Normalization**: "Lecture 5", "Class 5", "Week 5" all map to unit_number=5
-5. **PostgreSQL for Persistence**: TA configs, documents, sessions, AND vector embeddings all in PostgreSQL
-6. **Per-TA Isolation**: Each TA has separate document collection filtered by ta_id
-
-## Environment Variables
-- `OPENAI_API_KEY` - Required for embeddings and LLM
-- `DATABASE_URL` - PostgreSQL connection (auto-provided)
-- `SESSION_SECRET` - Flask session secret
-- `admin_id` - Admin username for login (required)
-- `admin_pw` - Admin password for login (required)
-- `qa_log_googlesheet` - Google Sheet ID for QA logging (optional)
-
-## How to Use
-1. Go to `/admin` and login with the admin key
-2. Create a new TA with a slug (URL path), name, and course name
-3. Upload course documents (PDF, DOCX, XLSX, TXT, PPTX)
-4. Click "Index Documents" to process and create the vector index
-5. Students can access the TA at `/<slug>` and ask questions
-
-## Document Types Supported
-- PDF (lectures, assignments, exams)
-- DOCX (readings, notes)
-- XLSX (data, spreadsheets)
-- TXT (plain text)
-- PPTX (lecture slides)
-
-## Recent Changes
-- Year Filtering Parity (Jan 2026)
-  - Added year extraction to analyze_query() using regex \b(20\d{2})\b
-  - Year filter now applied in pre-retrieval (filters chunks by file_name.contains(year))
-  - Achieves parity: year filtering was previously only in hybrid document identification
-  - Now "2023 final" queries return filters_applied: "doc_type=exam, year=2023"
-  - Reduced LLM temperature from 0.7 to 0.3 for more consistent responses
-  - Key insight: All classification/filtering logic should have parity across retrieval flows
-  - Note: Year filter uses filename; content_title parity not yet implemented (would require JOIN)
-- Document Classification Fix: Remove "solutions" as doc_type (Jan 2026)
-  - Removed "solutions" as a standalone doc_type from LLM classifier
-  - Root cause: Exam files with "solutions" in name were classified as "solutions" instead of "exam"
-  - This caused year filters to fail (doc_type=exam wouldn't match the 2023 exam)
-  - Valid doc_types: homework, exam, lecture, reading, syllabus, other
-  - is_solutions field captures whether document contains solutions/answers
-  - LLM prompt now explicitly instructs: classify by PRIMARY type, not solutions modifier
-  - Key insight: "solutions" is a modifier, not a document type
-  - Note: Existing files classified as "solutions" need re-indexing
-- Hybrid Document ID Year Parity Fix (Jan 2026)
-  - Fixed bug where hybrid fallback identified wrong exam due to content_title matching
-  - Root cause: 2024 exam had "MGT 404 2023" in header (instructor typo), both exams matched "2023" in content
-  - Solution: identify_target_documents() now uses year_filter from query_analysis (not re-extraction)
-  - New priority: When year_filter + doc_type=exam, match by filename (authoritative) before content_title
-  - Content_title matching now only fallback when no year_filter provided
-  - New identification method logged: "filename_year_match"
-  - Key insight: Filename is authoritative for year; content may have errors
-- Hybrid Mode Prompt Enhancement (Jan 2026)
-  - When full-document fallback is triggered, adds special instructions to the LLM response generator
-  - HYBRID_FULL_DOC_INSTRUCTIONS tells LLM: "You have the COMPLETE document - search thoroughly"
-  - Roman numeral equivalence guidance: Section 1 = Section I, Part 2 = Part II, (a) = a) = a
-  - Passes query_reference (e.g., "section 1 question a") to help LLM locate specific content
-  - Updated BASE_INSTRUCTIONS rule #5: "excerpts provided" instead of "course documents" (chunk-specific)
-  - Key insight: Full-doc mode needs different instructions than chunk mode; LLM must be told to search
-- Content-Based Document Identification (Jan 2026)
-  - Addresses document misidentification when filenames don't match content (e.g., "ss#1.pdf" contains "Self-Study Problem Set #2")
-  - Extracts actual document title from content during indexing using LLM (`content_title` field)
-  - Query like "problem 4 from Self-Study Problem Set #2" now matches by content_title, not filename
-  - New Document column: `content_title` (extracted from document headers/title text)
-  - Fallback chain: filename_filter → metadata_filter → content_title_match → chunk_frequency
-  - Key insight: Filenames are unreliable; document content is authoritative
-- Post-Retrieval Validation (Jan 2026)
-  - Catches critical bug where LLM reranker confidently scores chunks from WRONG problem (e.g., scoring problem 3d highly when query asks for 2d)
-  - Extracts specific problem reference from query (e.g., "problem 2d" -> "2d")
-  - Supports natural speech patterns with inverted references: "question a from section 1" -> "1a"
-  - Pattern priority ensures specific patterns match before generic ones (e.g., "part b of problem 5" -> "5b")
-  - After reranking, validates that top chunks actually contain BOTH section/problem number AND sub-part
-  - If validation fails, triggers hybrid full-document fallback even if LLM scores were high
-  - New diagnostic fields: validation_performed, validation_passed, validation_expected_ref, validation_matches_found
-  - Key insight: High LLM rerank scores don't guarantee correctness; explicit validation catches wrong-problem matches
-- Hybrid Retrieval with Full-Document Fallback (Jan 2026)
-  - Addresses core retrieval issue: chunks for distant subproblems (e.g., "problem 2f") often missed
-  - When LLM reranking shows low confidence (top score < 6 or low score spread), triggers full-doc fallback
-  - Identifies target document from query analysis or most-frequent document in retrieved chunks
-  - Extracts full document text and passes to LLM instead of chunks
-  - Configurable thresholds: HYBRID_CONFIDENCE_THRESHOLD=6, HYBRID_SCORE_SPREAD_THRESHOLD=2, HYBRID_MAX_DOC_TOKENS=80000
-  - New diagnostic fields in QA logs: hybrid_fallback_triggered, hybrid_fallback_reason, hybrid_doc_filename, hybrid_doc_tokens
-  - Key insight: ChatGPT with full document reliably answers any question; this replicates that for low-confidence retrievals
-  - Preserves chunk-based retrieval for high-confidence queries (cheaper, faster)
-- Boundary-Aware Chunking (Jan 2026)
-  - Fixed critical bug where all chunks were labeled "Problem 1" even when containing Problem 2 content
-  - Root cause: chunks spanning section boundaries inherited context from the PREVIOUS section
-  - Solution: Force chunk breaks at section headers (Problem X, Question X, etc.)
-  - When a header is detected within a chunk window, end chunk at boundary and start next chunk exactly at header
-  - No overlap applied across section boundaries to prevent context contamination
-  - Chunks now correctly labeled with the section they belong to
-- Index Logging to Google Sheets (Jan 2026)
-  - Added comprehensive indexing diagnostics to `index_logs` tab in Google Sheets
-  - Logs 16 fields per chunk: timestamp, ta_id, ta_slug, file_name, doc_type, total_pages, raw_text_length, chunk_index, total_chunks, chunk_text_length, chunk_context, chunk_text_preview (300 chars), enriched_text_preview (300 chars), has_embedding, status, error_message
-  - Enables diagnosis of text extraction and chunking issues
-  - Batch logging for efficiency (all chunks logged at end of indexing)
-- Context Injection for Chunking (Jan 2026)
-  - Added structural context to chunk embeddings to improve retrieval
-  - Chunks now prefixed with document name and detected problem/section headers
-  - Example: "[ProblemSet1.pdf > Problem 2: Airline Tickets] c) (0.5 points)..."
-  - Fixes vocabulary mismatch where "problem 2c" query didn't match chunks containing just "c)"
-  - Simple regex patterns detect Problem/Question/Section/Part/Exercise headers
-- Phase 2: LLM-Based Reranking (Jan 2026)
-  - Replaced keyword reranking with GPT-4o-mini semantic reranking
-  - Retrieves 20 chunks initially, LLM scores each for relevance 0-10
-  - LLM understands specific problem references (e.g., "problem 2f" vs "3d")
-  - Returns top 8 most relevant chunks based on LLM judgment
-  - Includes reasoning for each chunk score for observability
-  - QA logging: rerank_applied, rerank_method, rerank_latency_ms, llm_score_top1, llm_score_top8, vector_score_top1, top_reasons, pre_rerank_candidates (33 columns, A-AG)
-  - Robust fallback: pads with vector-order chunks if LLM returns incomplete results
-- Document-Aware Query Matching (Jan 2026)
-  - Added fallback mechanism when regex patterns don't detect structured queries
-  - Tokenizes query and document filenames, scores overlap to find matches
-  - Handles unusual document names like "Grow Co. 1" that regex can't anticipate
-  - Applies filename filter pre-retrieval (same unified pipeline, new parameter)
-  - Logs match source, score, and matched tokens for observability
-- Text sanitization for indexing (Jan 2026)
-  - Added sanitize_text() to strip null bytes and control characters from PDFs
-  - Fixes PostgreSQL "string literal cannot contain NUL" errors
-- Phase 1 Retrieval Observability (Jan 2026)
-  - Added 11 new diagnostic fields to QA logging (now 25 columns total, A-Y)
-  - New fields: total_chunks_in_ta, filters_applied, filter_match_count, retrieval_method, is_conceptual, score_top1, score_top8, score_mean, score_spread, chunk_scores, chunk_sources_detail
-  - Both streaming and non-streaming endpoints now log QA entries
-  - Enables diagnosis of retrieval issues (precision vs. extraction problems)
-- QA logging to Google Sheets with timing metrics (Jan 2026)
-  - Async logging via background threads for non-blocking operation
-- Streaming chat responses with SSE (Jan 2026)
-- Dynamic status indicators during query processing (Jan 2026)
-- Improved LaTeX rendering with delimiter conversion (Jan 2026)
-- Fixed Flask app context issue in streaming endpoint (Jan 2026)
-- Migrated from ChromaDB to PostgreSQL pgvector for persistent vector storage (Jan 2026)
-- Added DocumentChunk model with embeddings stored in PostgreSQL (Jan 2026)
-- Added admin endpoint to reset stuck indexing status (Jan 2026)
-- Document content stored in PostgreSQL (file_content column) for persistence across deployments (Jan 2026)
-- Admin panel session expiration handling with user-friendly redirect (Jan 2026)
-- Background indexing with progress tracking (Jan 2026)
-- In-page notification bar replacing browser alerts (Jan 2026)
-- Session-based admin login with username/password (Jan 2026)
-- LaTeX math rendering in chat using KaTeX (Jan 2026)
-- Drag-and-drop multi-file upload in admin panel (Jan 2026)
-- Editable URL slugs for TAs (Jan 2026)
-- Initial MVP build (Jan 2026)
-- Multi-tenant architecture with PostgreSQL
-- LLM-based metadata extraction
-- Session-based conversation history
+Maize is a multi-tenant AI-powered teaching assistant platform designed to help students understand course concepts without providing direct answers. Instructors create AI TAs for their courses, upload various course materials (PDFs, DOCX, spreadsheets, etc.), and students interact with a chat interface to receive guidance. The platform aims to reduce instructor workload and enhance student learning by providing 24/7 AI support. The project's ambition is to become a leading AI educational tool, offering reliable and insightful assistance across a wide range of academic subjects.
 
 ## User Preferences
 - Cost is not a major consideration - prioritize reliability
 - Full LLM extraction preferred over regex
 - Persistence of extracted data is crucial
 - All query types (structured, conceptual, coverage) should work together
+
+## System Architecture
+Maize utilizes a Python Flask backend with PostgreSQL for all persistent data, including SQLAlchemy models for TAs, documents, chat sessions, and messages. Vector embeddings are also stored in PostgreSQL using the `pgvector` extension for efficient and persistent vector search.
+
+Key architectural decisions include:
+- **Unified Retrieval Pipeline**: A single, parameterized pipeline handles all document retrieval, eliminating multiple conditional code paths.
+- **Pre-retrieval Filtering**: Metadata filters (e.g., by document type, year) are applied in PostgreSQL *before* vector search to narrow down the search space.
+- **LLM for Metadata Extraction**: GPT-4o is used for comprehensive and consistent document classification and metadata extraction during ingestion, including identifying instructional units and content titles.
+- **Instructional Unit Normalization**: The system normalizes various ways of referring to instructional units (e.g., "Lecture 5", "Week 5") into a consistent `unit_number` for filtering.
+- **Per-TA Isolation**: Each AI teaching assistant operates with its own isolated document collection and vector index, filtered by `ta_id`.
+- **Hybrid Retrieval Strategy**: The system employs a hybrid retrieval approach, combining initial vector search with LLM-based reranking. For queries requiring deep context or when confidence is low, it intelligently falls back to processing the full document with the LLM. This includes specific handling for queries that reference sub-parts of problems, directly leveraging full document context to ensure accuracy and reduce latency.
+- **Boundary-Aware Chunking**: Documents are chunked with a focus on preserving semantic boundaries (e.g., problem statements, section headers) to ensure chunks maintain relevant context and are correctly attributed.
+- **Context Injection**: Structural context (e.g., document name, problem/section headers) is injected into chunks before embedding to improve retrieval accuracy for specific queries.
+- **Post-Retrieval Validation**: An explicit validation step checks if the retrieved chunks align with the specific problem references in the user's query, triggering a full-document fallback if discrepancies are found, even with high LLM reranking scores.
+- **UI/UX**: The platform features an admin panel for TA creation and document management, and a student chat interface. It includes dynamic status indicators, in-page notifications, LaTeX math rendering with KaTeX, and drag-and-drop multi-file upload.
+- **Technology Stack**: Python 3.11, Flask, SQLAlchemy, PostgreSQL with pgvector, OpenAI `text-embedding-3-small` for embeddings (1536 dimensions), OpenAI GPT-4o for LLM tasks, PyPDF2, python-docx, openpyxl for file parsing.
+
+## External Dependencies
+- **OpenAI API**: Used for generating embeddings (`text-embedding-3-small`) and all Large Language Model (LLM) operations (`GPT-4o`).
+- **PostgreSQL**: Primary database for all persistent data, including SQLAlchemy models and vector embeddings (via `pgvector` extension).
+- **Google Sheets API**: Used for logging QA and indexing diagnostics.
