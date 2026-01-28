@@ -627,11 +627,27 @@ def analyze_query(query: str, ta_id: str = "") -> dict:
     
     Uses regex patterns for common patterns, then falls back to
     document filename matching if no structured elements found.
+    
+    When a specific problem reference with sub-part is detected (e.g., "section 1 question a"),
+    sets requires_early_hybrid=True to route directly to full-document mode,
+    bypassing the unreliable LLM reranker.
     """
     query_lower = query.lower()
     
     # Extract specific problem reference for validation
     problem_ref = extract_problem_reference(query)
+    
+    # Determine if this query should use early hybrid routing
+    # Specific references with sub-parts (like "1a") need full document context
+    # to reliably locate the exact content - chunk-based retrieval is unreliable for these
+    requires_early_hybrid = bool(
+        problem_ref and 
+        problem_ref.get("problem_number") and 
+        problem_ref.get("sub_part")
+    )
+    
+    if requires_early_hybrid:
+        logger.info(f"[{ta_id}] Early hybrid routing enabled: detected specific reference '{problem_ref.get('full_ref')}'")
     
     analysis = {
         "doc_type_filter": None,
@@ -643,6 +659,7 @@ def analyze_query(query: str, ta_id: str = "") -> dict:
         "filename_matched_tokens": None,
         "is_conceptual": False,
         "problem_reference": problem_ref,
+        "requires_early_hybrid": requires_early_hybrid,
         "original_query": query  # For content_title matching in document identification
     }
     
@@ -775,6 +792,51 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8) -> tuple:
     
     query_analysis = analyze_query(query, ta_id)
     diagnostics["is_conceptual"] = query_analysis.get("is_conceptual", False)
+    
+    # EARLY HYBRID ROUTING: For specific problem references (e.g., "section 1 question a"),
+    # skip the unreliable LLM reranker and go directly to full-document mode.
+    # This is more reliable for pinpoint queries where we need to find exact content.
+    if query_analysis.get("requires_early_hybrid") and Config.HYBRID_RETRIEVAL_ENABLED:
+        problem_ref = query_analysis.get("problem_reference", {})
+        logger.info(f"[{ta_id}] Early hybrid routing: skipping reranker for specific reference '{problem_ref.get('full_ref')}'")
+        
+        # Identify target document using query filters (year, doc_type, etc.)
+        target_doc_ids, id_method = identify_target_documents([], query_analysis, ta_id)
+        diagnostics["hybrid_doc_id_method"] = id_method
+        
+        if target_doc_ids:
+            doc_id = target_doc_ids[0]
+            full_text, filename, token_estimate = get_full_document_text(doc_id)
+            
+            if full_text and token_estimate <= Config.HYBRID_MAX_DOC_TOKENS:
+                logger.info(f"[{ta_id}] Early hybrid: using full document '{filename}' ({token_estimate} tokens)")
+                
+                diagnostics["hybrid_fallback_triggered"] = True
+                diagnostics["hybrid_fallback_reason"] = f"early_routing_specific_ref_{problem_ref.get('full_ref')}"
+                diagnostics["hybrid_doc_filename"] = filename
+                diagnostics["hybrid_doc_tokens"] = token_estimate
+                diagnostics["retrieval_method"] = "early_hybrid_full_doc"
+                diagnostics["validation_expected_ref"] = problem_ref.get("full_ref")
+                
+                hybrid_chunks = [{
+                    "text": full_text,
+                    "score": 10.0,
+                    "file_name": filename,
+                    "doc_type": "exam",  # Will be from document metadata in practice
+                    "metadata": {},
+                    "is_full_document": True,
+                    "llm_relevance_score": 10.0,
+                    "llm_reason": f"Early hybrid routing for specific reference '{problem_ref.get('full_ref')}'"
+                }]
+                
+                logger.info(f"[{ta_id}] Early hybrid complete | doc={filename} | tokens={token_estimate}")
+                return hybrid_chunks, diagnostics
+            elif token_estimate > Config.HYBRID_MAX_DOC_TOKENS:
+                logger.warning(f"[{ta_id}] Document too large for early hybrid: {token_estimate} tokens, falling back to chunk retrieval")
+            elif not full_text:
+                logger.warning(f"[{ta_id}] Failed to extract text for early hybrid, falling back to chunk retrieval")
+        else:
+            logger.warning(f"[{ta_id}] Early hybrid: could not identify target document (method={id_method}), falling back to chunk retrieval")
     
     base_query = db.session.query(
         DocumentChunk.chunk_text,
