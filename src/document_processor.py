@@ -183,8 +183,10 @@ def extract_text_from_file(file_path: str) -> tuple:
     try:
         if ext == 'pdf':
             text, page_count = extract_pdf(file_path)
-        elif ext in ('docx', 'doc'):
+        elif ext == 'docx':
             text = extract_docx(file_path)
+        elif ext == 'doc':
+            text = extract_doc(file_path)
         elif ext in ('xlsx', 'xls'):
             text = extract_excel(file_path)
         elif ext == 'txt':
@@ -267,11 +269,171 @@ def _extract_pdf_pypdf2(file_path: str) -> tuple:
         return "", 0
 
 def extract_docx(file_path: str) -> str:
-    from docx import Document
+    """
+    Extract text from DOCX files, preserving list numbering (a, b, c, 1, 2, 3),
+    tables, and document structure.
     
-    doc = Document(file_path)
-    paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
-    return "\n\n".join(paragraphs)
+    Uses docx2python for comprehensive extraction that preserves:
+    - Numbered/bulleted list prefixes
+    - Table content
+    - Text boxes
+    - Footnotes/endnotes
+    """
+    try:
+        from docx2python import docx2python
+        
+        with docx2python(file_path) as doc:
+            text_parts = []
+            
+            if doc.body:
+                body_text = _flatten_docx2python_content(doc.body)
+                if body_text.strip():
+                    text_parts.append(body_text)
+            
+            if doc.footnotes:
+                footnotes_text = _flatten_docx2python_content(doc.footnotes)
+                if footnotes_text.strip():
+                    text_parts.append("\n--- Footnotes ---\n" + footnotes_text)
+            
+            if doc.endnotes:
+                endnotes_text = _flatten_docx2python_content(doc.endnotes)
+                if endnotes_text.strip():
+                    text_parts.append("\n--- Endnotes ---\n" + endnotes_text)
+            
+            result = "\n\n".join(text_parts)
+            
+            if result.strip():
+                logger.info(f"Successfully extracted DOCX using docx2python: {len(result)} chars")
+                return result
+            
+    except Exception as e:
+        logger.warning(f"docx2python extraction failed, falling back to python-docx: {e}")
+    
+    try:
+        from docx import Document
+        
+        doc = Document(file_path)
+        text_parts = []
+        
+        for para in doc.paragraphs:
+            if para.text.strip():
+                prefix = _get_paragraph_list_prefix(para)
+                if prefix:
+                    text_parts.append(f"{prefix} {para.text}")
+                else:
+                    text_parts.append(para.text)
+        
+        for table in doc.tables:
+            table_text = _extract_table_text(table)
+            if table_text.strip():
+                text_parts.append(table_text)
+        
+        result = "\n\n".join(text_parts)
+        logger.info(f"Extracted DOCX using python-docx fallback: {len(result)} chars")
+        return result
+        
+    except Exception as e:
+        logger.error(f"DOCX extraction failed completely: {e}")
+        return ""
+
+
+def _flatten_docx2python_content(content) -> str:
+    """
+    Recursively flatten docx2python nested list structure into text.
+    docx2python returns deeply nested lists representing document structure.
+    """
+    if isinstance(content, str):
+        return content.strip()
+    
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            flattened = _flatten_docx2python_content(item)
+            if flattened:
+                parts.append(flattened)
+        return "\n".join(parts)
+    
+    return ""
+
+
+def _get_paragraph_list_prefix(para) -> str:
+    """
+    Extract list numbering prefix from a paragraph using python-docx XML parsing.
+    Returns prefix like 'a)', '1.', 'i)' or empty string if not a list item.
+    """
+    try:
+        if para._element.pPr is None:
+            return ""
+        
+        numPr = para._element.pPr.numPr
+        if numPr is None or numPr.numId is None:
+            return ""
+        
+        return ""
+        
+    except Exception:
+        return ""
+
+
+def _extract_table_text(table) -> str:
+    """Extract text from a Word table, preserving structure."""
+    try:
+        rows_text = []
+        for row in table.rows:
+            cells_text = []
+            for cell in row.cells:
+                cell_content = cell.text.strip()
+                if cell_content:
+                    cells_text.append(cell_content)
+            if cells_text:
+                rows_text.append(" | ".join(cells_text))
+        
+        if rows_text:
+            return "Table:\n" + "\n".join(rows_text)
+        return ""
+    except Exception:
+        return ""
+
+
+def extract_doc(file_path: str) -> str:
+    """
+    Extract text from older .doc files (pre-2007 Word format).
+    Uses antiword command-line tool or falls back to textract.
+    """
+    import subprocess
+    
+    try:
+        result = subprocess.run(
+            ['antiword', file_path],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            logger.info(f"Extracted .doc using antiword: {len(result.stdout)} chars")
+            return result.stdout
+    except FileNotFoundError:
+        logger.warning("antiword not installed, trying catdoc")
+    except Exception as e:
+        logger.warning(f"antiword extraction failed: {e}")
+    
+    try:
+        result = subprocess.run(
+            ['catdoc', file_path],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            logger.info(f"Extracted .doc using catdoc: {len(result.stdout)} chars")
+            return result.stdout
+    except FileNotFoundError:
+        logger.warning("catdoc not installed")
+    except Exception as e:
+        logger.warning(f"catdoc extraction failed: {e}")
+    
+    logger.warning(f"Could not extract .doc file: {file_path}. Install antiword or catdoc.")
+    return ""
 
 def extract_excel(file_path: str) -> str:
     import pandas as pd

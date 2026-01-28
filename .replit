@@ -5,7 +5,7 @@ integrations = ["python_database:1.0.0", "python_openai:1.0.0", "google-sheet:1.
 
 [nix]
 channel = "stable-25_05"
-packages = ["glibcLocales", "postgresql"]
+packages = ["glibcLocales", "postgresql", "antiword", "catdoc"]
 
 [workflows]
 runButton = "Project"
