@@ -131,33 +131,92 @@
             let processed = text;
             
             processed = processed.replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$1$$$$');
-            
             processed = processed.replace(/\\\(([\s\S]*?)\\\)/g, '$$$1$$');
             
             return processed;
         }
         
+        function sanitizeForRendering(text) {
+            // Fix common LLM formatting issues that break rendering
+            let sanitized = text;
+            
+            // 1. Remove asterisks that are adjacent to $ (math delimiters)
+            //    e.g., "*$x$*" -> "$x$", "**$equation$**" -> "$equation$"
+            sanitized = sanitized.replace(/\*+(\$[^\$]+\$)\*+/g, '$1');
+            sanitized = sanitized.replace(/\*+(\$\$[\s\S]*?\$\$)\*+/g, '$1');
+            
+            // 2. Fix unbalanced $ signs by escaping lone $ that aren't part of pairs
+            //    Count $ signs - if odd, escape the last lone one
+            const dollarMatches = sanitized.match(/\$/g);
+            if (dollarMatches && dollarMatches.length % 2 === 1) {
+                // Find the last $ and escape it if it looks like a currency symbol
+                sanitized = sanitized.replace(/\$(?=\d+[,.]?\d*(?:[^$]|$))/g, '\\$');
+            }
+            
+            // 3. Fix asterisks inside what looks like math content
+            //    If we see patterns like "word*word*word" with no spaces, 
+            //    it's likely broken formatting - escape the asterisks
+            sanitized = sanitized.replace(/(\w)\*(\w+)\*(\w)/g, '$1\\*$2\\*$3');
+            
+            // 4. Clean up problematic patterns: **text with spaces that runs together**
+            //    If bold text is very long (> 100 chars) with no spaces, something is wrong
+            sanitized = sanitized.replace(/\*\*([^\*]{100,})\*\*/g, (match, content) => {
+                // If the content has no spaces, it's likely broken - just return as plain text
+                if (!content.includes(' ')) {
+                    return content;
+                }
+                return match;
+            });
+            
+            // 5. Same for single asterisk italics
+            sanitized = sanitized.replace(/\*([^\*]{100,})\*/g, (match, content) => {
+                if (!content.includes(' ')) {
+                    return content;
+                }
+                return match;
+            });
+            
+            return sanitized;
+        }
+        
         function formatContent(content) {
+            // First sanitize problematic patterns
+            content = sanitizeForRendering(content);
             content = preprocessLatex(content);
             
             const mathPlaceholders = [];
             let placeholderIndex = 0;
             
+            // Protect display math first ($$...$$)
             content = content.replace(/\$\$([\s\S]*?)\$\$/g, (match) => {
                 mathPlaceholders.push(match);
                 return `%%%MATH_DISPLAY_${placeholderIndex++}%%%`;
             });
             
-            content = content.replace(/\$([^\$]+?)\$/g, (match) => {
+            // Protect inline math ($...$) - improved regex to be more robust
+            // Only match if there's content between $ signs and no newlines
+            content = content.replace(/\$([^\$\n]+?)\$/g, (match, inner) => {
+                // Skip if the inner content looks like it's not math (e.g., currency)
+                if (/^\d+[,.]?\d*$/.test(inner.trim())) {
+                    return match; // Leave currency-like patterns alone
+                }
                 mathPlaceholders.push(match);
                 return `%%%MATH_INLINE_${placeholderIndex++}%%%`;
             });
             
+            // Apply markdown formatting
             content = content.replace(/\n/g, '<br>');
-            content = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-            content = content.replace(/\*(.*?)\*/g, '<em>$1</em>');
+            
+            // Bold - only match if content is reasonable length and has spaces
+            content = content.replace(/\*\*(.{1,80}?)\*\*/g, '<strong>$1</strong>');
+            
+            // Italic - only match if content is reasonable length  
+            content = content.replace(/(?<!\*)\*([^\*\n]{1,80}?)\*(?!\*)/g, '<em>$1</em>');
+            
+            // Code
             content = content.replace(/`([^`]+)`/g, '<code>$1</code>');
             
+            // Restore math placeholders
             for (let i = 0; i < mathPlaceholders.length; i++) {
                 content = content.replace(`%%%MATH_DISPLAY_${i}%%%`, mathPlaceholders[i]);
                 content = content.replace(`%%%MATH_INLINE_${i}%%%`, mathPlaceholders[i]);
@@ -186,7 +245,23 @@
                             "\\Z": "\\mathbb{Z}",
                             "\\Q": "\\mathbb{Q}",
                             "\\C": "\\mathbb{C}"
+                        },
+                        // Custom error handler - show clean fallback instead of ugly error
+                        errorCallback: function(msg, err) {
+                            console.warn('KaTeX error:', msg, err);
                         }
+                    });
+                    
+                    // Post-process: find any KaTeX error spans and clean them up
+                    const errorSpans = element.querySelectorAll('.katex-error');
+                    errorSpans.forEach(span => {
+                        // Extract the original text and display it cleanly
+                        const originalText = span.getAttribute('title') || span.textContent;
+                        // Remove the $ delimiters for cleaner display
+                        const cleanText = originalText.replace(/^\$+|\$+$/g, '');
+                        span.className = 'math-fallback';
+                        span.style.cssText = 'font-family: "Times New Roman", serif; font-style: italic; color: inherit;';
+                        span.textContent = cleanText;
                     });
                 } catch (e) {
                     console.warn('LaTeX rendering error:', e);
