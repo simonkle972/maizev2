@@ -483,13 +483,19 @@ Extract the following information as JSON:
     "course_code": "MGT404" | null (if visible),
     "year": "2024" | "2025" | null (if mentioned),
     "is_solutions": true | false (whether this contains solutions/answers),
-    "content_title": "The actual document title as written in the content (e.g., 'Self-Study Problem Set #2', 'Final Exam 2024'). Extract from headers/title text, not filename."
+    "content_title": "The actual document title as written in the content (e.g., 'Self-Study Problem Set #2', 'Final Exam 2024'). Extract from headers/title text, not filename.",
+    "section_numbering_style": "arabic" | "roman" | "mixed" | null (how major sections/problems are numbered: "1, 2, 3" = arabic, "I, II, III" = roman)
 }}
 
 IMPORTANT: Classify by the PRIMARY document type, not whether it has solutions.
 - "exam_solutions.pdf" or "final_exam_with_solutions.pdf" → doc_type: "exam", is_solutions: true
 - "homework_answers.pdf" or "problem_set_solutions.pdf" → doc_type: "homework", is_solutions: true
 - "lecture_notes.pdf" → doc_type: "lecture"
+
+NUMBERING STYLE: Look at how the document labels its main sections/problems:
+- If sections are "Section 1", "Problem 2", "Question 3" → section_numbering_style: "arabic"
+- If sections are "Section I", "Problem II", "Part III" → section_numbering_style: "roman"
+- If mixed or unclear → section_numbering_style: "mixed"
 
 Return ONLY valid JSON, no other text."""
 
@@ -522,7 +528,8 @@ Return ONLY valid JSON, no other text."""
                     "course_code": None,
                     "year": None,
                     "is_solutions": False,
-                    "content_title": None
+                    "content_title": None,
+                    "section_numbering_style": None
                 }
 
 def chunk_text(text: str, chunk_size: int = 800, overlap: int = 200) -> list:

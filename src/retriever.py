@@ -361,6 +361,10 @@ CANDIDATE CHUNKS (numbered 0 to {len(chunks)-1}):
 
 TASK: Score each chunk's relevance to the SPECIFIC query on a scale of 0-10.
 - Pay close attention to specific problem/question numbers (e.g., "problem 2f" means ONLY 2f, not 2d or 3f)
+- NUMBER FORMAT EQUIVALENCE: Treat Roman numerals and Arabic numbers as equivalent when matching:
+  * "Section 1" = "Section I", "Part 2" = "Part II", "Question 3" = "Question III"
+  * "a)" = "(a)" = "a." for sub-parts
+  * Match content by meaning, not exact formatting
 - Score 10 = chunk directly contains the answer or exact problem referenced
 - Score 5 = chunk is related but doesn't have the specific content
 - Score 0 = chunk is irrelevant
