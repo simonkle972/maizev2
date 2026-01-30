@@ -15,7 +15,8 @@ Maize utilizes a Python Flask backend with PostgreSQL for all persistent data, i
 Key architectural decisions include:
 - **Unified Retrieval Pipeline**: A single, parameterized pipeline handles all document retrieval, eliminating multiple conditional code paths.
 - **Pre-retrieval Filtering**: Metadata filters (e.g., by document type, year) are applied in PostgreSQL *before* vector search to narrow down the search space.
-- **LLM for Metadata Extraction**: GPT-4o is used for comprehensive and consistent document classification and metadata extraction during ingestion, including identifying instructional units and content titles.
+- **LLM for Metadata Extraction**: GPT-4o is used for comprehensive and consistent document classification and metadata extraction at upload time, including identifying instructional units and content titles. Admins can review and edit these values (display_name, doc_type, unit_number) before indexing.
+- **Human-in-the-Loop Document Categorization**: Documents get LLM-extracted metadata at upload, which admins can correct before indexing. The display_name field allows admins to rename documents for better retrieval matching.
 - **Instructional Unit Normalization**: The system normalizes various ways of referring to instructional units (e.g., "Lecture 5", "Week 5") into a consistent `unit_number` for filtering.
 - **Per-TA Isolation**: Each AI teaching assistant operates with its own isolated document collection and vector index, filtered by `ta_id`.
 - **Hybrid Retrieval Strategy**: The system employs a hybrid retrieval approach, combining initial vector search with LLM-based reranking. For queries requiring deep context or when confidence is low, it intelligently falls back to processing the full document with the LLM. This includes specific handling for queries that reference sub-parts of problems, directly leveraging full document context to ensure accuracy and reduce latency.
