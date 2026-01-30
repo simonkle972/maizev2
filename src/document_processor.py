@@ -682,14 +682,23 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
         
         logger.info(f"[{ta_id}] [{doc.id}] Extracting metadata with LLM...")
         metadata = extract_metadata_with_llm(text, doc.original_filename)
-        doc.doc_type = metadata.get("doc_type")
-        doc.assignment_number = metadata.get("assignment_number")
-        doc.instructional_unit_number = metadata.get("instructional_unit_number")
-        doc.instructional_unit_label = metadata.get("instructional_unit_label")
-        doc.content_title = metadata.get("content_title")
+        
+        # Only update fields if they're currently empty - preserve human-edited values
+        if not doc.doc_type:
+            doc.doc_type = metadata.get("doc_type")
+        if not doc.assignment_number:
+            doc.assignment_number = metadata.get("assignment_number")
+        if doc.instructional_unit_number is None:
+            doc.instructional_unit_number = metadata.get("instructional_unit_number")
+        if not doc.instructional_unit_label:
+            doc.instructional_unit_label = metadata.get("instructional_unit_label")
+        if not doc.content_title:
+            doc.content_title = metadata.get("content_title")
+        
+        # Always store full extraction metadata for reference
         doc.extraction_metadata = metadata
         doc.metadata_extracted = True
-        logger.info(f"[{ta_id}] [{doc.id}] Saving metadata...")
+        logger.info(f"[{ta_id}] [{doc.id}] Saving metadata (preserving human edits)...")
         db_commit_with_retry(db)
         logger.info(f"[{ta_id}] [{doc.id}] Metadata saved")
         
