@@ -816,8 +816,9 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
         from datetime import datetime
         if indexed_doc_ids:
             now = datetime.utcnow()
+            # Set BOTH timestamps to same value - prevents SQLAlchemy onupdate from setting updated_at later
             updated_count = Document.query.filter(Document.id.in_(indexed_doc_ids)).update(
-                {"last_indexed_at": now},
+                {"last_indexed_at": now, "updated_at": now},
                 synchronize_session=False
             )
             db.session.commit()
