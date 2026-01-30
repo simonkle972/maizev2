@@ -803,6 +803,15 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
         
         logger.info(f"[{ta_id}] Indexing complete! Total chunks: {len(all_chunk_data)}")
         
+        indexed_doc_ids = set(chunk["document_id"] for chunk in all_chunk_data)
+        from datetime import datetime
+        for doc_id in indexed_doc_ids:
+            doc = Document.query.get(doc_id)
+            if doc:
+                doc.last_indexed_at = datetime.utcnow()
+        db.session.commit()
+        logger.info(f"[{ta_id}] Updated last_indexed_at for {len(indexed_doc_ids)} documents")
+        
         for entry in index_log_entries:
             entry["has_embedding"] = True
             entry["status"] = "success"
