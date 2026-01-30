@@ -160,8 +160,13 @@ def get_ta(ta_id):
     documents = [{
         "id": doc.id,
         "filename": doc.original_filename,
+        "display_name": doc.display_name or doc.original_filename,
         "file_type": doc.file_type,
         "doc_type": doc.doc_type,
+        "unit_number": doc.instructional_unit_number,
+        "assignment_number": doc.assignment_number,
+        "content_title": doc.content_title,
+        "metadata_extracted": doc.metadata_extracted,
         "uploaded_at": doc.uploaded_at.isoformat() if doc.uploaded_at else None
     } for doc in ta.documents]
     
@@ -265,6 +270,8 @@ def cleanup_orphaned_slug():
 @app.route('/admin/api/tas/<ta_id>/upload', methods=['POST'])
 @admin_api_required
 def upload_document(ta_id):
+    from src.document_processor import extract_metadata_from_file_content
+    
     ta = TeachingAssistant.query.get(ta_id)
     if not ta:
         return jsonify({"error": "TA not found"}), 404
@@ -289,14 +296,28 @@ def upload_document(ta_id):
     file_content = file.read()
     file_size = len(file_content)
     
+    metadata = extract_metadata_from_file_content(file_content, file_ext, original_filename)
+    
+    display_name = original_filename
+    if file_ext:
+        display_name = original_filename.rsplit('.', 1)[0]
+    
     doc = Document(
         ta_id=ta_id,
         filename=safe_filename,
         original_filename=original_filename,
+        display_name=display_name,
         file_type=file_ext,
         file_size=file_size,
         storage_path=storage_path,
-        file_content=file_content
+        file_content=file_content,
+        doc_type=metadata.get("doc_type"),
+        assignment_number=metadata.get("assignment_number"),
+        instructional_unit_number=metadata.get("instructional_unit_number"),
+        instructional_unit_label=metadata.get("instructional_unit_label"),
+        content_title=metadata.get("content_title"),
+        metadata_extracted=metadata.get("extraction_success", False),
+        extraction_metadata=metadata
     )
     
     db.session.add(doc)
@@ -311,7 +332,12 @@ def upload_document(ta_id):
     return jsonify({
         "success": True,
         "document_id": doc.id,
-        "filename": original_filename
+        "filename": original_filename,
+        "display_name": doc.display_name,
+        "doc_type": doc.doc_type,
+        "unit_number": doc.instructional_unit_number,
+        "content_title": doc.content_title,
+        "metadata_extracted": doc.metadata_extracted
     })
 
 @app.route('/admin/api/tas/<ta_id>/documents/<int:doc_id>', methods=['DELETE'])
@@ -338,6 +364,56 @@ def delete_document(ta_id, doc_id):
     db.session.commit()
     
     return jsonify({"success": True})
+
+
+@app.route('/admin/api/tas/<ta_id>/documents/<int:doc_id>', methods=['PATCH'])
+@admin_api_required
+def update_document_metadata(ta_id, doc_id):
+    """Update document metadata (display_name, doc_type, unit_number) before indexing."""
+    doc = Document.query.filter_by(id=doc_id, ta_id=ta_id).first()
+    if not doc:
+        return jsonify({"error": "Document not found"}), 404
+    
+    data = request.json
+    
+    if "display_name" in data:
+        doc.display_name = data["display_name"].strip() if data["display_name"] else doc.original_filename
+    
+    if "doc_type" in data:
+        valid_doc_types = ["homework", "exam", "lecture", "reading", "syllabus", "other"]
+        if data["doc_type"] in valid_doc_types or data["doc_type"] is None:
+            doc.doc_type = data["doc_type"]
+    
+    if "unit_number" in data:
+        if data["unit_number"] is None or data["unit_number"] == "":
+            doc.instructional_unit_number = None
+        else:
+            try:
+                doc.instructional_unit_number = int(data["unit_number"])
+            except (ValueError, TypeError):
+                pass
+    
+    if "assignment_number" in data:
+        doc.assignment_number = data["assignment_number"] if data["assignment_number"] else None
+    
+    ta = TeachingAssistant.query.get(ta_id)
+    if ta:
+        ta.is_indexed = False
+        ta.indexing_status = None
+    
+    db.session.commit()
+    
+    return jsonify({
+        "success": True,
+        "document": {
+            "id": doc.id,
+            "display_name": doc.display_name,
+            "doc_type": doc.doc_type,
+            "unit_number": doc.instructional_unit_number,
+            "assignment_number": doc.assignment_number
+        }
+    })
+
 
 def update_indexing_progress(ta_id, progress):
     """Update indexing progress for a TA (called from document_processor)."""

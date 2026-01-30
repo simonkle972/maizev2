@@ -532,6 +532,53 @@ Return ONLY valid JSON, no other text."""
                     "section_numbering_style": None
                 }
 
+
+def extract_metadata_from_file_content(file_content: bytes, file_type: str, original_filename: str) -> dict:
+    """
+    Extract document metadata from file content at upload time.
+    This runs LLM classification immediately so admins can review/edit before indexing.
+    
+    Returns dict with: doc_type, assignment_number, instructional_unit_number, content_title, etc.
+    """
+    import tempfile
+    
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_type}") as tmp_file:
+            tmp_file.write(file_content)
+            tmp_path = tmp_file.name
+        
+        try:
+            text, _ = extract_text_from_file(tmp_path)
+        finally:
+            os.unlink(tmp_path)
+        
+        if not text or len(text.strip()) < 50:
+            logger.warning(f"Could not extract sufficient text from {original_filename} for metadata extraction")
+            return {
+                "doc_type": None,
+                "assignment_number": None,
+                "instructional_unit_number": None,
+                "instructional_unit_label": None,
+                "content_title": None,
+                "extraction_success": False
+            }
+        
+        metadata = extract_metadata_with_llm(text, original_filename)
+        metadata["extraction_success"] = True
+        return metadata
+        
+    except Exception as e:
+        logger.error(f"Error extracting metadata from {original_filename}: {e}")
+        return {
+            "doc_type": None,
+            "assignment_number": None,
+            "instructional_unit_number": None,
+            "instructional_unit_label": None,
+            "content_title": None,
+            "extraction_success": False
+        }
+
+
 def chunk_text(text: str, chunk_size: int = 800, overlap: int = 200) -> list:
     if len(text) <= chunk_size:
         return [text]
