@@ -49,7 +49,7 @@ def get_full_document_text(document_id: int) -> tuple:
     
     token_estimate = len(text) // 4
     
-    return text, doc.original_filename, token_estimate
+    return text, doc.display_name or doc.original_filename, token_estimate
 
 
 def identify_target_documents(chunks: list, query_analysis: dict, ta_id: str) -> tuple:
