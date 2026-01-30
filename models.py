@@ -50,6 +50,8 @@ class Document(db.Model):
     metadata_extracted = db.Column(db.Boolean, default=False)
     extraction_metadata = db.Column(db.JSON, nullable=True)
     content_title = db.Column(db.String(512), nullable=True)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_indexed_at = db.Column(db.DateTime, nullable=True)
 
 class ChatSession(db.Model):
     __tablename__ = 'chat_sessions'
