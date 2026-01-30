@@ -69,12 +69,18 @@ def identify_target_documents(chunks: list, query_analysis: dict, ta_id: str) ->
     import re
     
     if query_analysis.get("filename_filter"):
+        filter_value = query_analysis["filename_filter"]
         doc = Document.query.filter_by(
             ta_id=ta_id,
-            original_filename=query_analysis["filename_filter"]
+            original_filename=filter_value
         ).first()
+        if not doc:
+            doc = Document.query.filter_by(
+                ta_id=ta_id,
+                display_name=filter_value
+            ).first()
         if doc:
-            logger.info(f"[{ta_id}] Target doc identified via filename_filter: {doc.original_filename}")
+            logger.info(f"[{ta_id}] Target doc identified via filename_filter: {doc.display_name or doc.original_filename}")
             return [doc.id], "filename_filter"
     
     if query_analysis.get("doc_type_filter") and query_analysis.get("assignment_filter"):
@@ -133,8 +139,9 @@ def identify_target_documents(chunks: list, query_analysis: dict, ta_id: str) ->
     if year_filter and query_analysis.get("doc_type_filter") == "exam":
         docs = Document.query.filter_by(ta_id=ta_id, doc_type="exam").all()
         for doc in docs:
-            if doc.original_filename and year_filter in doc.original_filename:
-                logger.info(f"[{ta_id}] Target doc identified via filename year match: '{doc.original_filename}' (year={year_filter})")
+            doc_name = doc.display_name or doc.original_filename
+            if doc_name and year_filter in doc_name:
+                logger.info(f"[{ta_id}] Target doc identified via filename year match: '{doc_name}' (year={year_filter})")
                 return [doc.id], "filename_year_match"
     
     if exam_match:
@@ -166,9 +173,14 @@ def identify_target_documents(chunks: list, query_analysis: dict, ta_id: str) ->
         ta_id=ta_id,
         original_filename=top_filename
     ).first()
+    if not doc:
+        doc = Document.query.filter_by(
+            ta_id=ta_id,
+            display_name=top_filename
+        ).first()
     
     if doc:
-        logger.info(f"[{ta_id}] Target doc identified via chunk frequency: {doc.original_filename}")
+        logger.info(f"[{ta_id}] Target doc identified via chunk frequency: {doc.display_name or doc.original_filename}")
         return [doc.id], "chunk_frequency"
     
     logger.warning(f"[{ta_id}] Could not find document for filename: {top_filename}")

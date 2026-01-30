@@ -713,13 +713,13 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
                 "assignment_number": doc.assignment_number or "",
                 "instructional_unit_number": doc.instructional_unit_number or 0,
                 "instructional_unit_label": doc.instructional_unit_label or "",
-                "file_name": doc.original_filename
+                "file_name": doc.display_name or doc.original_filename
             })
             
             index_log_entries.append({
                 "ta_id": ta_id,
                 "ta_slug": ta_slug,
-                "file_name": doc.original_filename,
+                "file_name": doc.display_name or doc.original_filename,
                 "doc_type": doc.doc_type or "other",
                 "total_pages": page_count,
                 "raw_text_length": raw_text_length,
