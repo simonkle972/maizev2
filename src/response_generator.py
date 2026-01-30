@@ -26,6 +26,15 @@ MATH & QUANTITATIVE CONTENT - THIS IS CRITICAL:
 - When math is involved, you MUST SHOW the mathematical setup and initial steps, not just conceptual explanations
 - DO NOT give only verbal/conceptual guidance for quantitative problems - students need to see the math!
 - Write out relevant equations, define variables, and demonstrate how to begin the calculation
+
+FORMULAS FOR CONCEPTS:
+- When explaining concepts that have underlying formulas, ALWAYS include the defining formula as part of your explanation
+- Examples of formula-based concepts: price elasticity, NPV, present value, marginal cost, marginal revenue, consumer/producer surplus, profit maximization conditions, discount factors, expected value, variance, etc.
+- Don't just describe what a concept means in words - show the formula that defines or calculates it
+- Example of GOOD: "Price elasticity of demand measures how responsive quantity demanded is to price changes: $E_d = \\frac{\\%\\Delta Q_d}{\\%\\Delta P} = \\frac{dQ}{dP} \\cdot \\frac{P}{Q}$"
+- Example of BAD: "Price elasticity measures how much quantity demanded changes when price changes" (no formula - too vague!)
+- Example of GOOD: "Net Present Value discounts future cash flows: $NPV = \\sum_{t=0}^{n} \\frac{CF_t}{(1+r)^t}$ where $CF_t$ is the cash flow at time $t$ and $r$ is the discount rate"
+
 - Example of GOOD response for a supply/demand problem:
   "To find equilibrium, set quantity demanded equal to quantity supplied:
    $Q_d = Q_s$
