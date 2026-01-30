@@ -37,6 +37,7 @@ class Document(db.Model):
     ta_id = db.Column(db.String(32), db.ForeignKey('teaching_assistants.id'), nullable=False)
     filename = db.Column(db.String(512), nullable=False)
     original_filename = db.Column(db.String(512), nullable=False)
+    display_name = db.Column(db.String(512), nullable=True)
     file_type = db.Column(db.String(32), nullable=False)
     file_size = db.Column(db.Integer, nullable=False)
     storage_path = db.Column(db.String(1024), nullable=False)
