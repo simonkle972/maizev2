@@ -69,6 +69,84 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+        .doc-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+        }
+        .doc-table th, .doc-table td {
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .doc-table th {
+            background: #f9fafb;
+            font-weight: 600;
+            font-size: 13px;
+            color: #374151;
+        }
+        .doc-table input, .doc-table select {
+            width: 100%;
+            padding: 6px 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .doc-table input:focus, .doc-table select:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+        }
+        .doc-table .unit-input {
+            width: 60px;
+        }
+        .doc-table .save-btn {
+            padding: 4px 10px;
+            font-size: 12px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .doc-table .save-btn:hover {
+            background: #2563eb;
+        }
+        .doc-table .save-btn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        .doc-table .delete-btn {
+            padding: 4px 10px;
+            font-size: 12px;
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 6px;
+        }
+        .doc-table .delete-btn:hover {
+            background: #dc2626;
+        }
+        .doc-row.saving {
+            opacity: 0.6;
+        }
+        .doc-row.saved td:first-child::after {
+            content: ' Saved!';
+            color: #22c55e;
+            font-size: 11px;
+        }
+        .doc-actions {
+            display: flex;
+            gap: 6px;
+            white-space: nowrap;
+        }
+        .metadata-hint {
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 6px;
+        }
     </style>
 </head>
 <body>
@@ -131,6 +209,58 @@
     <script>
         let currentTaId = null;
         let indexingPollInterval = null;
+        
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        async function saveDocumentMetadata(taId, docId, btn) {
+            const row = btn.closest('.doc-row');
+            const displayName = row.querySelector('.doc-display-name').value.trim();
+            const docType = row.querySelector('.doc-type-select').value || null;
+            const unitNumber = row.querySelector('.doc-unit-number').value || null;
+            
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+            row.classList.add('saving');
+            
+            try {
+                await apiCall(`/admin/api/tas/${taId}/documents/${docId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        display_name: displayName,
+                        doc_type: docType,
+                        unit_number: unitNumber
+                    })
+                });
+                
+                row.querySelector('.doc-display-name').dataset.original = displayName;
+                row.querySelector('.doc-type-select').dataset.original = docType || '';
+                row.querySelector('.doc-unit-number').dataset.original = unitNumber || '';
+                
+                row.classList.remove('saving');
+                row.classList.add('saved');
+                btn.textContent = 'Saved!';
+                btn.style.background = '#22c55e';
+                
+                setTimeout(() => {
+                    btn.textContent = 'Save';
+                    btn.style.background = '';
+                    btn.disabled = false;
+                    row.classList.remove('saved');
+                }, 1500);
+                
+            } catch (err) {
+                row.classList.remove('saving');
+                btn.textContent = 'Save';
+                btn.disabled = false;
+                showNotification('Failed to save: ' + err.message, 'error');
+            }
+        }
         
         function showNotification(message, type = 'info', duration = 5000) {
             const bar = document.getElementById('notification-bar');
@@ -204,13 +334,48 @@
                 document.getElementById('detail-title').textContent = ta.name;
                 
                 const docsHtml = ta.documents.length > 0 
-                    ? ta.documents.map(doc => `
-                        <div class="doc-item">
-                            <span class="doc-name">${doc.filename}</span>
-                            <span class="doc-type">${doc.doc_type || 'unknown'}</span>
-                            <button onclick="deleteDocument('${ta.id}', ${doc.id})" class="btn btn-small btn-danger">Delete</button>
-                        </div>
-                    `).join('')
+                    ? `<table class="doc-table">
+                        <thead>
+                            <tr>
+                                <th>Display Name</th>
+                                <th>Type</th>
+                                <th>Unit #</th>
+                                <th>Original File</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${ta.documents.map(doc => `
+                                <tr class="doc-row" data-doc-id="${doc.id}">
+                                    <td>
+                                        <input type="text" class="doc-display-name" value="${escapeHtml(doc.display_name || doc.filename)}" data-original="${escapeHtml(doc.display_name || doc.filename)}">
+                                    </td>
+                                    <td>
+                                        <select class="doc-type-select" data-original="${doc.doc_type || ''}">
+                                            <option value="" ${!doc.doc_type ? 'selected' : ''}>--</option>
+                                            <option value="homework" ${doc.doc_type === 'homework' ? 'selected' : ''}>Homework</option>
+                                            <option value="exam" ${doc.doc_type === 'exam' ? 'selected' : ''}>Exam</option>
+                                            <option value="lecture" ${doc.doc_type === 'lecture' ? 'selected' : ''}>Lecture</option>
+                                            <option value="reading" ${doc.doc_type === 'reading' ? 'selected' : ''}>Reading</option>
+                                            <option value="syllabus" ${doc.doc_type === 'syllabus' ? 'selected' : ''}>Syllabus</option>
+                                            <option value="other" ${doc.doc_type === 'other' ? 'selected' : ''}>Other</option>
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <input type="number" class="doc-unit-number unit-input" value="${doc.unit_number || ''}" data-original="${doc.unit_number || ''}" min="1" max="99">
+                                    </td>
+                                    <td style="font-size: 12px; color: #6b7280;">${escapeHtml(doc.filename)}</td>
+                                    <td>
+                                        <div class="doc-actions">
+                                            <button class="save-btn" onclick="saveDocumentMetadata('${ta.id}', ${doc.id}, this)">Save</button>
+                                            <button class="delete-btn" onclick="deleteDocument('${ta.id}', ${doc.id})">Delete</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                    <p class="metadata-hint">Edit document attributes above, then click "Save" for each row. Index after making all changes.</p>`
                     : '<p class="empty">No documents uploaded yet.</p>';
                 
                 let indexingStatusHtml = '';
