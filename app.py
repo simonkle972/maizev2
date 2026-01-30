@@ -167,7 +167,10 @@ def get_ta(ta_id):
         "assignment_number": doc.assignment_number,
         "content_title": doc.content_title,
         "metadata_extracted": doc.metadata_extracted,
-        "uploaded_at": doc.uploaded_at.isoformat() if doc.uploaded_at else None
+        "uploaded_at": doc.uploaded_at.isoformat() if doc.uploaded_at else None,
+        "updated_at": doc.updated_at.isoformat() if doc.updated_at else None,
+        "last_indexed_at": doc.last_indexed_at.isoformat() if doc.last_indexed_at else None,
+        "needs_reindex": (doc.updated_at and doc.last_indexed_at and doc.updated_at > doc.last_indexed_at) or (doc.updated_at and not doc.last_indexed_at)
     } for doc in ta.documents]
     
     return jsonify({

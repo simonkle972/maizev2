@@ -132,13 +132,38 @@
         .doc-row.saving {
             opacity: 0.6;
         }
-        .doc-row.saved td:first-child::after {
-            content: ' Saved!';
-            color: #22c55e;
+        .doc-row.needs-reindex {
+            background: #fffbeb;
+        }
+        .field-with-indicator {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .field-with-indicator input {
+            flex: 1;
+        }
+        .reindex-indicator {
+            color: #f59e0b;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        .save-status {
             font-size: 11px;
+            min-width: 50px;
+        }
+        .save-status.saving {
+            color: #6b7280;
+        }
+        .save-status.saved {
+            color: #22c55e;
+        }
+        .save-status.error {
+            color: #ef4444;
         }
         .doc-actions {
             display: flex;
+            align-items: center;
             gap: 6px;
             white-space: nowrap;
         }
@@ -217,15 +242,27 @@
             return div.innerHTML;
         }
         
-        async function saveDocumentMetadata(taId, docId, btn) {
-            const row = btn.closest('.doc-row');
+        async function saveDocumentMetadata(row) {
+            const taId = row.dataset.taId;
+            const docId = row.dataset.docId;
             const displayName = row.querySelector('.doc-display-name').value.trim();
             const docType = row.querySelector('.doc-type-select').value || null;
             const unitNumber = row.querySelector('.doc-unit-number').value || null;
+            const statusEl = row.querySelector('.save-status');
             
-            btn.disabled = true;
-            btn.textContent = 'Saving...';
+            const origDisplayName = row.querySelector('.doc-display-name').dataset.original;
+            const origDocType = row.querySelector('.doc-type-select').dataset.original;
+            const origUnitNumber = row.querySelector('.doc-unit-number').dataset.original;
+            
+            if (displayName === origDisplayName && 
+                (docType || '') === origDocType && 
+                (unitNumber || '').toString() === origUnitNumber) {
+                return;
+            }
+            
             row.classList.add('saving');
+            statusEl.textContent = 'Saving...';
+            statusEl.className = 'save-status saving';
             
             try {
                 await apiCall(`/admin/api/tas/${taId}/documents/${docId}`, {
@@ -243,23 +280,48 @@
                 row.querySelector('.doc-unit-number').dataset.original = unitNumber || '';
                 
                 row.classList.remove('saving');
-                row.classList.add('saved');
-                btn.textContent = 'Saved!';
-                btn.style.background = '#22c55e';
+                row.classList.add('needs-reindex');
+                statusEl.textContent = 'Saved';
+                statusEl.className = 'save-status saved';
+                
+                if (!row.querySelector('.reindex-indicator')) {
+                    const nameField = row.querySelector('.field-with-indicator');
+                    const indicator = document.createElement('span');
+                    indicator.className = 'reindex-indicator';
+                    indicator.title = 'Changes not yet indexed';
+                    indicator.textContent = '*';
+                    nameField.appendChild(indicator);
+                }
                 
                 setTimeout(() => {
-                    btn.textContent = 'Save';
-                    btn.style.background = '';
-                    btn.disabled = false;
+                    statusEl.textContent = '';
                     row.classList.remove('saved');
-                }, 1500);
+                }, 2000);
                 
             } catch (err) {
                 row.classList.remove('saving');
-                btn.textContent = 'Save';
-                btn.disabled = false;
+                statusEl.textContent = 'Error';
+                statusEl.className = 'save-status error';
                 showNotification('Failed to save: ' + err.message, 'error');
+                
+                setTimeout(() => {
+                    statusEl.textContent = '';
+                }, 3000);
             }
+        }
+        
+        function setupAutoSave() {
+            document.querySelectorAll('.doc-row').forEach(row => {
+                const inputs = row.querySelectorAll('.doc-display-name, .doc-type-select, .doc-unit-number');
+                inputs.forEach(input => {
+                    input.addEventListener('blur', () => saveDocumentMetadata(row));
+                    input.addEventListener('change', () => {
+                        if (input.tagName === 'SELECT') {
+                            saveDocumentMetadata(row);
+                        }
+                    });
+                });
+            });
         }
         
         function showNotification(message, type = 'info', duration = 5000) {
@@ -346,9 +408,12 @@
                         </thead>
                         <tbody>
                             ${ta.documents.map(doc => `
-                                <tr class="doc-row" data-doc-id="${doc.id}">
+                                <tr class="doc-row ${doc.needs_reindex ? 'needs-reindex' : ''}" data-doc-id="${doc.id}" data-ta-id="${ta.id}">
                                     <td>
-                                        <input type="text" class="doc-display-name" value="${escapeHtml(doc.display_name || doc.filename)}" data-original="${escapeHtml(doc.display_name || doc.filename)}">
+                                        <div class="field-with-indicator">
+                                            <input type="text" class="doc-display-name" value="${escapeHtml(doc.display_name || doc.filename)}" data-original="${escapeHtml(doc.display_name || doc.filename)}">
+                                            ${doc.needs_reindex ? '<span class="reindex-indicator" title="Changes not yet indexed">*</span>' : ''}
+                                        </div>
                                     </td>
                                     <td>
                                         <select class="doc-type-select" data-original="${doc.doc_type || ''}">
@@ -367,7 +432,7 @@
                                     <td style="font-size: 12px; color: #6b7280;">${escapeHtml(doc.filename)}</td>
                                     <td>
                                         <div class="doc-actions">
-                                            <button class="save-btn" onclick="saveDocumentMetadata('${ta.id}', ${doc.id}, this)">Save</button>
+                                            <span class="save-status"></span>
                                             <button class="delete-btn" onclick="deleteDocument('${ta.id}', ${doc.id})">Delete</button>
                                         </div>
                                     </td>
@@ -375,7 +440,7 @@
                             `).join('')}
                         </tbody>
                     </table>
-                    <p class="metadata-hint">Edit document attributes above, then click "Save" for each row. Index after making all changes.</p>`
+                    <p class="metadata-hint">Changes auto-save when you click out of a field. Documents marked with * have unindexed changes.</p>`
                     : '<p class="empty">No documents uploaded yet.</p>';
                 
                 let indexingStatusHtml = '';
@@ -446,7 +511,10 @@
                     </div>
                 `;
                 currentTaId = ta.id;
-                setTimeout(setupDropZone, 0);
+                setTimeout(() => {
+                    setupDropZone();
+                    setupAutoSave();
+                }, 0);
             })
             .catch(err => {
                 if (err.message !== 'Session expired') {
