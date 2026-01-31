@@ -746,7 +746,165 @@ def analyze_query(query: str, ta_id: str = "") -> dict:
     
     return analysis
 
-def retrieve_context(ta_id: str, query: str, top_k: int = 8) -> tuple:
+
+def detect_followup_query(query: str, conversation_history: list = None) -> dict:
+    """
+    Detect if this query is a follow-up that needs context from previous messages.
+    
+    Returns:
+        dict with:
+            - is_followup: bool
+            - followup_type: str (answer_submission, clarification, continuation, pronoun_reference)
+            - needs_context_enrichment: bool
+    """
+    query_lower = query.lower().strip()
+    query_words = query_lower.split()
+    
+    result = {
+        "is_followup": False,
+        "followup_type": None,
+        "needs_context_enrichment": False
+    }
+    
+    # No history = can't be a follow-up
+    if not conversation_history or len(conversation_history) == 0:
+        return result
+    
+    # 1. Answer submission patterns
+    answer_patterns = [
+        r'^i\s*got\b', r'^my\s*(answer|result|solution)\b', r'^i\s*calculated\b',
+        r'^i\s*think\s*(it|the\s*answer)\b', r'^the\s*answer\s*is\b', r'^i\s*found\b',
+        r'^is\s*it\b', r'^it\s*equals?\b', r'^so\s*(it|the)\b', r'^that\s*gives?\b',
+        r'^\d+\.?\d*$',  # Just a number
+        r'^[a-z]\)?\.?\s*$',  # Just a letter like "b" or "c)"
+    ]
+    for pattern in answer_patterns:
+        if re.search(pattern, query_lower):
+            result["is_followup"] = True
+            result["followup_type"] = "answer_submission"
+            result["needs_context_enrichment"] = True
+            return result
+    
+    # 2. Clarification patterns
+    clarification_patterns = [
+        r'^what\s*do\s*you\s*mean\b', r'^can\s*you\s*explain\b', r'^i\s*don\'?t\s*understand\b',
+        r'^why\s*(is|does|do)\b', r'^how\s*(do|does|did)\b', r'^what\s*about\b',
+        r'^could\s*you\b', r'^can\s*you\s*clarify\b', r'^explain\s*more\b',
+        r'^more\s*(detail|info|explanation)\b'
+    ]
+    for pattern in clarification_patterns:
+        if re.search(pattern, query_lower):
+            result["is_followup"] = True
+            result["followup_type"] = "clarification"
+            result["needs_context_enrichment"] = True
+            return result
+    
+    # 3. Short query with pronouns (likely needs context)
+    pronoun_refs = ['it', 'this', 'that', 'these', 'those', 'them', 'they']
+    if len(query_words) <= 10:
+        for pronoun in pronoun_refs:
+            if pronoun in query_words:
+                result["is_followup"] = True
+                result["followup_type"] = "pronoun_reference"
+                result["needs_context_enrichment"] = True
+                return result
+    
+    # 4. Very short queries (likely continuation)
+    if len(query_words) <= 5 and not any(kw in query_lower for kw in ['what is', 'explain', 'help with']):
+        result["is_followup"] = True
+        result["followup_type"] = "continuation"
+        result["needs_context_enrichment"] = True
+        return result
+    
+    # 5. Part reference without full context (e.g., "part b" or "what about 2c")
+    part_patterns = [r'^(part|section|question)\s*[a-z]?\d*[a-z]?\b', r'^[a-z]?\d+[a-z]?\)?$', r'^(and|what about|now)\s*(part|section)?\s*[a-z]?\d*[a-z]?\b']
+    for pattern in part_patterns:
+        if re.search(pattern, query_lower):
+            result["is_followup"] = True
+            result["followup_type"] = "continuation"
+            result["needs_context_enrichment"] = True
+            return result
+    
+    return result
+
+
+def extract_context_from_history(conversation_history: list, max_messages: int = 4) -> dict:
+    """
+    Extract relevant context from conversation history for query enrichment.
+    
+    Returns:
+        dict with:
+            - topic_summary: str (key topic/problem being discussed)
+            - document_reference: str (any specific document mentioned)
+            - problem_reference: str (any specific problem number/part)
+            - last_assistant_response: str (truncated)
+    """
+    context = {
+        "topic_summary": None,
+        "document_reference": None,
+        "problem_reference": None,
+        "last_assistant_response": None
+    }
+    
+    if not conversation_history:
+        return context
+    
+    # Get recent messages (most recent first for analysis)
+    recent = conversation_history[-max_messages:] if len(conversation_history) > max_messages else conversation_history
+    
+    # Find the most recent user question that started the topic
+    for msg in reversed(recent):
+        msg_content = msg.content if hasattr(msg, 'content') else str(msg)
+        msg_role = msg.role if hasattr(msg, 'role') else 'unknown'
+        
+        if msg_role == 'user':
+            # Look for problem/document references in previous user queries
+            problem_match = re.search(r'(problem|question|exercise|section)\s*(\d+[a-z]?)', msg_content.lower())
+            if problem_match and not context["problem_reference"]:
+                context["problem_reference"] = problem_match.group(0)
+            
+            # Look for document references
+            doc_match = re.search(r'(problem\s*set|pset|homework|hw|exam|midterm|final|lecture)\s*(\d+)?', msg_content.lower())
+            if doc_match and not context["document_reference"]:
+                context["document_reference"] = doc_match.group(0)
+            
+            # Use the first substantive user query as topic summary
+            if not context["topic_summary"] and len(msg_content) > 20:
+                context["topic_summary"] = msg_content[:200]
+                
+        elif msg_role == 'assistant' and not context["last_assistant_response"]:
+            context["last_assistant_response"] = msg_content[:500]
+    
+    return context
+
+
+def enrich_query_with_context(query: str, history_context: dict) -> str:
+    """
+    Enrich a follow-up query with context from conversation history.
+    
+    Creates an augmented query that includes relevant context for better retrieval.
+    """
+    enrichment_parts = []
+    
+    if history_context.get("document_reference"):
+        enrichment_parts.append(history_context["document_reference"])
+    
+    if history_context.get("problem_reference"):
+        enrichment_parts.append(history_context["problem_reference"])
+    
+    if history_context.get("topic_summary"):
+        # Extract key terms from the topic summary
+        topic = history_context["topic_summary"]
+        enrichment_parts.append(topic)
+    
+    if enrichment_parts:
+        enriched = f"{' '.join(enrichment_parts)} {query}"
+        return enriched
+    
+    return query
+
+
+def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_history: list = None) -> tuple:
     """
     Retrieve relevant chunks for a query with hybrid fallback.
     
@@ -788,8 +946,44 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8) -> tuple:
         "validation_performed": False,
         "validation_passed": None,
         "validation_expected_ref": None,
-        "validation_matches_found": 0
+        "validation_matches_found": 0,
+        "followup_detected": False,
+        "followup_type": None,
+        "query_enriched": False,
+        "original_query": query
     }
+    
+    # FOLLOW-UP DETECTION AND QUERY ENRICHMENT
+    # Detect if this is a follow-up query that needs context from conversation history
+    followup_info = detect_followup_query(query, conversation_history)
+    diagnostics["followup_detected"] = followup_info["is_followup"]
+    diagnostics["followup_type"] = followup_info["followup_type"]
+    
+    # If follow-up detected, enrich the query with context from history
+    # BUT only if history actually contains a problem/document reference worth enriching with
+    effective_query = query
+    if followup_info["needs_context_enrichment"] and conversation_history:
+        history_context = extract_context_from_history(conversation_history)
+        
+        # Only enrich if we found useful context (problem or document reference)
+        # This prevents over-enriching standalone short queries
+        has_useful_context = (
+            history_context.get("problem_reference") or 
+            history_context.get("document_reference") or
+            history_context.get("topic_summary")
+        )
+        
+        if has_useful_context:
+            enriched_query = enrich_query_with_context(query, history_context)
+            
+            if enriched_query != query:
+                logger.info(f"[{ta_id}] Follow-up detected ({followup_info['followup_type']}), enriching query")
+                logger.info(f"[{ta_id}] Original: '{query}' -> Enriched: '{enriched_query[:100]}...'")
+                effective_query = enriched_query
+                diagnostics["query_enriched"] = True
+                diagnostics["enriched_query"] = enriched_query[:200]
+        else:
+            logger.info(f"[{ta_id}] Follow-up detected but no useful context in history, skipping enrichment")
     
     total_chunks = DocumentChunk.query.filter_by(ta_id=ta_id).count()
     diagnostics["total_chunks_in_ta"] = total_chunks
@@ -800,12 +994,15 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8) -> tuple:
     
     client = get_openai_client()
     
+    # Use the enriched query for embedding to get better semantic search results
     response = client.embeddings.create(
         model=Config.EMBEDDING_MODEL,
-        input=query
+        input=effective_query
     )
     query_embedding = response.data[0].embedding
     
+    # IMPORTANT: Use ORIGINAL query for analyze_query to preserve filename matching and filters
+    # Enriched query is only for semantic search (embeddings), not for filter extraction
     query_analysis = analyze_query(query, ta_id)
     diagnostics["is_conceptual"] = query_analysis.get("is_conceptual", False)
     

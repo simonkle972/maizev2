@@ -581,7 +581,7 @@ def chat_api(slug):
         conversation_history = list(reversed(recent_messages))
         
         retrieval_start = time.time()
-        chunks, retrieval_diagnostics = retrieve_context(ta.id, query, top_k=8)
+        chunks, retrieval_diagnostics = retrieve_context(ta.id, query, top_k=8, conversation_history=conversation_history)
         retrieval_latency_ms = int((time.time() - retrieval_start) * 1000)
         
         context = "\n\n---\n\n".join([
@@ -727,7 +727,7 @@ def chat_stream_api(slug):
                 history_text = "\n".join(history_parts)
             
             retrieval_start = time.time()
-            chunks, retrieval_diagnostics = retrieve_context(ta_id, query, top_k=8)
+            chunks, retrieval_diagnostics = retrieve_context(ta_id, query, top_k=8, conversation_history=conversation_history)
             retrieval_latency_ms = int((time.time() - retrieval_start) * 1000)
             chunk_count = len(chunks)
             
