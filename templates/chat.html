@@ -145,36 +145,62 @@
             sanitized = sanitized.replace(/\*+(\$[^\$]+\$)\*+/g, '$1');
             sanitized = sanitized.replace(/\*+(\$\$[\s\S]*?\$\$)\*+/g, '$1');
             
-            // 2. Fix unbalanced $ signs by escaping lone $ that aren't part of pairs
-            //    Count $ signs - if odd, escape the last lone one
+            // 2. Remove asterisks before LaTeX commands (e.g., "**\varepsilon" -> "\varepsilon")
+            //    Must capture full command name (varepsilon, frac, cdot, etc.)
+            sanitized = sanitized.replace(/\*+(\\[a-zA-Z]+)/g, '$1');
+            sanitized = sanitized.replace(/(\\[a-zA-Z]+)\*+/g, '$1');
+            
+            // 3. Remove trailing asterisks at end of sentences/lines
+            sanitized = sanitized.replace(/\s\*+\s*$/gm, '');
+            sanitized = sanitized.replace(/\.\s*\*+\s/g, '. ');
+            sanitized = sanitized.replace(/\.\s*\*+$/gm, '.');
+            
+            // 4. Remove asterisks around section headers like "*2b) Title:**" or "**2a) Title:**"
+            sanitized = sanitized.replace(/^\*+\s*(\d+[a-zA-Z]?\))/gm, '$1');
+            sanitized = sanitized.replace(/\*+\s*(\d+[a-zA-Z]?\))/g, '$1');
+            sanitized = sanitized.replace(/:\s*\*+\s*$/gm, ':');
+            sanitized = sanitized.replace(/:\s*\*+\s*\n/g, ':\n');
+            
+            // 5. Fix unbalanced $ signs by escaping lone $ that aren't part of pairs
             const dollarMatches = sanitized.match(/\$/g);
             if (dollarMatches && dollarMatches.length % 2 === 1) {
-                // Find the last $ and escape it if it looks like a currency symbol
                 sanitized = sanitized.replace(/\$(?=\d+[,.]?\d*(?:[^$]|$))/g, '\\$');
             }
             
-            // 3. Fix asterisks inside what looks like math content
-            //    If we see patterns like "word*word*word" with no spaces, 
-            //    it's likely broken formatting - escape the asterisks
+            // 6. Fix asterisks inside what looks like math content
             sanitized = sanitized.replace(/(\w)\*(\w+)\*(\w)/g, '$1\\*$2\\*$3');
             
-            // 4. Clean up problematic patterns: **text with spaces that runs together**
-            //    If bold text is very long (> 100 chars) with no spaces, something is wrong
+            // 7. Clean up long broken bold patterns
             sanitized = sanitized.replace(/\*\*([^\*]{100,})\*\*/g, (match, content) => {
-                // If the content has no spaces, it's likely broken - just return as plain text
                 if (!content.includes(' ')) {
                     return content;
                 }
                 return match;
             });
             
-            // 5. Same for single asterisk italics
+            // 8. Same for single asterisk italics
             sanitized = sanitized.replace(/\*([^\*]{100,})\*/g, (match, content) => {
                 if (!content.includes(' ')) {
                     return content;
                 }
                 return match;
             });
+            
+            // 9. Remove any remaining lone asterisks that aren't valid markdown
+            //    Simple approach: remove * surrounded by spaces or at line boundaries
+            sanitized = sanitized.replace(/\s\*\s/g, ' ');
+            sanitized = sanitized.replace(/^\*\s/gm, '');
+            sanitized = sanitized.replace(/\s\*$/gm, '');
+            
+            // 10. Strip all asterisks if content has math (aggressive cleanup for math-heavy responses)
+            if (sanitized.includes('$') || sanitized.includes('\\frac') || sanitized.includes('\\varepsilon')) {
+                // Remove bold/italic markers entirely - they just cause problems with math
+                // First remove bold (**text**)
+                sanitized = sanitized.replace(/\*\*([^*]+)\*\*/g, '$1');
+                // Then remove italic (*text*) - Safari-compatible without lookbehind
+                // Match *text* where text doesn't start/end with * and has no newlines
+                sanitized = sanitized.replace(/\*([^*\n]+)\*/g, '$1');
+            }
             
             return sanitized;
         }
@@ -210,8 +236,10 @@
             // Bold - only match if content is reasonable length and has spaces
             content = content.replace(/\*\*(.{1,80}?)\*\*/g, '<strong>$1</strong>');
             
-            // Italic - only match if content is reasonable length  
-            content = content.replace(/(?<!\*)\*([^\*\n]{1,80}?)\*(?!\*)/g, '<em>$1</em>');
+            // Italic - only match if content is reasonable length
+            // Safari-compatible: match *text* but only if not inside ** markers
+            // We already handled ** for bold above, so remaining single * pairs are italic
+            content = content.replace(/\*([^\*\n]{1,80}?)\*/g, '<em>$1</em>');
             
             // Code
             content = content.replace(/`([^`]+)`/g, '<code>$1</code>');
