@@ -772,12 +772,20 @@ def detect_followup_query(query: str, conversation_history: list = None) -> dict
         return result
     
     # 1. Answer submission patterns
+    # Match patterns at start of query OR after common prefixes like "ok", "alright", "so"
     answer_patterns = [
         r'^i\s*got\b', r'^my\s*(answer|result|solution)\b', r'^i\s*calculated\b',
         r'^i\s*think\s*(it|the\s*answer)\b', r'^the\s*answer\s*is\b', r'^i\s*found\b',
         r'^is\s*it\b', r'^it\s*equals?\b', r'^so\s*(it|the)\b', r'^that\s*gives?\b',
         r'^\d+\.?\d*$',  # Just a number
         r'^[a-z]\)?\.?\s*$',  # Just a letter like "b" or "c)"
+        # Flexible patterns with common prefixes
+        r'^(ok|okay|alright|so|well|right)\s*(,|\.|\!)?\s*i\s*(got|have|found|calculated)\b',
+        r'^(ok|okay|alright|so|well|right)\s*(,|\.|\!)?\s*(my|the)\s*(answer|result)\b',
+        r'\bi\s*have\s*[pqxyznm]\s*=\s*\d',  # "I have p=3" anywhere in query
+        r'\bi\s*got\s*[pqxyznm]\s*=\s*\d',   # "I got x=5" anywhere in query
+        r'=\s*\d+\.?\d*\s*(and|,)?\s*[pqxyznm]?\s*=?\s*\d*',  # Multiple variable assignments like "p=3 and q=510"
+        r'(plugging|substituting|putting)\s*(in|it|back)',  # "plugging in" type answers
     ]
     for pattern in answer_patterns:
         if re.search(pattern, query_lower):
