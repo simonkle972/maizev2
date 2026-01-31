@@ -2,6 +2,7 @@ import os
 import re
 import logging
 import tempfile
+from datetime import datetime
 from openai import OpenAI
 from sqlalchemy import text
 from config import Config
@@ -904,12 +905,17 @@ def enrich_query_with_context(query: str, history_context: dict) -> str:
     return query
 
 
-def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_history: list = None) -> tuple:
+def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_history: list = None, session_id: str = None) -> tuple:
     """
     Retrieve relevant chunks for a query with hybrid fallback.
     
     When chunk-based retrieval shows low confidence (poor LLM rerank scores),
     falls back to retrieving the full document text for more reliable results.
+    
+    Session Context Caching:
+        When a document is successfully retrieved with high confidence (early hybrid routing),
+        the document context is cached in the session. On follow-up queries, this cached
+        context is reused instead of re-searching, ensuring continuity in multi-turn conversations.
     
     Returns:
         tuple: (chunks, diagnostics)
@@ -917,7 +923,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
               If hybrid fallback triggered, returns a single "chunk" with full doc text
             - diagnostics: dict with retrieval metrics for logging
     """
-    from models import db, DocumentChunk
+    from models import db, DocumentChunk, ChatSession
     from sqlalchemy import func, literal
     from pgvector.sqlalchemy import Vector
     import json
@@ -950,8 +956,28 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         "followup_detected": False,
         "followup_type": None,
         "query_enriched": False,
-        "original_query": query
+        "original_query": query,
+        "session_cache_used": False,
+        "session_cache_document": None
     }
+    
+    # SESSION CONTEXT CACHE: Check if we have cached context from previous successful retrieval
+    # This avoids re-searching for the same document on follow-up questions
+    session_context = None
+    if session_id:
+        try:
+            session = ChatSession.query.get(session_id)
+            # SECURITY: Validate session belongs to this TA to prevent cross-tenant context leakage
+            if session and session.ta_id == ta_id and session.active_context:
+                cached_ta_id = session.active_context.get("ta_id")
+                # Double-check the cached content also belongs to this TA
+                if cached_ta_id == ta_id or cached_ta_id is None:  # Allow legacy caches without ta_id
+                    session_context = session.active_context
+                    logger.info(f"[{ta_id}] Session has cached context: {session_context.get('document_filename', 'unknown')}")
+                else:
+                    logger.warning(f"[{ta_id}] Cached context belongs to different TA ({cached_ta_id}), ignoring")
+        except Exception as e:
+            logger.warning(f"[{ta_id}] Failed to load session context: {e}")
     
     # FOLLOW-UP DETECTION AND QUERY ENRICHMENT
     # Detect if this is a follow-up query that needs context from conversation history
@@ -984,6 +1010,63 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                 diagnostics["enriched_query"] = enriched_query[:200]
         else:
             logger.info(f"[{ta_id}] Follow-up detected but no useful context in history, skipping enrichment")
+    
+    # USE SESSION CACHE FOR FOLLOW-UPS
+    # If this is a follow-up AND we have cached document context, use it directly
+    # This prevents "lost context" issues when validating student answers
+    if followup_info["is_followup"] and session_context and session_context.get("document_content"):
+        # Check if user is asking about something new (topic switch detection)
+        # Look for explicit new problem/document references that differ from cached context
+        query_lower = query.lower()
+        cached_problem = session_context.get("problem_reference", "").lower() if session_context.get("problem_reference") else ""
+        
+        # Detect topic switch: user mentions a DIFFERENT problem/document than what's cached
+        problem_match = re.search(r'(problem|question|exercise|section)\s*(\d+[a-z]?)', query_lower)
+        doc_match = re.search(r'(problem\s*set|pset|homework|hw|exam|midterm|final|lecture|unit|week)\s*(\d+)?', query_lower)
+        
+        is_topic_switch = False
+        if problem_match:
+            new_problem = problem_match.group(0)
+            # Only switch if it's explicitly different from cached
+            if cached_problem and new_problem not in cached_problem and cached_problem not in new_problem:
+                is_topic_switch = True
+                logger.info(f"[{ta_id}] Topic switch: cached='{cached_problem}', new='{new_problem}'")
+        elif doc_match:
+            # Mentioning a specific document type suggests topic switch
+            is_topic_switch = True
+            logger.info(f"[{ta_id}] Topic switch: new document reference '{doc_match.group(0)}'")
+        
+        if not is_topic_switch:
+            # Use cached context - no need to re-search
+            logger.info(f"[{ta_id}] Using cached session context for follow-up (document: {session_context.get('document_filename')})")
+            
+            diagnostics["session_cache_used"] = True
+            diagnostics["session_cache_document"] = session_context.get("document_filename")
+            diagnostics["hybrid_fallback_triggered"] = True
+            diagnostics["hybrid_fallback_reason"] = "session_cache"
+            diagnostics["hybrid_doc_filename"] = session_context.get("document_filename")
+            
+            cached_chunk = {
+                "text": session_context.get("document_content", ""),
+                "score": 1.0,
+                "file_name": session_context.get("document_filename", "cached document"),
+                "chunk_index": 0,
+                "doc_type": session_context.get("doc_type"),
+                "problem_reference": session_context.get("problem_reference")
+            }
+            return [cached_chunk], diagnostics
+        else:
+            # User is switching topics - clear the cache and proceed with normal retrieval
+            logger.info(f"[{ta_id}] Topic switch detected, clearing session cache")
+            if session_id:
+                try:
+                    session = ChatSession.query.get(session_id)
+                    # SECURITY: Only clear cache for this TA's session
+                    if session and session.ta_id == ta_id:
+                        session.active_context = None
+                        db.session.commit()
+                except Exception as e:
+                    logger.warning(f"[{ta_id}] Failed to clear session cache: {e}")
     
     total_chunks = DocumentChunk.query.filter_by(ta_id=ta_id).count()
     diagnostics["total_chunks_in_ta"] = total_chunks
@@ -1043,6 +1126,26 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                 }]
                 
                 logger.info(f"[{ta_id}] Early hybrid complete | doc={filename} | tokens={token_estimate}")
+                
+                # CACHE TO SESSION: Save this successful retrieval for follow-up queries
+                if session_id:
+                    try:
+                        session = ChatSession.query.get(session_id)
+                        # SECURITY: Only cache if session belongs to this TA
+                        if session and session.ta_id == ta_id:
+                            session.active_context = {
+                                "ta_id": ta_id,  # Store ta_id for cross-tenant security validation
+                                "document_filename": filename,
+                                "document_content": full_text,
+                                "problem_reference": problem_ref.get("full_ref") if problem_ref else None,
+                                "doc_type": "problem_set",
+                                "cached_at": datetime.utcnow().isoformat()
+                            }
+                            db.session.commit()
+                            logger.info(f"[{ta_id}] Cached document context for session: {filename}")
+                    except Exception as e:
+                        logger.warning(f"[{ta_id}] Failed to cache session context: {e}")
+                
                 return hybrid_chunks, diagnostics
             elif token_estimate > Config.HYBRID_MAX_DOC_TOKENS:
                 logger.warning(f"[{ta_id}] Document too large for early hybrid: {token_estimate} tokens, falling back to chunk retrieval")

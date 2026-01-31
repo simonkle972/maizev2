@@ -60,6 +60,7 @@ class ChatSession(db.Model):
     ta_id = db.Column(db.String(32), db.ForeignKey('teaching_assistants.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_activity = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    active_context = db.Column(db.JSON, nullable=True)
     
     messages = db.relationship('ChatMessage', backref='session', lazy='dynamic', cascade='all, delete-orphan', order_by='ChatMessage.created_at')
 
