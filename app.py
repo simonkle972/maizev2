@@ -41,6 +41,69 @@ def health():
 def favicon():
     return '', 204
 
+@app.route('/api/demo-request', methods=['POST'])
+def demo_request():
+    """Handle demo request form submissions and send email notification."""
+    import smtplib
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+    
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+    
+    name = data.get('name', '').strip()
+    email = data.get('email', '').strip()
+    institution = data.get('institution', '').strip()
+    course = data.get('course', '').strip()
+    message = data.get('message', '').strip()
+    
+    if not name or not email or not institution:
+        return jsonify({"error": "Please fill in all required fields"}), 400
+    
+    email_body = f"""
+New Demo Request for Maize
+
+Name: {name}
+Email: {email}
+Institution: {institution}
+Course: {course or 'Not specified'}
+
+Message:
+{message or 'No additional message'}
+
+---
+Submitted at: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}
+"""
+    
+    smtp_host = os.environ.get('SMTP_HOST')
+    smtp_port = int(os.environ.get('SMTP_PORT', 587))
+    smtp_user = os.environ.get('SMTP_USER')
+    smtp_pass = os.environ.get('SMTP_PASS')
+    
+    if smtp_host and smtp_user and smtp_pass:
+        try:
+            msg = MIMEMultipart()
+            msg['From'] = smtp_user
+            msg['To'] = 'simon.kleffner@yale.edu'
+            msg['Subject'] = f'Maize Demo Request: {name} from {institution}'
+            msg.attach(MIMEText(email_body, 'plain'))
+            
+            with smtplib.SMTP(smtp_host, smtp_port) as server:
+                server.starttls()
+                server.login(smtp_user, smtp_pass)
+                server.send_message(msg)
+            
+            logger.info(f"Demo request email sent for {email}")
+        except Exception as e:
+            logger.error(f"Failed to send demo request email: {e}")
+            logger.info(f"Demo request (email failed): {name} <{email}> from {institution}")
+    else:
+        logger.info(f"Demo request (no SMTP configured): {name} <{email}> from {institution}")
+        logger.info(f"Course: {course or 'N/A'}, Message: {message or 'N/A'}")
+    
+    return jsonify({"success": True, "message": "Demo request received"})
+
 @app.route('/')
 def landing():
     return render_template('landing.html')

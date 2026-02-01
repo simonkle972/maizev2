@@ -4,19 +4,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ ta.name }} - Maize</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/chat-brand.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
 </head>
-<body>
+<body class="chat-page">
     <div class="chat-container">
         <header class="chat-header">
             <div class="header-info">
                 <h1>{{ ta.name }}</h1>
                 <p class="course-name">{{ ta.course_name }}</p>
             </div>
-            <a href="/" class="logo-link">Maize</a>
+            <a href="/" class="logo-link">
+                <img src="/static/images/maize-logo.png" alt="Maize" class="logo-img">
+                <span class="logo-text">Maize</span>
+            </a>
         </header>
         
         <main class="chat-main">

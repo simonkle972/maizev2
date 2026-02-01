@@ -4,44 +4,283 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Maize - AI Teaching Assistant</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/landing.css">
 </head>
-<body>
-    <div class="landing-container">
-        <header class="landing-header">
-            <h1 class="logo">Maize</h1>
-            <p class="tagline">AI-Powered Teaching Assistants for Your Courses</p>
-        </header>
-        
-        <main class="landing-main">
-            <section class="hero">
-                <h2>Your Course, Your TA</h2>
-                <p>Maize creates intelligent teaching assistants that know your course materials inside and out. Students get instant help with concepts, homework guidance, and exam preparation.</p>
-            </section>
+<body class="landing-page">
+    <header class="site-header">
+        <div class="header-container">
+            <a href="/" class="header-logo">
+                <img src="/static/images/maize-logo.png" alt="Maize" class="logo-img">
+                <span class="logo-text">Maize</span>
+            </a>
+            <nav class="header-nav">
+                <a href="#features" class="nav-link">Features</a>
+                <a href="#comparison" class="nav-link">Why Maize</a>
+                <a href="#demo" class="nav-link">Demo</a>
+                <a href="/admin" class="nav-link nav-admin">Admin</a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <section class="hero-section">
+            <div class="hero-container">
+                <div class="hero-content">
+                    <h1 class="hero-title">Teach students to think, not just answer.</h1>
+                    <p class="hero-subtitle">Maize is an AI teaching assistant that helps students understand course concepts using your actual materials. 24/7 support that guides learning without giving away answers.</p>
+                    <div class="hero-cta">
+                        <a href="#demo" class="btn btn-primary btn-large">Request a Demo</a>
+                        <a href="#features" class="btn btn-secondary-outline btn-large">Learn More</a>
+                    </div>
+                </div>
+                <div class="hero-image">
+                    <img src="/static/images/maize-logo.png" alt="Maize AI Teaching Assistant" class="hero-mascot">
+                </div>
+            </div>
+        </section>
+
+        <section id="features" class="features-section">
+            <div class="section-container">
+                <h2 class="section-title">Why instructors choose Maize</h2>
+                <p class="section-subtitle">An AI TA that actually understands your course</p>
+                
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>
+                            </svg>
+                        </div>
+                        <h3>Course-Specific Knowledge</h3>
+                        <p>Upload your lectures, problem sets, and readings. Maize learns your specific curriculum, not generic information from the internet.</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 16v-4"/>
+                                <path d="M12 8h.01"/>
+                            </svg>
+                        </div>
+                        <h3>Pedagogical Guardrails</h3>
+                        <p>Maize guides students to understand concepts without giving direct answers. Students learn to solve problems themselves.</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"/>
+                                <polyline points="12 6 12 12 16 14"/>
+                            </svg>
+                        </div>
+                        <h3>Available 24/7</h3>
+                        <p>Students get help whenever they need it, not just during office hours. Reduce the burden on you and your human TAs.</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 20h9"/>
+                                <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+                            </svg>
+                        </div>
+                        <h3>Instructor Control</h3>
+                        <p>You decide what materials the TA knows. Upload, review, and update content through an easy admin panel.</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                            </svg>
+                        </div>
+                        <h3>Patient Tutoring</h3>
+                        <p>Maize adapts its hints based on how many attempts a student makes. Struggling students get more guidance, naturally.</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/>
+                            </svg>
+                        </div>
+                        <h3>Isolated & Secure</h3>
+                        <p>Each course has its own TA with isolated knowledge. Students only access materials from their enrolled courses.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="comparison" class="comparison-section">
+            <div class="section-container">
+                <h2 class="section-title">Maize vs. General LLMs</h2>
+                <p class="section-subtitle">Why generic AI assistants fall short for education</p>
+                
+                <div class="comparison-table-wrapper">
+                    <table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th></th>
+                                <th class="highlight-col">
+                                    <img src="/static/images/maize-logo.png" alt="Maize" class="table-logo">
+                                    Maize
+                                </th>
+                                <th>ChatGPT / Claude</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="feature-name">Uses your actual course materials</td>
+                                <td class="highlight-col"><span class="check">Yes</span></td>
+                                <td><span class="cross">No</span></td>
+                            </tr>
+                            <tr>
+                                <td class="feature-name">Guides learning without giving answers</td>
+                                <td class="highlight-col"><span class="check">Built-in</span></td>
+                                <td><span class="cross">Will solve problems</span></td>
+                            </tr>
+                            <tr>
+                                <td class="feature-name">Knows your specific assignments</td>
+                                <td class="highlight-col"><span class="check">Yes</span></td>
+                                <td><span class="cross">No access</span></td>
+                            </tr>
+                            <tr>
+                                <td class="feature-name">Instructor controls content</td>
+                                <td class="highlight-col"><span class="check">Full control</span></td>
+                                <td><span class="cross">No control</span></td>
+                            </tr>
+                            <tr>
+                                <td class="feature-name">Adapts patience based on attempts</td>
+                                <td class="highlight-col"><span class="check">3-tier system</span></td>
+                                <td><span class="cross">No tracking</span></td>
+                            </tr>
+                            <tr>
+                                <td class="feature-name">Course-isolated security</td>
+                                <td class="highlight-col"><span class="check">Per-TA isolation</span></td>
+                                <td><span class="cross">Shared context</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section id="demo" class="demo-section">
+            <div class="section-container">
+                <div class="demo-card">
+                    <div class="demo-content">
+                        <h2>Ready to transform your course?</h2>
+                        <p>Request a demo to see how Maize can support your students while keeping learning rigorous.</p>
+                    </div>
+                    <form id="demo-form" class="demo-form" onsubmit="submitDemoRequest(event)">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="name">Name</label>
+                                <input type="text" id="name" name="name" required placeholder="Your name">
+                            </div>
+                            <div class="form-group">
+                                <label for="email">Email</label>
+                                <input type="email" id="email" name="email" required placeholder="your.email@university.edu">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="institution">Institution</label>
+                                <input type="text" id="institution" name="institution" required placeholder="University or college">
+                            </div>
+                            <div class="form-group">
+                                <label for="course">Course</label>
+                                <input type="text" id="course" name="course" placeholder="e.g., Intro to Economics">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="message">Anything else we should know?</label>
+                            <textarea id="message" name="message" rows="3" placeholder="Tell us about your course or specific needs..."></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-large btn-full" id="demo-submit-btn">Request Demo</button>
+                        <p id="demo-status" class="form-status"></p>
+                    </form>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <div class="footer-container">
+            <div class="footer-brand">
+                <img src="/static/images/maize-logo.png" alt="Maize" class="footer-logo">
+                <span class="footer-tagline">AI that teaches thinking, not answers.</span>
+            </div>
+            <div class="footer-links">
+                <a href="/admin">Instructor Login</a>
+                <a href="#demo">Request Demo</a>
+            </div>
+            <div class="footer-copy">
+                <p>&copy; 2026 Maize. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        async function submitDemoRequest(e) {
+            e.preventDefault();
             
-            <section class="features">
-                <div class="feature">
-                    <h3>Course-Aware</h3>
-                    <p>Upload your lectures, assignments, and readings. Your TA learns the specific content of your course.</p>
-                </div>
-                <div class="feature">
-                    <h3>Guided Learning</h3>
-                    <p>Helps students understand concepts without giving away answers. Perfect for homework help.</p>
-                </div>
-                <div class="feature">
-                    <h3>Always Available</h3>
-                    <p>Students can get help 24/7, reducing the burden on instructors and human TAs.</p>
-                </div>
-            </section>
+            const btn = document.getElementById('demo-submit-btn');
+            const status = document.getElementById('demo-status');
             
-            <section class="cta">
-                <p>Are you an instructor? <a href="/admin">Access the Admin Panel</a></p>
-            </section>
-        </main>
+            btn.disabled = true;
+            btn.textContent = 'Sending...';
+            status.textContent = '';
+            status.className = 'form-status';
+            
+            const formData = {
+                name: document.getElementById('name').value,
+                email: document.getElementById('email').value,
+                institution: document.getElementById('institution').value,
+                course: document.getElementById('course').value,
+                message: document.getElementById('message').value
+            };
+            
+            try {
+                const response = await fetch('/api/demo-request', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    status.textContent = 'Thanks! We\'ll be in touch soon.';
+                    status.className = 'form-status success';
+                    document.getElementById('demo-form').reset();
+                } else {
+                    status.textContent = data.error || 'Something went wrong. Please try again.';
+                    status.className = 'form-status error';
+                }
+            } catch (err) {
+                status.textContent = 'Network error. Please try again.';
+                status.className = 'form-status error';
+            }
+            
+            btn.disabled = false;
+            btn.textContent = 'Request Demo';
+        }
         
-        <footer class="landing-footer">
-            <p>Maize - Making course assistance accessible</p>
-        </footer>
-    </div>
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+    </script>
 </body>
 </html>
