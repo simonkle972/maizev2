@@ -540,7 +540,10 @@ def extract_problem_reference(query: str) -> dict:
         }
     
     # Pattern 4: Standard - "problem 2d", "question 3a", "exercise 1b" (GENERIC - check after specific patterns)
-    match = re.search(r'(?:problem|question|exercise|prob|q)\s*(\d+)\s*([a-z])?(?:\s|$|\.|\,|\?)', query_lower)
+    # IMPORTANT: Sub-part letter must be IMMEDIATELY after the number (no whitespace)
+    # This prevents "Q8 I have" from matching as "8i" where "I" is the next word
+    # The sub-part is optional BUT must be directly attached (no \s* before it)
+    match = re.search(r'(?:problem|question|exercise|prob|q)\s*(\d+)([a-z])?(?=\s|$|\.|\,|\?|\))', query_lower)
     if match:
         problem_num = match.group(1)
         sub_part = match.group(2)
@@ -552,8 +555,9 @@ def extract_problem_reference(query: str) -> dict:
         }
     
     # Pattern 5: "2d", "3a" standalone with problem context words nearby
+    # Sub-part must be immediately attached to number (no space between)
     if any(word in query_lower for word in ['problem', 'question', 'exercise', 'help', 'solve', 'answer', 'section']):
-        match = re.search(r'(?:^|\s)(\d+)([a-z])(?:\s|$|\.|\,|\?)', query_lower)
+        match = re.search(r'(?:^|\s)(\d+)([a-z])(?=\s|$|\.|\,|\?)', query_lower)
         if match:
             problem_num = match.group(1)
             sub_part = match.group(2)
@@ -1431,6 +1435,28 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                     "llm_reason": "Full document fallback due to low chunk confidence"
                 }]
                 
+                # CACHE THE DOCUMENT for follow-up queries
+                # This ensures answer submissions and clarification questions use the same document
+                if session_id:
+                    try:
+                        session = ChatSession.query.get(session_id)
+                        # SECURITY: Only cache if session belongs to this TA
+                        if session and session.ta_id == ta_id:
+                            existing_attempts = session_context.get("attempt_counts", {}) if session_context else {}
+                            session.active_context = {
+                                "ta_id": ta_id,
+                                "document_filename": filename,
+                                "document_content": full_text,
+                                "problem_reference": problem_ref.get("full_ref") if problem_ref else None,
+                                "doc_type": chunks[0].get("doc_type", "other") if chunks else "other",
+                                "cached_at": datetime.utcnow().isoformat(),
+                                "attempt_counts": existing_attempts
+                            }
+                            db.session.commit()
+                            logger.info(f"[{ta_id}] Cached document context for session (hybrid fallback): {filename}")
+                    except Exception as e:
+                        logger.warning(f"[{ta_id}] Failed to cache session context in hybrid fallback: {e}")
+                
                 logger.info(f"[{ta_id}] Hybrid fallback complete | doc={filename} | tokens={token_estimate}")
                 return hybrid_chunks, diagnostics
             elif token_estimate > Config.HYBRID_MAX_DOC_TOKENS:
@@ -1444,5 +1470,42 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
             diagnostics["hybrid_fallback_reason"] = f"no_target_doc_{id_method}"
     
     logger.info(f"[{ta_id}] Retrieved {len(chunks)} chunks | method={diagnostics['retrieval_method']} | reranked={diagnostics['rerank_applied']} | scores: top1={diagnostics['score_top1']}, spread={diagnostics['score_spread']}")
+    
+    # CACHE DOCUMENT CONTEXT for follow-up queries (standard chunk retrieval path)
+    # Only cache when retrieval is confident (not low confidence) AND validation passed
+    # This prevents caching wrong document context that would mislead follow-ups
+    should_cache_chunks = (
+        session_id and 
+        chunks and 
+        not diagnostics.get("session_cache_used") and
+        not confidence["is_low_confidence"] and  # Only cache when confident
+        (not diagnostics.get("validation_performed") or diagnostics.get("validation_passed"))  # And validation passed (if performed)
+    )
+    
+    if should_cache_chunks:
+        try:
+            # Get the primary document from top chunk
+            top_doc = chunks[0].get("file_name", "")
+            if top_doc:
+                session = ChatSession.query.get(session_id)
+                # SECURITY: Only cache if session belongs to this TA
+                if session and session.ta_id == ta_id:
+                    # Concatenate chunk texts as the cached content
+                    combined_content = "\n\n---\n\n".join([c.get("text", "") for c in chunks])
+                    existing_attempts = session_context.get("attempt_counts", {}) if session_context else {}
+                    session.active_context = {
+                        "ta_id": ta_id,
+                        "document_filename": top_doc,
+                        "document_content": combined_content,
+                        "problem_reference": problem_ref.get("full_ref") if problem_ref else None,
+                        "doc_type": chunks[0].get("doc_type", "other"),
+                        "cached_at": datetime.utcnow().isoformat(),
+                        "attempt_counts": existing_attempts,
+                        "cache_source": "chunk_retrieval"  # Track that this came from chunks, not full doc
+                    }
+                    db.session.commit()
+                    logger.info(f"[{ta_id}] Cached document context for session (chunk retrieval): {top_doc}")
+        except Exception as e:
+            logger.warning(f"[{ta_id}] Failed to cache session context in chunk retrieval: {e}")
     
     return chunks, diagnostics
