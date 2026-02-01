@@ -35,6 +35,15 @@ Key architectural decisions include:
 - **Technology Stack**: Python 3.11, Flask, SQLAlchemy, PostgreSQL with pgvector, OpenAI `text-embedding-3-small` for embeddings (1536 dimensions), OpenAI GPT-4o for LLM tasks, PyPDF2, docx2python (for DOCX with list numbering preservation), antiword/catdoc (for legacy .doc files), openpyxl for file parsing.
 - **Document Extraction**: Uses docx2python library for DOCX files to preserve list numbering (a, b, c, 1, 2, 3), tables, footnotes, and document structure. This ensures sub-part labels in problem sets are correctly indexed for accurate LLM navigation.
 
+## Brand Identity
+- **Name**: Maize (named after the creator's tortoiseshell cat)
+- **Personality**: Thoughtful, calm, friendly, academically serious
+- **Mascot**: Stylized tortoiseshell cat face logo (flat geometric patches, no outlines)
+- **Color Palette**: Deep Charcoal (#2B1F1A), Dark Cocoa (#4A3328), Warm Amber (#F2A93B), Burnt Orange (#D9772A), Soft Cream (#F7EBD8), Muted Rose (#D97A8A)
+- **Typography**: Inter (humanist sans-serif)
+- **Landing Page**: Hero with mascot, features section, comparison table (Maize vs ChatGPT), demo request form
+- **Demo Requests**: Submitted via /api/demo-request, emails sent to simon.kleffner@yale.edu if SMTP configured
+
 ## External Dependencies
 - **OpenAI API**: Used for generating embeddings (`text-embedding-3-small`) and all Large Language Model (LLM) operations (`GPT-4o`).
 - **PostgreSQL**: Primary database for all persistent data, including SQLAlchemy models and vector embeddings (via `pgvector` extension).
