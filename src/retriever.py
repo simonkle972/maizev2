@@ -774,18 +774,22 @@ def detect_followup_query(query: str, conversation_history: list = None) -> dict
     # 1. Answer submission patterns
     # Match patterns at start of query OR after common prefixes like "ok", "alright", "so"
     answer_patterns = [
-        r'^i\s*got\b', r'^my\s*(answer|result|solution)\b', r'^i\s*calculated\b',
+        r'^i\s*got\b', r'^my\s*(answer|result|solution|response)\b', r'^i\s*calculated\b',
         r'^i\s*think\s*(it|the\s*answer)\b', r'^the\s*answer\s*is\b', r'^i\s*found\b',
         r'^is\s*it\b', r'^it\s*equals?\b', r'^so\s*(it|the)\b', r'^that\s*gives?\b',
         r'^\d+\.?\d*$',  # Just a number
         r'^[a-z]\)?\.?\s*$',  # Just a letter like "b" or "c)"
         # Flexible patterns with common prefixes
         r'^(ok|okay|alright|so|well|right)\s*(,|\.|\!)?\s*i\s*(got|have|found|calculated)\b',
-        r'^(ok|okay|alright|so|well|right)\s*(,|\.|\!)?\s*(my|the)\s*(answer|result)\b',
+        r'^(ok|okay|alright|so|well|right)\s*(,|\.|\!)?\s*(my|the)\s*(answer|result|response)\b',
+        # Answer with problem reference like "ok for question 8, my answer is..."
+        r'^(ok|okay|alright|so|well|right)\s*(,|\.|\!)?\s*(for\s*)?(problem|question|q)\s*\d+[a-z]?\s*(,|\.|\:)?\s*(my|the|i)',
         r'\bi\s*have\s*[pqxyznm]\s*=\s*\d',  # "I have p=3" anywhere in query
         r'\bi\s*got\s*[pqxyznm]\s*=\s*\d',   # "I got x=5" anywhere in query
         r'=\s*\d+\.?\d*\s*(and|,)?\s*[pqxyznm]?\s*=?\s*\d*',  # Multiple variable assignments like "p=3 and q=510"
         r'(plugging|substituting|putting)\s*(in|it|back)',  # "plugging in" type answers
+        # Answer with explicit prefix and units (e.g., "my answer is 31 minutes", "I got 5 units/min")
+        r'(my\s*(answer|response|result)\s*(is|:)|i\s*(got|found|calculated))\s*\d+\.?\d*\s*(minutes?|mins?|hours?|hrs?|seconds?|secs?|units?|dollars?|percent|%)',
     ]
     for pattern in answer_patterns:
         if re.search(pattern, query_lower):
@@ -1047,21 +1051,63 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         query_lower = query.lower()
         cached_problem = session_context.get("problem_reference", "").lower() if session_context.get("problem_reference") else ""
         
+        # Extract problem numbers for comparison (normalize "Q8", "question 8", "problem 8" all to "8")
+        def extract_problem_number(text):
+            """Extract just the problem number from various formats."""
+            if not text:
+                return None
+            # Match patterns like "q8", "question 8", "problem 8", "8", "q8a", "8a"
+            match = re.search(r'(?:q|question|problem|exercise|section)?\s*(\d+)([a-z])?', text.lower())
+            if match:
+                return match.group(1) + (match.group(2) or "")  # e.g., "8" or "8a"
+            return None
+        
         # Detect topic switch: user mentions a DIFFERENT problem/document than what's cached
-        problem_match = re.search(r'(problem|question|exercise|section)\s*(\d+[a-z]?)', query_lower)
+        problem_match = re.search(r'(problem|question|exercise|section|q)\s*(\d+[a-z]?)', query_lower)
         doc_match = re.search(r'(problem\s*set|pset|homework|hw|exam|midterm|final|lecture|unit|week)\s*(\d+)?', query_lower)
         
         is_topic_switch = False
-        if problem_match:
-            new_problem = problem_match.group(0)
-            # Only switch if it's explicitly different from cached
-            if cached_problem and new_problem not in cached_problem and cached_problem not in new_problem:
-                is_topic_switch = True
-                logger.info(f"[{ta_id}] Topic switch: cached='{cached_problem}', new='{new_problem}'")
-        elif doc_match:
-            # Mentioning a specific document type suggests topic switch
-            is_topic_switch = True
-            logger.info(f"[{ta_id}] Topic switch: new document reference '{doc_match.group(0)}'")
+        
+        # For ANSWER SUBMISSIONS, be very lenient - don't switch unless explicitly referencing a DIFFERENT document type
+        # The student is just referring back to the problem they're answering
+        if followup_info["followup_type"] == "answer_submission":
+            # Only consider it a topic switch if they mention a different document type (not just a problem number)
+            if doc_match:
+                # Check if the document type/number is different from what's cached
+                cached_doc = session_context.get("document_filename", "").lower()
+                new_doc_ref = doc_match.group(0)
+                new_doc_num = doc_match.group(2) if doc_match.group(2) else ""
+                # Extract number from cached filename
+                cached_doc_num = re.search(r'(\d+)', cached_doc)
+                cached_doc_num = cached_doc_num.group(1) if cached_doc_num else ""
+                
+                if new_doc_num and cached_doc_num and new_doc_num != cached_doc_num:
+                    is_topic_switch = True
+                    logger.info(f"[{ta_id}] Topic switch (answer submission): cached doc num='{cached_doc_num}', new='{new_doc_num}'")
+            # For answer submissions, problem reference (like "for question 8") is NOT a topic switch
+            # The student is just clarifying which problem their answer is for
+            if problem_match and not is_topic_switch:
+                logger.info(f"[{ta_id}] Answer submission with problem reference - NOT a topic switch")
+        else:
+            # For non-answer follow-ups, use the existing logic but compare normalized numbers
+            if problem_match:
+                new_problem_num = extract_problem_number(problem_match.group(0))
+                cached_problem_num = extract_problem_number(cached_problem)
+                
+                # Only switch if the numbers are explicitly different
+                if new_problem_num and cached_problem_num and new_problem_num != cached_problem_num:
+                    is_topic_switch = True
+                    logger.info(f"[{ta_id}] Topic switch: cached problem='{cached_problem_num}', new='{new_problem_num}'")
+            elif doc_match:
+                # Mentioning a specific document type - check if it's a different document
+                cached_doc = session_context.get("document_filename", "").lower()
+                new_doc_num = doc_match.group(2) if doc_match.group(2) else ""
+                cached_doc_num_match = re.search(r'(\d+)', cached_doc)
+                cached_doc_num = cached_doc_num_match.group(1) if cached_doc_num_match else ""
+                
+                if new_doc_num and cached_doc_num and new_doc_num != cached_doc_num:
+                    is_topic_switch = True
+                    logger.info(f"[{ta_id}] Topic switch: cached doc='{cached_doc_num}', new='{new_doc_num}'")
         
         if not is_topic_switch:
             # Use cached context - no need to re-search
