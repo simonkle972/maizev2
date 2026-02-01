@@ -966,7 +966,9 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         "query_enriched": False,
         "original_query": query,
         "session_cache_used": False,
-        "session_cache_document": None
+        "session_cache_document": None,
+        "attempt_count": 0,
+        "current_problem_key": None
     }
     
     # SESSION CONTEXT CACHE: Check if we have cached context from previous successful retrieval
@@ -992,6 +994,23 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
     followup_info = detect_followup_query(query, conversation_history)
     diagnostics["followup_detected"] = followup_info["is_followup"]
     diagnostics["followup_type"] = followup_info["followup_type"]
+    
+    # PATIENCE SYSTEM: Track answer attempts before retrieval
+    # This runs for ALL answer submissions, not just cached ones
+    if followup_info["followup_type"] == "answer_submission" and session_context:
+        problem_key = session_context.get("problem_reference", "unknown_problem")
+        attempt_counts = session_context.get("attempt_counts", {})
+        
+        # Increment attempt count for this problem
+        current_count = attempt_counts.get(problem_key, 0) + 1
+        attempt_counts[problem_key] = current_count
+        
+        diagnostics["attempt_count"] = current_count
+        diagnostics["current_problem_key"] = problem_key
+        logger.info(f"[{ta_id}] Answer attempt #{current_count} for problem '{problem_key}'")
+        
+        # Update session cache with new attempt count (will be saved later if cache is updated)
+        session_context["attempt_counts"] = attempt_counts
     
     # If follow-up detected, enrich the query with context from history
     # BUT only if history actually contains a problem/document reference worth enriching with
@@ -1054,6 +1073,16 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
             diagnostics["hybrid_fallback_reason"] = "session_cache"
             diagnostics["hybrid_doc_filename"] = session_context.get("document_filename")
             
+            # Save updated attempt counts to session (was already incremented earlier)
+            if session_id and session_context.get("attempt_counts"):
+                try:
+                    session = ChatSession.query.get(session_id)
+                    if session and session.ta_id == ta_id:
+                        session.active_context = dict(session_context)
+                        db.session.commit()
+                except Exception as e:
+                    logger.warning(f"[{ta_id}] Failed to save attempt count: {e}")
+            
             cached_chunk = {
                 "text": session_context.get("document_content", ""),
                 "score": 1.0,
@@ -1064,8 +1093,10 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
             }
             return [cached_chunk], diagnostics
         else:
-            # User is switching topics - clear the cache and proceed with normal retrieval
-            logger.info(f"[{ta_id}] Topic switch detected, clearing session cache")
+            # User is switching topics - clear the cache and reset attempt counts
+            logger.info(f"[{ta_id}] Topic switch detected, clearing session cache and resetting attempts")
+            diagnostics["attempt_count"] = 0  # Reset for new problem
+            diagnostics["current_problem_key"] = None
             if session_id:
                 try:
                     session = ChatSession.query.get(session_id)
@@ -1141,13 +1172,16 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                         session = ChatSession.query.get(session_id)
                         # SECURITY: Only cache if session belongs to this TA
                         if session and session.ta_id == ta_id:
+                            # Preserve existing attempt_counts from session_context if available
+                            existing_attempts = session_context.get("attempt_counts", {}) if session_context else {}
                             session.active_context = {
                                 "ta_id": ta_id,  # Store ta_id for cross-tenant security validation
                                 "document_filename": filename,
                                 "document_content": full_text,
                                 "problem_reference": problem_ref.get("full_ref") if problem_ref else None,
                                 "doc_type": "problem_set",
-                                "cached_at": datetime.utcnow().isoformat()
+                                "cached_at": datetime.utcnow().isoformat(),
+                                "attempt_counts": existing_attempts
                             }
                             db.session.commit()
                             logger.info(f"[{ta_id}] Cached document context for session: {filename}")

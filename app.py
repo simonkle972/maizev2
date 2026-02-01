@@ -746,6 +746,7 @@ def chat_stream_api(slug):
             hybrid_mode = retrieval_diagnostics.get("hybrid_fallback_triggered", False)
             hybrid_doc_filename = retrieval_diagnostics.get("hybrid_doc_filename")
             query_reference = retrieval_diagnostics.get("validation_expected_ref")
+            attempt_count = retrieval_diagnostics.get("attempt_count", 0)
             
             generation_start = time.time()
             for token in generate_response_stream(
@@ -756,7 +757,8 @@ def chat_stream_api(slug):
                 course_name=ta_course_name,
                 hybrid_mode=hybrid_mode,
                 hybrid_doc_filename=hybrid_doc_filename,
-                query_reference=query_reference
+                query_reference=query_reference,
+                attempt_count=attempt_count
             ):
                 full_response += token
                 yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"

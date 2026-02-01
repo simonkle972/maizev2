@@ -144,6 +144,48 @@ When the student asks about a later sub-part (like part d, e, or f):
 DO NOT say "couldn't find" unless you have thoroughly searched the entire document for all format variations.
 """
 
+PATIENCE_INSTRUCTIONS = {
+    1: """
+PATIENCE LEVEL 1 - First attempt (no hints):
+The student just submitted their FIRST answer attempt for this problem.
+- If CORRECT: Confirm immediately ("That's right!")
+- If INCORRECT: Say ONLY "Not quite. Try again!" or similar brief encouragement
+- Do NOT give any hints, formulas, or guidance yet - let them think about it more
+- Keep response to 1 sentence maximum
+""",
+    2: """
+PATIENCE LEVEL 2 - Second attempt (give hints):
+The student is on their SECOND attempt for this problem.
+- If CORRECT: Confirm immediately ("That's right!")
+- If INCORRECT: Now provide a helpful hint:
+  - Point to the formula/method they should use, OR
+  - Identify specifically where their calculation went wrong
+  - Example: "Check that you're computing capacity as 1/(task time), not task time directly."
+- Keep response to 1-2 sentences
+""",
+    3: """
+PATIENCE LEVEL 3+ - Third or later attempt (walk through approach):
+The student has tried {attempt_count} times and is still stuck.
+- If CORRECT: Confirm immediately ("That's right!")
+- If INCORRECT: Now offer to walk through the approach step-by-step:
+  - Show the setup and method more explicitly
+  - Guide them through the logical steps (without giving the final numerical answer)
+  - Example: "Let me walk you through this. First, identify the task time from the table. Then capacity = 1/(task time). For Task 2, what's the task time value?"
+- Be more supportive - they're struggling and need more scaffolding
+"""
+}
+
+def get_patience_instructions(attempt_count: int) -> str:
+    """Get patience-level instructions based on attempt count."""
+    if attempt_count <= 0:
+        return ""  # Not an answer submission, no patience instructions
+    elif attempt_count == 1:
+        return PATIENCE_INSTRUCTIONS[1]
+    elif attempt_count == 2:
+        return PATIENCE_INSTRUCTIONS[2]
+    else:
+        return PATIENCE_INSTRUCTIONS[3].format(attempt_count=attempt_count)
+
 def build_messages(
     query: str, 
     context: str, 
@@ -152,9 +194,15 @@ def build_messages(
     course_name: str = "",
     hybrid_mode: bool = False,
     hybrid_doc_filename: Optional[str] = None,
-    query_reference: Optional[str] = None
+    query_reference: Optional[str] = None,
+    attempt_count: int = 0
 ):
     full_system_prompt = f"{system_prompt}\n\n{BASE_INSTRUCTIONS}"
+    
+    # Add patience-level instructions for answer validation
+    patience_instructions = get_patience_instructions(attempt_count)
+    if patience_instructions:
+        full_system_prompt += f"\n{patience_instructions}"
     
     if hybrid_mode:
         ref = query_reference or query
@@ -198,13 +246,15 @@ def generate_response(
     course_name: str = "",
     hybrid_mode: bool = False,
     hybrid_doc_filename: Optional[str] = None,
-    query_reference: Optional[str] = None
+    query_reference: Optional[str] = None,
+    attempt_count: int = 0
 ) -> str:
     client = OpenAI(api_key=Config.OPENAI_API_KEY)
     
     messages = build_messages(
         query, context, system_prompt, conversation_history, course_name,
-        hybrid_mode=hybrid_mode, hybrid_doc_filename=hybrid_doc_filename, query_reference=query_reference
+        hybrid_mode=hybrid_mode, hybrid_doc_filename=hybrid_doc_filename, query_reference=query_reference,
+        attempt_count=attempt_count
     )
     
     try:
@@ -229,13 +279,15 @@ def generate_response_stream(
     course_name: str = "",
     hybrid_mode: bool = False,
     hybrid_doc_filename: Optional[str] = None,
-    query_reference: Optional[str] = None
+    query_reference: Optional[str] = None,
+    attempt_count: int = 0
 ):
     client = OpenAI(api_key=Config.OPENAI_API_KEY)
     
     messages = build_messages(
         query, context, system_prompt, conversation_history, course_name,
-        hybrid_mode=hybrid_mode, hybrid_doc_filename=hybrid_doc_filename, query_reference=query_reference
+        hybrid_mode=hybrid_mode, hybrid_doc_filename=hybrid_doc_filename, query_reference=query_reference,
+        attempt_count=attempt_count
     )
     
     try:
