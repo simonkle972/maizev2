@@ -64,7 +64,7 @@
 }
 
 .chat-page .messages {
-    background: var(--maize-light-cream);
+    background: var(--maize-white);
 }
 
 .chat-page .message.assistant {
