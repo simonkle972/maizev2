@@ -53,6 +53,72 @@ def get_full_document_text(document_id: int) -> tuple:
     return text, doc.display_name or doc.original_filename, token_estimate
 
 
+def find_solution_document(problem_doc_name: str, ta_id: str) -> tuple:
+    """
+    Find the corresponding solution document for a problem document.
+    
+    Strategy: Look for a document with "Solution" + the problem document name/number.
+    For example:
+    - "Practice Problems Set 1" -> "Solution to Practice Problems Set 1"
+    - "Problem Set 2" -> "Solution to Problem Set 2"
+    - "Homework 3" -> "Homework 3 Solutions"
+    
+    Args:
+        problem_doc_name: The name of the problem document
+        ta_id: The TA ID
+        
+    Returns:
+        tuple: (full_text, filename, token_estimate) or (None, None, 0) if not found
+    """
+    from models import Document
+    
+    if not problem_doc_name:
+        return None, None, 0
+    
+    problem_lower = problem_doc_name.lower()
+    
+    # Extract the document number/identifier for flexible matching
+    # Match patterns like "Problem Set 1", "Practice Problems Set 2", "Homework 3", "PS1"
+    number_match = re.search(r'(?:problem(?:s)?\s*set|homework|hw|ps|pset|practice\s*problems?\s*set?)\s*#?\s*(\d+)', problem_lower)
+    doc_number = number_match.group(1) if number_match else None
+    
+    # Get all documents for this TA
+    docs = Document.query.filter_by(ta_id=ta_id).all()
+    
+    solution_doc = None
+    
+    for doc in docs:
+        doc_name = (doc.display_name or doc.original_filename or "").lower()
+        
+        # Check if this is a solution document
+        is_solution = 'solution' in doc_name
+        
+        if is_solution:
+            # Check if it matches our problem document
+            # Method 1: Direct name containment
+            # "Solution to Practice Problems Set 1" contains "Practice Problems Set 1"
+            problem_name_clean = problem_lower.replace('.pdf', '').replace('.docx', '').strip()
+            if problem_name_clean in doc_name:
+                solution_doc = doc
+                logger.info(f"[{ta_id}] Found solution doc via name containment: {doc.display_name or doc.original_filename}")
+                break
+            
+            # Method 2: Matching document number
+            if doc_number:
+                sol_number_match = re.search(r'(?:problem(?:s)?\s*set|homework|hw|ps|pset|practice\s*problems?\s*set?)\s*#?\s*(\d+)', doc_name)
+                if sol_number_match and sol_number_match.group(1) == doc_number:
+                    solution_doc = doc
+                    logger.info(f"[{ta_id}] Found solution doc via number match ({doc_number}): {doc.display_name or doc.original_filename}")
+                    break
+    
+    if solution_doc:
+        full_text, filename, token_estimate = get_full_document_text(solution_doc.id)
+        return full_text, filename, token_estimate
+    
+    logger.info(f"[{ta_id}] No solution document found for: {problem_doc_name}")
+    return None, None, 0
+
+
 def identify_target_documents(chunks: list, query_analysis: dict, ta_id: str) -> tuple:
     """
     Identify which document(s) should be retrieved in full for fallback.
@@ -1133,13 +1199,34 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                 except Exception as e:
                     logger.warning(f"[{ta_id}] Failed to save attempt count: {e}")
             
+            # For ANSWER SUBMISSIONS: Also fetch the solution document for verification
+            # This allows the LLM to give definitive correct/incorrect feedback
+            combined_content = session_context.get("document_content", "")
+            solution_added = False
+            
+            if followup_info["followup_type"] == "answer_submission":
+                problem_doc_name = session_context.get("document_filename", "")
+                solution_text, solution_filename, solution_tokens = find_solution_document(problem_doc_name, ta_id)
+                
+                if solution_text:
+                    logger.info(f"[{ta_id}] Adding solution document '{solution_filename}' for answer verification")
+                    combined_content = f"=== PROBLEM DOCUMENT: {problem_doc_name} ===\n\n{combined_content}\n\n=== SOLUTION DOCUMENT (for answer verification): {solution_filename} ===\n\n{solution_text}"
+                    diagnostics["solution_doc_added"] = True
+                    diagnostics["solution_doc_filename"] = solution_filename
+                    solution_added = True
+                else:
+                    logger.info(f"[{ta_id}] No solution document found - LLM will calculate answer from problem context")
+                    diagnostics["solution_doc_added"] = False
+                    diagnostics["llm_calculation_mode"] = True
+            
             cached_chunk = {
-                "text": session_context.get("document_content", ""),
+                "text": combined_content,
                 "score": 1.0,
                 "file_name": session_context.get("document_filename", "cached document"),
                 "chunk_index": 0,
                 "doc_type": session_context.get("doc_type"),
-                "problem_reference": session_context.get("problem_reference")
+                "problem_reference": session_context.get("problem_reference"),
+                "solution_included": solution_added
             }
             return [cached_chunk], diagnostics
         else:
