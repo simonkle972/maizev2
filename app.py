@@ -58,8 +58,8 @@ def demo_request():
     course = data.get('course', '').strip()
     message = data.get('message', '').strip()
     
-    if not name or not email or not institution:
-        return jsonify({"error": "Please fill in all required fields"}), 400
+    if not name or not email:
+        return jsonify({"error": "Name and email are required"}), 400
     
     email_body = f"""
 New Demo Request for Maize

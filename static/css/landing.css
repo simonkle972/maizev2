@@ -140,6 +140,7 @@
     display: flex;
     justify-content: center;
     align-items: center;
+    position: relative;
 }
 
 .hero-mascot {
@@ -147,11 +148,87 @@
     width: 100%;
     filter: drop-shadow(0 20px 40px rgba(43, 31, 26, 0.15));
     animation: float 6s ease-in-out infinite;
+    position: relative;
+    z-index: 2;
 }
 
 @keyframes float {
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-15px); }
+}
+
+.floating-questions {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+}
+
+.question-bubble {
+    position: absolute;
+    background: var(--maize-white);
+    padding: 0.5rem 1rem;
+    border-radius: 1rem;
+    font-size: 0.85rem;
+    color: var(--maize-cocoa);
+    box-shadow: 0 4px 15px rgba(43, 31, 26, 0.1);
+    white-space: nowrap;
+    opacity: 0.9;
+    border: 1px solid rgba(74, 51, 40, 0.1);
+}
+
+.bubble-1 {
+    top: 0;
+    left: 10%;
+    animation: bobble1 4s ease-in-out infinite;
+}
+
+.bubble-2 {
+    top: 15%;
+    right: 5%;
+    animation: bobble2 5s ease-in-out infinite;
+}
+
+.bubble-3 {
+    bottom: 25%;
+    left: 0;
+    animation: bobble3 4.5s ease-in-out infinite;
+}
+
+.bubble-4 {
+    bottom: 5%;
+    right: 10%;
+    animation: bobble4 5.5s ease-in-out infinite;
+}
+
+.bubble-5 {
+    top: 45%;
+    right: -5%;
+    animation: bobble5 4.8s ease-in-out infinite;
+}
+
+@keyframes bobble1 {
+    0%, 100% { transform: translate(0, 0); }
+    50% { transform: translate(5px, -8px); }
+}
+
+@keyframes bobble2 {
+    0%, 100% { transform: translate(0, 0); }
+    50% { transform: translate(-6px, 10px); }
+}
+
+@keyframes bobble3 {
+    0%, 100% { transform: translate(0, 0); }
+    50% { transform: translate(8px, 6px); }
+}
+
+@keyframes bobble4 {
+    0%, 100% { transform: translate(0, 0); }
+    50% { transform: translate(-5px, -7px); }
+}
+
+@keyframes bobble5 {
+    0%, 100% { transform: translate(0, 0); }
+    50% { transform: translate(4px, 9px); }
 }
 
 .section-container {
@@ -188,40 +265,83 @@
 
 .feature-card {
     background: var(--maize-light-cream);
-    padding: 2rem;
+    padding: 1.5rem;
     border-radius: 1rem;
     border: 1px solid rgba(74, 51, 40, 0.1);
-    transition: transform 0.2s, box-shadow 0.2s;
+    transition: transform 0.2s, box-shadow 0.2s, max-height 0.3s ease;
+    cursor: pointer;
+    overflow: hidden;
 }
 
-.feature-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 10px 30px rgba(43, 31, 26, 0.1);
+.feature-card:hover,
+.feature-card:focus {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 30px rgba(43, 31, 26, 0.12);
+}
+
+.feature-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
 }
 
 .feature-icon {
-    width: 56px;
-    height: 56px;
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
     background: var(--maize-amber);
-    border-radius: 12px;
+    border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 1.25rem;
     color: var(--maize-white);
 }
 
-.feature-card h3 {
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--maize-charcoal);
-    margin-bottom: 0.75rem;
+.feature-icon svg {
+    width: 24px;
+    height: 24px;
 }
 
-.feature-card p {
+.feature-card h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--maize-charcoal);
+    margin: 0;
+    flex: 1;
+}
+
+.expand-icon {
+    font-size: 1.5rem;
+    font-weight: 300;
+    color: var(--maize-amber);
+    transition: transform 0.3s ease;
+}
+
+.feature-card:hover .expand-icon,
+.feature-card:focus .expand-icon {
+    transform: rotate(45deg);
+}
+
+.feature-card.expanded .expand-icon {
+    transform: rotate(45deg);
+}
+
+.feature-description {
     color: var(--maize-cocoa);
-    font-size: 0.975rem;
+    font-size: 0.925rem;
     line-height: 1.6;
+    margin-top: 1rem;
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease, opacity 0.3s ease, margin 0.3s ease;
+}
+
+.feature-card:hover .feature-description,
+.feature-card:focus .feature-description,
+.feature-card.expanded .feature-description {
+    max-height: 150px;
+    opacity: 1;
 }
 
 .comparison-section {
@@ -350,6 +470,11 @@
     margin-bottom: 0.5rem;
 }
 
+.required {
+    color: var(--maize-rose);
+    font-weight: 600;
+}
+
 .demo-form input,
 .demo-form textarea {
     width: 100%;
@@ -461,6 +586,10 @@
     
     .hero-mascot {
         max-width: 250px;
+    }
+    
+    .floating-questions {
+        display: none;
     }
     
     .features-grid {
