@@ -268,21 +268,12 @@
     padding: 1.5rem;
     border-radius: 1rem;
     border: 1px solid rgba(74, 51, 40, 0.1);
-    transition: transform 0.2s, box-shadow 0.2s, max-height 0.3s ease;
-    cursor: pointer;
-    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
 }
 
-.feature-card:hover,
-.feature-card:focus {
+.feature-card:hover {
     transform: translateY(-3px);
     box-shadow: 0 10px 30px rgba(43, 31, 26, 0.12);
-}
-
-.feature-header {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
 }
 
 .feature-icon {
@@ -295,6 +286,7 @@
     align-items: center;
     justify-content: center;
     color: var(--maize-white);
+    margin-bottom: 1rem;
 }
 
 .feature-icon svg {
@@ -306,42 +298,14 @@
     font-size: 1.1rem;
     font-weight: 600;
     color: var(--maize-charcoal);
-    margin: 0;
-    flex: 1;
+    margin: 0 0 0.75rem 0;
 }
 
-.expand-icon {
-    font-size: 1.5rem;
-    font-weight: 300;
-    color: var(--maize-amber);
-    transition: transform 0.3s ease;
-}
-
-.feature-card:hover .expand-icon,
-.feature-card:focus .expand-icon {
-    transform: rotate(45deg);
-}
-
-.feature-card.expanded .expand-icon {
-    transform: rotate(45deg);
-}
-
-.feature-description {
+.feature-card p {
     color: var(--maize-cocoa);
     font-size: 0.925rem;
     line-height: 1.6;
-    margin-top: 1rem;
-    max-height: 0;
-    opacity: 0;
-    overflow: hidden;
-    transition: max-height 0.3s ease, opacity 0.3s ease, margin 0.3s ease;
-}
-
-.feature-card:hover .feature-description,
-.feature-card:focus .feature-description,
-.feature-card.expanded .feature-description {
-    max-height: 150px;
-    opacity: 1;
+    margin: 0;
 }
 
 .comparison-section {
