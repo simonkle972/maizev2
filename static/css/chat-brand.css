@@ -205,6 +205,10 @@
 .chat-page .message.streaming .message-wrapper .message-content {
     background: var(--maize-white);
     border: 1px solid rgba(74, 51, 40, 0.1);
+    border-left: 3px solid var(--maize-amber);
+    border-radius: 0.75rem;
+    border-top-left-radius: 0.25rem;
+    border-bottom-left-radius: 0.25rem;
 }
 
 .chat-page .loading {
@@ -218,8 +222,10 @@
 .chat-page .loading-content {
     background: var(--maize-white);
     border: 1px solid rgba(74, 51, 40, 0.1);
+    border-left: 3px solid var(--maize-amber);
     padding: 1rem 1.25rem;
-    border-radius: 1rem;
+    border-radius: 0.75rem;
+    border-top-left-radius: 0.25rem;
     border-bottom-left-radius: 0.25rem;
 }
 
