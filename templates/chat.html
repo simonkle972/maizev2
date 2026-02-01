@@ -7,8 +7,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="stylesheet" href="/static/css/chat-brand.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=12">
+    <link rel="stylesheet" href="/static/css/chat-brand.css?v=12">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
@@ -28,7 +28,8 @@
         
         <main class="chat-main">
             <div id="messages" class="messages">
-                <div class="message assistant">
+                <div class="message assistant" id="welcome-message">
+                    <img src="/static/images/maize-logo.png" alt="Maize" class="ta-avatar">
                     <div class="message-content">
                         <p>Hello! I'm your teaching assistant for <strong>{{ ta.course_name }}</strong>. I'm here to help you understand course concepts, work through problems, and prepare for exams.</p>
                         <p>How can I help you today?</p>
@@ -88,6 +89,7 @@
             const messagesEl = document.getElementById('messages');
             messagesEl.innerHTML = `
                 <div class="message assistant">
+                    <img src="/static/images/maize-logo.png" alt="Maize" class="ta-avatar">
                     <div class="message-content">
                         <p>Hello! I'm your teaching assistant for <strong>{{ ta.course_name }}</strong>. I'm here to help you understand course concepts, work through problems, and prepare for exams.</p>
                         <p>How can I help you today?</p>
@@ -310,13 +312,16 @@
             messageDiv.className = 'message assistant streaming';
             messageDiv.id = 'streaming-message';
             messageDiv.innerHTML = `
-                <div class="message-status">
-                    <div class="status-indicator">
-                        <span class="status-dot"></span>
-                        <span class="status-text">Preparing...</span>
+                <img src="/static/images/maize-logo.png" alt="Maize" class="ta-avatar">
+                <div class="message-wrapper">
+                    <div class="message-status">
+                        <div class="status-indicator">
+                            <span class="status-dot"></span>
+                            <span class="status-text">Preparing...</span>
+                        </div>
                     </div>
+                    <div class="message-content" id="streaming-content"></div>
                 </div>
-                <div class="message-content" id="streaming-content"></div>
             `;
             messagesEl.appendChild(messageDiv);
             messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -356,7 +361,8 @@
             streamingMsg.id = '';
             streamingMsg.className = 'message assistant';
             
-            let html = `<div class="message-content">${formatContent(rawContent)}</div>`;
+            let html = `<img src="/static/images/maize-logo.png" alt="Maize" class="ta-avatar">`;
+            html += `<div class="message-content">${formatContent(rawContent)}`;
             
             if (sources && sources.length > 0) {
                 const uniqueSources = [...new Set(sources)];
@@ -368,6 +374,7 @@
                 `;
             }
             
+            html += `</div>`;
             streamingMsg.innerHTML = html;
             renderLatex(streamingMsg);
         }
