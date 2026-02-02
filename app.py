@@ -104,9 +104,13 @@ Submitted at: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}
     
     return jsonify({"success": True, "message": "Demo request received"})
 
+@app.route('/health')
+def health_check():
+    return 'OK', 200
+
 @app.route('/')
 def landing():
-    return redirect(url_for('chat_ta', ta_slug='mgt422'))
+    return redirect('/mgt422')
 
 def admin_required(f):
     from functools import wraps
