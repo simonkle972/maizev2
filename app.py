@@ -5,7 +5,7 @@ import threading
 from datetime import datetime
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for, send_from_directory, Response, stream_with_context
 from config import Config
-from models import db, TeachingAssistant, Document, ChatSession, ChatMessage, DocumentChunk, Institution
+from models import db, TeachingAssistant, Document, ChatSession, ChatMessage, DocumentChunk, Institution, IndexingJob
 
 logging.basicConfig(
     level=logging.INFO,
@@ -632,36 +632,73 @@ def update_document_metadata(ta_id, doc_id):
     })
 
 
-def update_indexing_progress(ta_id, progress):
+def update_indexing_progress(ta_id, progress, job_id=None, docs_processed=None, chunks_created=None):
     """Update indexing progress for a TA (called from document_processor)."""
     with app.app_context():
         ta = TeachingAssistant.query.get(ta_id)
         if ta:
             ta.indexing_progress = progress
             db.session.commit()
+        
+        if job_id:
+            job = IndexingJob.query.get(job_id)
+            if job:
+                if docs_processed is not None:
+                    job.docs_processed = docs_processed
+                if chunks_created is not None:
+                    job.chunks_created = chunks_created
+                db.session.commit()
 
-def run_indexing_task(ta_id):
-    """Background task to run document indexing."""
+def run_indexing_task(ta_id, job_id=None, is_resume=False):
+    """Background task to run document indexing with job tracking for resumption."""
     import traceback
     
     with app.app_context():
-        logger.info(f"[{ta_id}] Background indexing task started")
+        logger.info(f"[{ta_id}] Background indexing task started (job_id={job_id}, is_resume={is_resume})")
         
         ta = TeachingAssistant.query.get(ta_id)
         if not ta:
             logger.error(f"[{ta_id}] TA not found, aborting indexing")
             return
         
+        job = None
+        if job_id:
+            job = IndexingJob.query.get(job_id)
+        
+        if not job:
+            job = IndexingJob(
+                ta_id=ta_id,
+                status='running',
+                started_at=datetime.utcnow(),
+                total_docs=ta.document_count
+            )
+            db.session.add(job)
+            db.session.commit()
+            job_id = job.id
+        else:
+            job.status = 'running'
+            job.started_at = datetime.utcnow()
+            db.session.commit()
+        
         try:
             ta.indexing_status = 'running'
             ta.indexing_error = None
-            ta.indexing_progress = 0
-            ta.is_indexed = False
+            if not is_resume:
+                ta.indexing_progress = 0
+                ta.is_indexed = False
             db.session.commit()
             logger.info(f"[{ta_id}] Set status to running, starting document processing...")
             
-            from src.document_processor import process_and_index_documents
-            result = process_and_index_documents(ta_id, progress_callback=update_indexing_progress)
+            from src.document_processor import process_and_index_documents_resumable
+            
+            def progress_with_job(ta_id, progress, docs_processed=None, chunks_created=None):
+                update_indexing_progress(ta_id, progress, job_id, docs_processed, chunks_created)
+            
+            result = process_and_index_documents_resumable(
+                ta_id, 
+                progress_callback=progress_with_job,
+                resume_from_doc_id=is_resume  # Pass is_resume flag to trigger resume logic
+            )
             
             db.session.expire_all()
             ta = TeachingAssistant.query.get(ta_id)
@@ -670,6 +707,14 @@ def run_indexing_task(ta_id):
             ta.indexing_status = 'completed'
             ta.indexing_progress = 100
             db.session.commit()
+            
+            job = IndexingJob.query.get(job_id)
+            if job:
+                job.status = 'completed'
+                job.completed_at = datetime.utcnow()
+                job.chunks_created = result.get('chunks_indexed', 0)
+                db.session.commit()
+            
             logger.info(f"[{ta_id}] Indexing completed successfully: {result.get('chunks_indexed', 0)} chunks")
             
         except Exception as e:
@@ -687,9 +732,84 @@ def run_indexing_task(ta_id):
                     ta.indexing_error = error_msg[:500]
                     ta.is_indexed = False
                     db.session.commit()
-                    logger.info(f"[{ta_id}] Set indexing status to failed")
+                
+                job = IndexingJob.query.get(job_id)
+                if job:
+                    job.status = 'failed'
+                    job.error_message = error_msg[:500]
+                    db.session.commit()
+                    
+                logger.info(f"[{ta_id}] Set indexing status to failed")
             except Exception as e2:
                 logger.error(f"[{ta_id}] Failed to update status after error: {e2}")
+
+
+def resume_interrupted_indexing_jobs():
+    """Check for interrupted indexing jobs and resume them on startup.
+    Uses atomic status update to prevent multiple workers from resuming the same job."""
+    with app.app_context():
+        try:
+            interrupted_jobs = IndexingJob.query.filter(
+                IndexingJob.status.in_(['running', 'resuming'])
+            ).all()
+            
+            for job in interrupted_jobs:
+                result = db.session.execute(
+                    db.text("""
+                        UPDATE indexing_jobs 
+                        SET status = 'resuming', updated_at = NOW()
+                        WHERE id = :job_id AND status = 'running'
+                        RETURNING id
+                    """),
+                    {"job_id": job.id}
+                )
+                db.session.commit()
+                
+                row = result.fetchone()
+                if row:
+                    logger.info(f"[{job.ta_id}] Acquired lock on interrupted indexing job {job.id}, resuming...")
+                    
+                    thread = threading.Thread(
+                        target=run_indexing_task, 
+                        args=(job.ta_id, job.id, True)
+                    )
+                    thread.daemon = True
+                    thread.start()
+                elif job.status == 'resuming':
+                    stale_threshold_seconds = 300
+                    if job.updated_at and (datetime.utcnow() - job.updated_at).total_seconds() > stale_threshold_seconds:
+                        stale_result = db.session.execute(
+                            db.text("""
+                                UPDATE indexing_jobs 
+                                SET status = 'resuming', updated_at = NOW()
+                                WHERE id = :job_id 
+                                  AND status = 'resuming' 
+                                  AND updated_at < NOW() - INTERVAL '5 minutes'
+                                RETURNING id
+                            """),
+                            {"job_id": job.id}
+                        )
+                        db.session.commit()
+                        stale_row = stale_result.fetchone()
+                        if stale_row:
+                            logger.info(f"[{job.ta_id}] Re-acquired stale job {job.id} (was in 'resuming' for over 5 minutes)...")
+                            thread = threading.Thread(
+                                target=run_indexing_task, 
+                                args=(job.ta_id, job.id, True)
+                            )
+                            thread.daemon = True
+                            thread.start()
+                        else:
+                            logger.info(f"[{job.ta_id}] Job {job.id} stale check failed (likely claimed by another worker)")
+                    else:
+                        logger.info(f"[{job.ta_id}] Job {job.id} is actively being resumed by another worker, skipping")
+                else:
+                    logger.info(f"[{job.ta_id}] Job {job.id} status changed, skipping")
+                
+        except Exception as e:
+            logger.error(f"Error checking for interrupted indexing jobs: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
 
 @app.route('/admin/api/tas/<ta_id>/reindex', methods=['POST'])
 @admin_api_required
@@ -703,6 +823,16 @@ def reindex_ta(ta_id):
     
     if ta.indexing_status == 'running':
         return jsonify({"error": "Indexing is already in progress"}), 400
+    
+    active_jobs = IndexingJob.query.filter(
+        IndexingJob.ta_id == ta_id,
+        IndexingJob.status.in_(['running', 'resuming', 'pending'])
+    ).all()
+    for job in active_jobs:
+        job.status = 'cancelled'
+    if active_jobs:
+        db.session.commit()
+        logger.info(f"[{ta_id}] Cancelled {len(active_jobs)} existing indexing jobs before starting fresh")
     
     thread = threading.Thread(target=run_indexing_task, args=(ta_id,))
     thread.daemon = True
@@ -1026,6 +1156,10 @@ def chat_stream_api(slug):
             'X-Accel-Buffering': 'no'
         }
     )
+
+with app.app_context():
+    db.create_all()
+    threading.Timer(2.0, resume_interrupted_indexing_jobs).start()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

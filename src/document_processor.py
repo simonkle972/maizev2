@@ -845,3 +845,233 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
         log_index_batch(index_log_entries)
         
         raise
+
+
+def process_and_index_documents_resumable(ta_id: str, progress_callback=None, resume_from_doc_id=None, job_start_time=None) -> dict:
+    """
+    Resumable version of document indexing that can continue from where it left off.
+    Uses document.last_indexed_at as the completion marker - if a document has chunks
+    stored, it has last_indexed_at set and will be skipped on resume.
+    """
+    import tempfile
+    from openai import OpenAI
+    from datetime import datetime
+    
+    from models import db, Document, TeachingAssistant, DocumentChunk
+    from flask import current_app
+    from src.qa_logger import log_index_batch
+    
+    is_resume = resume_from_doc_id is not None
+    logger.info(f"[{ta_id}] Starting {'resumable' if is_resume else 'fresh'} indexing process...")
+    
+    ta = db.session.get(TeachingAssistant, ta_id)
+    ta_slug = ta.slug if ta else "unknown"
+    
+    client = OpenAI(api_key=Config.OPENAI_API_KEY)
+    
+    all_doc_ids = [d.id for d in db.session.query(Document.id).filter_by(ta_id=ta_id).order_by(Document.id).all()]
+    total_docs = len(all_doc_ids)
+    
+    if total_docs == 0:
+        raise ValueError("No documents found for this TA")
+    
+    if is_resume:
+        already_indexed_docs = db.session.query(Document.id, Document.last_indexed_at, Document.updated_at).filter(
+            Document.ta_id == ta_id,
+            Document.last_indexed_at.isnot(None)
+        ).all()
+        already_indexed_doc_ids = set(
+            d.id for d in already_indexed_docs 
+            if d.last_indexed_at and (d.updated_at is None or d.updated_at <= d.last_indexed_at)
+        )
+        doc_ids = [d for d in all_doc_ids if d not in already_indexed_doc_ids]
+        docs_already_processed = len(already_indexed_doc_ids)
+        logger.info(f"[{ta_id}] Resuming: {docs_already_processed} docs already indexed (have chunks and not modified since), {len(doc_ids)} remaining")
+    else:
+        logger.info(f"[{ta_id}] Fresh indexing - clearing existing chunks and reset last_indexed_at...")
+        DocumentChunk.query.filter_by(ta_id=ta_id).delete()
+        Document.query.filter_by(ta_id=ta_id).update({"last_indexed_at": None}, synchronize_session=False)
+        db_commit_with_retry(db)
+        logger.info(f"[{ta_id}] Cleared existing chunks and reset document states")
+        doc_ids = all_doc_ids
+        docs_already_processed = 0
+    
+    logger.info(f"[{ta_id}] Found {len(doc_ids)} documents to process: {doc_ids}")
+    
+    total_chunks_created = 0
+    all_index_log_entries = []
+    docs_with_content = 0
+    
+    for doc_idx, doc_id in enumerate(doc_ids):
+        absolute_doc_idx = docs_already_processed + doc_idx
+        
+        doc = db.session.get(Document, doc_id)
+        if not doc:
+            logger.warning(f"[{ta_id}] Document {doc_id} not found, skipping")
+            continue
+        
+        logger.info(f"[{ta_id}] Processing document [{doc.id}]: {doc.original_filename} ({absolute_doc_idx + 1}/{total_docs})")
+        
+        if progress_callback and total_docs > 0:
+            progress = int((absolute_doc_idx / total_docs) * 80)
+            progress_callback(ta_id, progress, docs_processed=absolute_doc_idx)
+        
+        text = None
+        page_count = 0
+        
+        logger.info(f"[{ta_id}] [{doc.id}] Extracting text...")
+        if doc.file_content:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=f".{doc.file_type}") as tmp_file:
+                tmp_file.write(doc.file_content)
+                tmp_path = tmp_file.name
+            try:
+                text, page_count = extract_text_from_file(tmp_path)
+            finally:
+                os.unlink(tmp_path)
+        elif os.path.exists(doc.storage_path):
+            text, page_count = extract_text_from_file(doc.storage_path)
+        else:
+            logger.warning(f"[{ta_id}] [{doc.id}] No file content available - document needs to be re-uploaded")
+            continue
+        
+        if not text:
+            logger.warning(f"[{ta_id}] [{doc.id}] No text extracted")
+            continue
+        
+        raw_text_length = len(text)
+        logger.info(f"[{ta_id}] [{doc.id}] Extracted {raw_text_length} chars from {page_count} pages")
+        
+        logger.info(f"[{ta_id}] [{doc.id}] Extracting metadata with LLM...")
+        metadata = extract_metadata_with_llm(text, doc.original_filename)
+        
+        if not doc.doc_type:
+            doc.doc_type = metadata.get("doc_type")
+        if not doc.assignment_number:
+            doc.assignment_number = metadata.get("assignment_number")
+        if doc.instructional_unit_number is None:
+            doc.instructional_unit_number = metadata.get("instructional_unit_number")
+        if not doc.instructional_unit_label:
+            doc.instructional_unit_label = metadata.get("instructional_unit_label")
+        if not doc.content_title:
+            doc.content_title = metadata.get("content_title")
+        
+        doc.extraction_metadata = metadata
+        doc.metadata_extracted = True
+        logger.info(f"[{ta_id}] [{doc.id}] Saving metadata (preserving human edits)...")
+        db_commit_with_retry(db)
+        logger.info(f"[{ta_id}] [{doc.id}] Metadata saved")
+        
+        headers_found = extract_section_headers(text)
+        headers_summary = "; ".join([f"{h[1][:40]}" for h in headers_found[:5]])
+        logger.info(f"[{ta_id}] [{doc.id}] Found {len(headers_found)} headers: {headers_summary}")
+        
+        chunks = chunk_text_with_context(text, Config.CHUNK_SIZE, Config.CHUNK_OVERLAP, doc.original_filename)
+        num_chunks = len(chunks)
+        
+        doc_chunk_data = []
+        doc_log_entries = []
+        for i, chunk_data in enumerate(chunks):
+            doc_chunk_data.append({
+                "chunk_index": i,
+                "chunk_text": chunk_data["original_text"],
+                "chunk_text_enriched": chunk_data["text"],
+                "context": chunk_data.get("context", ""),
+                "doc_type": doc.doc_type or "other",
+                "assignment_number": doc.assignment_number or "",
+                "instructional_unit_number": doc.instructional_unit_number or 0,
+                "instructional_unit_label": doc.instructional_unit_label or "",
+                "file_name": doc.display_name or doc.original_filename
+            })
+            
+            doc_log_entries.append({
+                "ta_id": ta_id,
+                "ta_slug": ta_slug,
+                "file_name": doc.display_name or doc.original_filename,
+                "doc_type": doc.doc_type or "other",
+                "total_pages": page_count,
+                "raw_text_length": raw_text_length,
+                "chunk_index": i,
+                "total_chunks": num_chunks,
+                "chunk_text_length": len(chunk_data["original_text"]),
+                "chunk_context": chunk_data.get("context", ""),
+                "chunk_text_preview": chunk_data["original_text"][:300],
+                "enriched_text_preview": chunk_data["text"][:300],
+                "has_embedding": False,
+                "status": "pending",
+                "error_message": "",
+                "headers_found": headers_summary if i == 0 else ""
+            })
+        
+        try:
+            logger.info(f"[{ta_id}] [{doc.id}] Embedding {num_chunks} chunks for this document...")
+            chunk_texts = [c["chunk_text_enriched"] for c in doc_chunk_data]
+            
+            doc_embeddings = []
+            batch_size = 100
+            for batch_start in range(0, len(chunk_texts), batch_size):
+                batch_texts_slice = chunk_texts[batch_start:batch_start+batch_size]
+                response = client.embeddings.create(
+                    model=Config.EMBEDDING_MODEL,
+                    input=batch_texts_slice
+                )
+                doc_embeddings.extend([item.embedding for item in response.data])
+            
+            logger.info(f"[{ta_id}] [{doc.id}] Storing {num_chunks} chunks...")
+            for i, chunk_item in enumerate(doc_chunk_data):
+                chunk_obj = DocumentChunk(
+                    ta_id=ta_id,
+                    document_id=doc.id,
+                    chunk_index=chunk_item["chunk_index"],
+                    chunk_text=sanitize_text(chunk_item["chunk_text"]),
+                    chunk_context=chunk_item.get("context", "")[:256] if chunk_item.get("context") else None,
+                    doc_type=chunk_item["doc_type"],
+                    assignment_number=chunk_item["assignment_number"],
+                    instructional_unit_number=chunk_item["instructional_unit_number"],
+                    instructional_unit_label=chunk_item["instructional_unit_label"],
+                    file_name=chunk_item["file_name"],
+                    embedding=doc_embeddings[i]
+                )
+                db.session.add(chunk_obj)
+            
+            now = datetime.utcnow()
+            doc.last_indexed_at = now
+            doc.updated_at = now
+            db_commit_with_retry(db)
+            
+            total_chunks_created += num_chunks
+            docs_with_content += 1
+            logger.info(f"[{ta_id}] [{doc.id}] Document fully indexed with {num_chunks} chunks")
+            
+            for entry in doc_log_entries:
+                entry["has_embedding"] = True
+                entry["status"] = "success"
+            all_index_log_entries.extend(doc_log_entries)
+                
+        except Exception as doc_error:
+            logger.error(f"[{ta_id}] [{doc.id}] Failed to embed/store chunks: {doc_error}")
+            db.session.rollback()
+            for entry in doc_log_entries:
+                entry["has_embedding"] = False
+                entry["status"] = "error"
+                entry["error_message"] = str(doc_error)[:500]
+            all_index_log_entries.extend(doc_log_entries)
+            raise
+        
+        if progress_callback:
+            progress_callback(ta_id, int(((absolute_doc_idx + 1) / total_docs) * 100), 
+                            docs_processed=absolute_doc_idx + 1,
+                            chunks_created=total_chunks_created)
+    
+    if docs_with_content == 0:
+        if is_resume:
+            logger.info(f"[{ta_id}] No new documents to process - resumption complete")
+            return {"chunks_indexed": 0}
+        raise ValueError("No text content found in any documents")
+    
+    logger.info(f"[{ta_id}] Indexing complete! Total chunks: {total_chunks_created}")
+    
+    if all_index_log_entries:
+        logger.info(f"[{ta_id}] Logging {len(all_index_log_entries)} index entries to Google Sheets...")
+        log_index_batch(all_index_log_entries)
+    
+    return {"chunks_indexed": total_chunks_created}

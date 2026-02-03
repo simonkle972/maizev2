@@ -105,3 +105,21 @@ class DocumentChunk(db.Model):
     file_name = db.Column(db.String(512), nullable=True)
     embedding = db.Column(Vector(1536), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class IndexingJob(db.Model):
+    """Tracks indexing jobs for resumption after container restarts."""
+    __tablename__ = 'indexing_jobs'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    ta_id = db.Column(db.String(32), db.ForeignKey('teaching_assistants.id'), nullable=False, index=True)
+    status = db.Column(db.String(32), default='pending')  # pending, running, completed, failed
+    started_at = db.Column(db.DateTime, nullable=True)
+    completed_at = db.Column(db.DateTime, nullable=True)
+    last_processed_doc_id = db.Column(db.Integer, nullable=True)
+    docs_processed = db.Column(db.Integer, default=0)
+    total_docs = db.Column(db.Integer, default=0)
+    chunks_created = db.Column(db.Integer, default=0)
+    error_message = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

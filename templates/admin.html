@@ -698,6 +698,7 @@
         let currentTaId = null;
         let currentInstId = null;
         let indexingPollInterval = null;
+        let activeIndexingPolls = {}; // Track active indexing polls per TA
         
         let taPage = 1;
         const taPerPage = 25;
@@ -778,6 +779,11 @@
                     ta.docs = await apiCall('/admin/api/tas/' + ta.id).then(d => d.documents || []).catch(() => []);
                     ta.indexed_count = ta.docs.filter(d => d.last_indexed_at).length;
                     ta.pending_count = ta.docs.filter(d => !d.last_indexed_at).length;
+                    
+                    // Resume polling for any TA that's currently indexing
+                    if (ta.indexing_status === 'running' && !activeIndexingPolls[ta.id]) {
+                        startIndexingPoll(ta.id);
+                    }
                 }
                 filterTAs();
                 populateInstitutionFilter();
@@ -1118,10 +1124,6 @@
         
         function hideEditTAModal() {
             document.getElementById('edit-ta-modal').classList.add('hidden');
-            if (indexingPollInterval) {
-                clearInterval(indexingPollInterval);
-                indexingPollInterval = null;
-            }
             currentTaId = null;
         }
         
@@ -1421,6 +1423,15 @@
             try {
                 await apiCall('/admin/api/tas/' + taId + '/reindex', { method: 'POST' });
                 showNotification('Indexing started in the background.', 'info', 8000);
+                
+                // Immediately update local state to show "Indexing" status
+                const taIndex = allTAs.findIndex(ta => ta.id === taId);
+                if (taIndex !== -1) {
+                    allTAs[taIndex].indexing_status = 'running';
+                    allTAs[taIndex].is_indexed = false;
+                    renderTAs(); // Re-render table to show "Indexing" badge
+                }
+                
                 startIndexingPoll(taId);
                 showEditTAModal(taId);
             } catch (err) {
@@ -1431,28 +1442,52 @@
         }
         
         function startIndexingPoll(taId) {
-            if (indexingPollInterval) clearInterval(indexingPollInterval);
+            // Clear any existing poll for this TA
+            if (activeIndexingPolls[taId]) {
+                clearInterval(activeIndexingPolls[taId]);
+            }
             
-            indexingPollInterval = setInterval(() => {
+            activeIndexingPolls[taId] = setInterval(() => {
                 apiCall('/admin/api/tas/' + taId + '/indexing-status')
                 .then(status => {
                     if (status.status === 'completed') {
-                        clearInterval(indexingPollInterval);
-                        indexingPollInterval = null;
+                        clearInterval(activeIndexingPolls[taId]);
+                        delete activeIndexingPolls[taId];
                         showNotification('Indexing completed successfully!', 'success');
+                        
+                        // Update local state immediately
+                        const taIndex = allTAs.findIndex(ta => ta.id === taId);
+                        if (taIndex !== -1) {
+                            allTAs[taIndex].indexing_status = 'completed';
+                            allTAs[taIndex].is_indexed = true;
+                            renderTAs();
+                        }
+                        
+                        // Refresh modal if open for this TA
                         if (currentTaId === taId) showEditTAModal(taId);
+                        
+                        // Also do a full reload to get all updated data
                         loadTAs();
                     } else if (status.status === 'failed') {
-                        clearInterval(indexingPollInterval);
-                        indexingPollInterval = null;
-                        showNotification('Indexing failed: ' + status.error, 'error', 10000);
+                        clearInterval(activeIndexingPolls[taId]);
+                        delete activeIndexingPolls[taId];
+                        showNotification('Indexing failed: ' + (status.error || 'Unknown error'), 'error', 10000);
+                        
+                        // Update local state immediately
+                        const taIndex = allTAs.findIndex(ta => ta.id === taId);
+                        if (taIndex !== -1) {
+                            allTAs[taIndex].indexing_status = 'failed';
+                            allTAs[taIndex].indexing_error = status.error;
+                            renderTAs();
+                        }
+                        
                         if (currentTaId === taId) showEditTAModal(taId);
                         loadTAs();
                     }
                 })
                 .catch(err => {
-                    clearInterval(indexingPollInterval);
-                    indexingPollInterval = null;
+                    clearInterval(activeIndexingPolls[taId]);
+                    delete activeIndexingPolls[taId];
                 });
             }, 3000);
         }
