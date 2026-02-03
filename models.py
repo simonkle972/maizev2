@@ -8,6 +8,19 @@ class Base(DeclarativeBase):
 
 db = SQLAlchemy(model_class=Base)
 
+class Institution(db.Model):
+    __tablename__ = 'institutions'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(256), nullable=False)
+    customer_id = db.Column(db.String(64), nullable=True, unique=True)
+    notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    teaching_assistants = db.relationship('TeachingAssistant', backref='institution', lazy='dynamic')
+
+
 class TeachingAssistant(db.Model):
     __tablename__ = 'teaching_assistants'
     
@@ -26,6 +39,8 @@ class TeachingAssistant(db.Model):
     indexing_status = db.Column(db.String(32), default=None)
     indexing_error = db.Column(db.Text, nullable=True)
     indexing_progress = db.Column(db.Integer, default=0)
+    institution_id = db.Column(db.Integer, db.ForeignKey('institutions.id'), nullable=True)
+    last_activity_at = db.Column(db.DateTime, nullable=True)
     
     documents = db.relationship('Document', backref='ta', lazy='dynamic', cascade='all, delete-orphan')
     sessions = db.relationship('ChatSession', backref='ta', lazy='dynamic', cascade='all, delete-orphan')

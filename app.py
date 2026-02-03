@@ -5,7 +5,7 @@ import threading
 from datetime import datetime
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for, send_from_directory, Response, stream_with_context
 from config import Config
-from models import db, TeachingAssistant, Document, ChatSession, ChatMessage, DocumentChunk
+from models import db, TeachingAssistant, Document, ChatSession, ChatMessage, DocumentChunk, Institution
 
 logging.basicConfig(
     level=logging.INFO,
@@ -167,6 +167,122 @@ def admin_api_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+@app.route('/admin/api/institutions', methods=['GET'])
+@admin_api_required
+def list_institutions():
+    institutions = Institution.query.order_by(Institution.name).all()
+    return jsonify([{
+        "id": inst.id,
+        "name": inst.name,
+        "customer_id": inst.customer_id,
+        "notes": inst.notes,
+        "ta_count": inst.teaching_assistants.count(),
+        "created_at": inst.created_at.isoformat() if inst.created_at else None
+    } for inst in institutions])
+
+@app.route('/admin/api/institutions', methods=['POST'])
+@admin_api_required
+def create_institution():
+    data = request.json
+    name = data.get("name", "").strip()
+    
+    if not name:
+        return jsonify({"error": "Name is required"}), 400
+    
+    customer_id = data.get("customer_id", "").strip() or None
+    if customer_id:
+        existing = Institution.query.filter_by(customer_id=customer_id).first()
+        if existing:
+            return jsonify({"error": "Customer ID already exists"}), 400
+    
+    inst = Institution(
+        name=name,
+        customer_id=customer_id,
+        notes=data.get("notes", "").strip() or None
+    )
+    
+    db.session.add(inst)
+    db.session.commit()
+    
+    return jsonify({
+        "id": inst.id,
+        "name": inst.name,
+        "customer_id": inst.customer_id,
+        "notes": inst.notes,
+        "ta_count": 0,
+        "created_at": inst.created_at.isoformat() if inst.created_at else None
+    })
+
+@app.route('/admin/api/institutions/<int:inst_id>', methods=['GET'])
+@admin_api_required
+def get_institution(inst_id):
+    inst = Institution.query.get(inst_id)
+    if not inst:
+        return jsonify({"error": "Institution not found"}), 404
+    
+    return jsonify({
+        "id": inst.id,
+        "name": inst.name,
+        "customer_id": inst.customer_id,
+        "notes": inst.notes,
+        "ta_count": inst.teaching_assistants.count(),
+        "created_at": inst.created_at.isoformat() if inst.created_at else None,
+        "updated_at": inst.updated_at.isoformat() if inst.updated_at else None
+    })
+
+@app.route('/admin/api/institutions/<int:inst_id>', methods=['PUT'])
+@admin_api_required
+def update_institution(inst_id):
+    inst = Institution.query.get(inst_id)
+    if not inst:
+        return jsonify({"error": "Institution not found"}), 404
+    
+    data = request.json
+    
+    if "name" in data:
+        name = data["name"].strip()
+        if not name:
+            return jsonify({"error": "Name cannot be empty"}), 400
+        inst.name = name
+    
+    if "customer_id" in data:
+        customer_id = data["customer_id"].strip() or None
+        if customer_id and customer_id != inst.customer_id:
+            existing = Institution.query.filter_by(customer_id=customer_id).first()
+            if existing:
+                return jsonify({"error": "Customer ID already exists"}), 400
+        inst.customer_id = customer_id
+    
+    if "notes" in data:
+        inst.notes = data["notes"].strip() or None
+    
+    db.session.commit()
+    
+    return jsonify({
+        "id": inst.id,
+        "name": inst.name,
+        "customer_id": inst.customer_id,
+        "notes": inst.notes,
+        "ta_count": inst.teaching_assistants.count(),
+        "created_at": inst.created_at.isoformat() if inst.created_at else None,
+        "updated_at": inst.updated_at.isoformat() if inst.updated_at else None
+    })
+
+@app.route('/admin/api/institutions/<int:inst_id>', methods=['DELETE'])
+@admin_api_required
+def delete_institution(inst_id):
+    inst = Institution.query.get(inst_id)
+    if not inst:
+        return jsonify({"error": "Institution not found"}), 404
+    
+    if inst.teaching_assistants.count() > 0:
+        return jsonify({"error": "Cannot delete institution with associated TAs. Remove TAs first or reassign them."}), 400
+    
+    db.session.delete(inst)
+    db.session.commit()
+    
+    return jsonify({"success": True})
+
 @app.route('/admin/api/tas', methods=['GET'])
 @admin_api_required
 def list_tas():
@@ -180,7 +296,10 @@ def list_tas():
         "document_count": ta.document_count,
         "created_at": ta.created_at.isoformat() if ta.created_at else None,
         "indexed_at": ta.indexed_at.isoformat() if ta.indexed_at else None,
-        "indexing_status": ta.indexing_status
+        "indexing_status": ta.indexing_status,
+        "institution_id": ta.institution_id,
+        "institution_name": ta.institution.name if ta.institution else None,
+        "last_activity_at": ta.last_activity_at.isoformat() if ta.last_activity_at else None
     } for ta in tas])
 
 @app.route('/admin/api/tas', methods=['POST'])
@@ -197,12 +316,20 @@ def create_ta():
     if existing:
         return jsonify({"error": "Slug already exists"}), 400
     
+    institution_id = data.get("institution_id")
+    if institution_id:
+        institution_id = int(institution_id)
+        inst = Institution.query.get(institution_id)
+        if not inst:
+            return jsonify({"error": "Institution not found"}), 400
+    
     ta = TeachingAssistant(
         id=ta_id,
         slug=slug,
         name=data.get("name", "New TA"),
         course_name=data.get("course_name", ""),
-        system_prompt=data.get("system_prompt", TeachingAssistant.system_prompt.default.arg)
+        system_prompt=data.get("system_prompt", TeachingAssistant.system_prompt.default.arg),
+        institution_id=institution_id if institution_id else None
     )
     
     db.session.add(ta)
@@ -214,7 +341,9 @@ def create_ta():
         "id": ta_id,
         "slug": slug,
         "name": ta.name,
-        "course_name": ta.course_name
+        "course_name": ta.course_name,
+        "institution_id": ta.institution_id,
+        "institution_name": ta.institution.name if ta.institution else None
     })
 
 @app.route('/admin/api/tas/<ta_id>', methods=['GET'])
@@ -253,7 +382,10 @@ def get_ta(ta_id):
         "indexed_at": ta.indexed_at.isoformat() if ta.indexed_at else None,
         "indexing_status": ta.indexing_status,
         "indexing_error": ta.indexing_error,
-        "indexing_progress": ta.indexing_progress
+        "indexing_progress": ta.indexing_progress,
+        "institution_id": ta.institution_id,
+        "institution_name": ta.institution.name if ta.institution else None,
+        "last_activity_at": ta.last_activity_at.isoformat() if ta.last_activity_at else None
     })
 
 @app.route('/admin/api/tas/<ta_id>', methods=['PUT'])
@@ -284,9 +416,24 @@ def update_ta(ta_id):
         ta.course_name = data["course_name"]
     if "system_prompt" in data:
         ta.system_prompt = data["system_prompt"]
+    if "institution_id" in data:
+        institution_id = data["institution_id"]
+        if institution_id is None or institution_id == "":
+            ta.institution_id = None
+        else:
+            institution_id = int(institution_id)
+            inst = Institution.query.get(institution_id)
+            if not inst:
+                return jsonify({"error": "Institution not found"}), 400
+            ta.institution_id = institution_id
     
     db.session.commit()
-    return jsonify({"success": True, "slug": ta.slug})
+    return jsonify({
+        "success": True, 
+        "slug": ta.slug,
+        "institution_id": ta.institution_id,
+        "institution_name": ta.institution.name if ta.institution else None
+    })
 
 @app.route('/admin/api/tas/<ta_id>', methods=['DELETE'])
 @admin_api_required

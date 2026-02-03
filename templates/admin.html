@@ -14,7 +14,7 @@
             padding: 12px 20px;
             text-align: center;
             font-weight: 500;
-            z-index: 1000;
+            z-index: 1100;
             transform: translateY(-100%);
             transition: transform 0.3s ease;
         }
@@ -37,38 +37,225 @@
             background: #f59e0b;
             color: white;
         }
-        .indexing-status {
-            display: inline-flex;
+        
+        .tab-bar {
+            display: flex;
+            border-bottom: 2px solid var(--border);
+            margin-bottom: 1.5rem;
+            background: var(--card-bg);
+            border-radius: 0.5rem 0.5rem 0 0;
+        }
+        .tab-btn {
+            padding: 1rem 2rem;
+            border: none;
+            background: none;
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--text-light);
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.2s;
+        }
+        .tab-btn:hover {
+            color: var(--primary);
+            background: rgba(37, 99, 235, 0.05);
+        }
+        .tab-btn.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        
+        .filters-bar {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
             align-items: center;
-            gap: 8px;
-            padding: 8px 16px;
-            border-radius: 6px;
-            font-size: 14px;
-            margin-bottom: 16px;
         }
-        .indexing-status.running {
-            background: #dbeafe;
-            color: #1d4ed8;
+        .search-input {
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            min-width: 200px;
         }
-        .indexing-status.failed {
-            background: #fee2e2;
-            color: #b91c1c;
+        .filter-select {
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            background: white;
         }
-        .indexing-status.completed {
+        
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--card-bg);
+            border-radius: 0.5rem;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        .data-table th {
+            background: #f9fafb;
+            padding: 0.75rem 1rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.8rem;
+            color: var(--text-light);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            user-select: none;
+        }
+        .data-table th:hover {
+            background: #f3f4f6;
+        }
+        .data-table th .sort-icon {
+            margin-left: 0.25rem;
+            opacity: 0.3;
+        }
+        .data-table th.sorted .sort-icon {
+            opacity: 1;
+        }
+        .data-table td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.875rem;
+        }
+        .data-table tbody tr {
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .data-table tbody tr:hover {
+            background: rgba(37, 99, 235, 0.05);
+        }
+        .data-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        .status-badge.ready {
             background: #dcfce7;
             color: #166534;
         }
-        .spinner {
-            width: 16px;
-            height: 16px;
-            border: 2px solid #3b82f6;
-            border-top-color: transparent;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
+        .status-badge.not-indexed {
+            background: #fef3c7;
+            color: #92400e;
         }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+        .status-badge.indexing {
+            background: #dbeafe;
+            color: #1d4ed8;
         }
+        
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 1rem;
+            padding: 1rem;
+        }
+        .pagination button {
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border);
+            background: white;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+        }
+        .pagination button:hover:not(:disabled) {
+            background: #f3f4f6;
+        }
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .pagination .page-info {
+            font-size: 0.875rem;
+            color: var(--text-light);
+        }
+        
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-backdrop.hidden {
+            display: none;
+        }
+        .modal-box {
+            background: var(--card-bg);
+            border-radius: 1rem;
+            width: 100%;
+            max-width: 700px;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+            box-shadow: var(--shadow-lg);
+        }
+        .modal-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            background: var(--card-bg);
+            z-index: 10;
+        }
+        .modal-header h2 {
+            margin: 0;
+            font-size: 1.25rem;
+        }
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-light);
+            padding: 0.25rem;
+            line-height: 1;
+        }
+        .modal-close:hover {
+            color: var(--text);
+        }
+        .modal-body {
+            padding: 1.5rem;
+        }
+        .modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+            position: sticky;
+            bottom: 0;
+            background: var(--card-bg);
+        }
+        
         .doc-table {
             width: 100%;
             border-collapse: collapse;
@@ -100,22 +287,6 @@
         .doc-table .unit-input {
             width: 60px;
         }
-        .doc-table .save-btn {
-            padding: 4px 10px;
-            font-size: 12px;
-            background: #3b82f6;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .doc-table .save-btn:hover {
-            background: #2563eb;
-        }
-        .doc-table .save-btn:disabled {
-            background: #9ca3af;
-            cursor: not-allowed;
-        }
         .doc-table .delete-btn {
             padding: 4px 10px;
             font-size: 12px;
@@ -124,7 +295,6 @@
             border: none;
             border-radius: 4px;
             cursor: pointer;
-            margin-left: 6px;
         }
         .doc-table .delete-btn:hover {
             background: #dc2626;
@@ -172,6 +342,149 @@
             color: #6b7280;
             margin-top: 6px;
         }
+        
+        .drop-zone {
+            border: 2px dashed var(--border);
+            border-radius: 0.75rem;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: var(--bg);
+            margin-bottom: 1rem;
+        }
+        .drop-zone:hover {
+            border-color: var(--primary);
+            background: rgba(59, 130, 246, 0.05);
+        }
+        .drop-zone-active {
+            border-color: var(--primary);
+            background: rgba(59, 130, 246, 0.1);
+            transform: scale(1.01);
+        }
+        .drop-zone-content {
+            pointer-events: none;
+        }
+        .drop-icon {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 1rem;
+            color: var(--text-light);
+        }
+        .drop-zone:hover .drop-icon {
+            color: var(--primary);
+        }
+        .drop-text {
+            font-size: 1rem;
+            color: var(--text);
+            margin-bottom: 0.5rem;
+        }
+        .drop-hint {
+            font-size: 0.875rem;
+            color: var(--text-light);
+        }
+        
+        .upload-progress {
+            margin-top: 0.5rem;
+        }
+        .upload-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0.75rem;
+            background: var(--bg);
+            border-radius: 0.375rem;
+            margin-bottom: 0.5rem;
+        }
+        .upload-filename {
+            font-size: 0.875rem;
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            margin-right: 1rem;
+        }
+        .upload-status {
+            font-size: 0.75rem;
+            font-weight: 500;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+        }
+        .upload-status.uploading {
+            background: #fef3c7;
+            color: #d97706;
+        }
+        .upload-status.success {
+            background: #d1fae5;
+            color: #059669;
+        }
+        .upload-status.error {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+        
+        .indexing-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+        .indexing-status.running {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+        .indexing-status.failed {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+        .indexing-status.completed {
+            background: #dcfce7;
+            color: #166534;
+        }
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #3b82f6;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .section-actions {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 1rem;
+        }
+        
+        .slug-link {
+            color: var(--primary);
+            text-decoration: none;
+        }
+        .slug-link:hover {
+            text-decoration: underline;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-light);
+        }
+        
+        .danger-zone {
+            margin-top: 2rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid #fee2e2;
+        }
+        .danger-zone h4 {
+            color: var(--danger);
+            margin-bottom: 0.5rem;
+        }
     </style>
 </head>
 <body>
@@ -183,63 +496,755 @@
             <a href="/admin/logout" class="btn btn-secondary btn-sm">Logout</a>
         </header>
         
-        <main id="admin-main" class="admin-main">
-            <section class="ta-list-section">
-                <div class="section-header">
-                    <h2>Teaching Assistants</h2>
-                    <button onclick="showCreateModal()" class="btn btn-primary">Create New TA</button>
-                </div>
-                <div id="ta-list" class="ta-list">
-                    <p class="loading">Loading...</p>
-                </div>
-            </section>
+        <main class="admin-main">
+            <div class="tab-bar">
+                <button class="tab-btn active" data-tab="tas" onclick="switchTab('tas')">Teaching Assistants</button>
+                <button class="tab-btn" data-tab="institutions" onclick="switchTab('institutions')">Institutions</button>
+            </div>
             
-            <section id="ta-detail" class="ta-detail-section" style="display: none;">
-                <div class="section-header">
-                    <h2 id="detail-title">TA Details</h2>
-                    <button onclick="hideDetail()" class="btn btn-secondary">Back to List</button>
+            <div id="tab-tas" class="tab-content active">
+                <div class="filters-bar">
+                    <input type="text" id="ta-search" class="search-input" placeholder="Search by name..." oninput="filterTAs()">
+                    <select id="ta-status-filter" class="filter-select" onchange="filterTAs()">
+                        <option value="">All Statuses</option>
+                        <option value="ready">Ready</option>
+                        <option value="not-indexed">Not Indexed</option>
+                        <option value="indexing">Indexing</option>
+                    </select>
+                    <select id="ta-institution-filter" class="filter-select" onchange="filterTAs()">
+                        <option value="">All Institutions</option>
+                    </select>
+                    <div style="flex:1"></div>
+                    <button onclick="showCreateTAModal()" class="btn btn-primary">Create New TA</button>
                 </div>
-                <div id="ta-detail-content"></div>
-            </section>
+                
+                <table class="data-table" id="ta-table">
+                    <thead>
+                        <tr>
+                            <th onclick="sortTAs('name')">Name <span class="sort-icon">↕</span></th>
+                            <th onclick="sortTAs('institution_name')">Institution <span class="sort-icon">↕</span></th>
+                            <th onclick="sortTAs('status')">Status <span class="sort-icon">↕</span></th>
+                            <th onclick="sortTAs('doc_health')">Doc Health <span class="sort-icon">↕</span></th>
+                            <th onclick="sortTAs('last_activity_at')">Last Activity <span class="sort-icon">↕</span></th>
+                            <th onclick="sortTAs('slug')">Slug <span class="sort-icon">↕</span></th>
+                        </tr>
+                    </thead>
+                    <tbody id="ta-tbody">
+                        <tr><td colspan="6" class="empty-state">Loading...</td></tr>
+                    </tbody>
+                </table>
+                
+                <div class="pagination" id="ta-pagination">
+                    <button onclick="prevTAPage()" id="ta-prev-btn" disabled>← Previous</button>
+                    <span class="page-info" id="ta-page-info">Page 1</span>
+                    <button onclick="nextTAPage()" id="ta-next-btn" disabled>Next →</button>
+                </div>
+            </div>
+            
+            <div id="tab-institutions" class="tab-content">
+                <div class="filters-bar">
+                    <input type="text" id="inst-search" class="search-input" placeholder="Search by name..." oninput="filterInstitutions()">
+                    <div style="flex:1"></div>
+                    <button onclick="showCreateInstitutionModal()" class="btn btn-primary">Add Institution</button>
+                </div>
+                
+                <table class="data-table" id="inst-table">
+                    <thead>
+                        <tr>
+                            <th onclick="sortInstitutions('name')">Name <span class="sort-icon">↕</span></th>
+                            <th onclick="sortInstitutions('customer_id')">Customer ID <span class="sort-icon">↕</span></th>
+                            <th onclick="sortInstitutions('ta_count')">TA Count <span class="sort-icon">↕</span></th>
+                            <th onclick="sortInstitutions('created_at')">Created Date <span class="sort-icon">↕</span></th>
+                        </tr>
+                    </thead>
+                    <tbody id="inst-tbody">
+                        <tr><td colspan="4" class="empty-state">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </main>
-        
-        <div id="create-modal" class="modal" style="display: none;">
-            <div class="modal-content">
-                <span class="close" onclick="hideCreateModal()">&times;</span>
+    </div>
+    
+    <div id="create-ta-modal" class="modal-backdrop hidden">
+        <div class="modal-box" style="max-width: 500px;">
+            <div class="modal-header">
                 <h2>Create New Teaching Assistant</h2>
-                <form id="create-ta-form" onsubmit="createTA(event)">
+                <button class="modal-close" onclick="hideCreateTAModal()">&times;</button>
+            </div>
+            <form id="create-ta-form" onsubmit="createTA(event)">
+                <div class="modal-body">
                     <div class="form-group">
-                        <label for="ta-slug">URL Path (slug):</label>
-                        <input type="text" id="ta-slug" required placeholder="e.g., financecourse" pattern="[a-z0-9-]+" title="Lowercase letters, numbers, and hyphens only">
+                        <label for="new-ta-slug">URL Path (slug):</label>
+                        <input type="text" id="new-ta-slug" required placeholder="e.g., financecourse" pattern="[a-z0-9-]+" title="Lowercase letters, numbers, and hyphens only">
                         <small>This will be the URL path: /financecourse</small>
                     </div>
                     <div class="form-group">
-                        <label for="ta-name">TA Name:</label>
-                        <input type="text" id="ta-name" required placeholder="e.g., Finance 101 TA">
+                        <label for="new-ta-name">TA Name:</label>
+                        <input type="text" id="new-ta-name" required placeholder="e.g., Finance 101 TA">
                     </div>
                     <div class="form-group">
-                        <label for="ta-course">Course Name:</label>
-                        <input type="text" id="ta-course" required placeholder="e.g., Introduction to Finance">
+                        <label for="new-ta-course">Course Name:</label>
+                        <input type="text" id="new-ta-course" required placeholder="e.g., Introduction to Finance">
                     </div>
                     <div class="form-group">
-                        <label for="ta-prompt">System Prompt (optional):</label>
-                        <textarea id="ta-prompt" rows="4" placeholder="Custom instructions for the TA..."></textarea>
+                        <label for="new-ta-institution">Institution (optional):</label>
+                        <select id="new-ta-institution">
+                            <option value="">None</option>
+                        </select>
                     </div>
+                    <div class="form-group">
+                        <label for="new-ta-prompt">System Prompt (optional):</label>
+                        <textarea id="new-ta-prompt" rows="4" placeholder="Custom instructions for the TA..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="hideCreateTAModal()">Cancel</button>
                     <button type="submit" class="btn btn-primary">Create TA</button>
-                </form>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div id="edit-ta-modal" class="modal-backdrop hidden">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h2 id="edit-ta-title">Edit Teaching Assistant</h2>
+                <button class="modal-close" onclick="hideEditTAModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="edit-ta-body">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="hideEditTAModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveTA()">Save Changes</button>
             </div>
         </div>
     </div>
     
+    <div id="create-inst-modal" class="modal-backdrop hidden">
+        <div class="modal-box" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>Add Institution</h2>
+                <button class="modal-close" onclick="hideCreateInstitutionModal()">&times;</button>
+            </div>
+            <form id="create-inst-form" onsubmit="createInstitution(event)">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="new-inst-name">Name:</label>
+                        <input type="text" id="new-inst-name" required placeholder="e.g., Yale University">
+                    </div>
+                    <div class="form-group">
+                        <label for="new-inst-customer-id">Customer ID (optional):</label>
+                        <input type="text" id="new-inst-customer-id" placeholder="e.g., YALE-001">
+                    </div>
+                    <div class="form-group">
+                        <label for="new-inst-notes">Notes (optional):</label>
+                        <textarea id="new-inst-notes" rows="3" placeholder="Additional notes..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="hideCreateInstitutionModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Institution</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div id="edit-inst-modal" class="modal-backdrop hidden">
+        <div class="modal-box" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>Edit Institution</h2>
+                <button class="modal-close" onclick="hideEditInstitutionModal()">&times;</button>
+            </div>
+            <form id="edit-inst-form" onsubmit="updateInstitution(event)">
+                <div class="modal-body">
+                    <input type="hidden" id="edit-inst-id">
+                    <div class="form-group">
+                        <label for="edit-inst-name">Name:</label>
+                        <input type="text" id="edit-inst-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-inst-customer-id">Customer ID:</label>
+                        <input type="text" id="edit-inst-customer-id">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-inst-notes">Notes:</label>
+                        <textarea id="edit-inst-notes" rows="3"></textarea>
+                    </div>
+                    <div class="danger-zone" id="inst-danger-zone">
+                        <h4>Danger Zone</h4>
+                        <p style="font-size: 0.875rem; color: var(--text-light); margin-bottom: 0.75rem;">Deleting an institution cannot be undone.</p>
+                        <button type="button" class="btn btn-danger" onclick="deleteInstitution()">Delete Institution</button>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="hideEditInstitutionModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
     <script>
+        let allTAs = [];
+        let filteredTAs = [];
+        let allInstitutions = [];
+        let filteredInstitutions = [];
         let currentTaId = null;
+        let currentInstId = null;
         let indexingPollInterval = null;
+        
+        let taPage = 1;
+        const taPerPage = 25;
+        let taSortField = 'name';
+        let taSortDir = 'asc';
+        
+        let instSortField = 'name';
+        let instSortDir = 'asc';
         
         function escapeHtml(text) {
             if (!text) return '';
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+        
+        function showNotification(message, type = 'info', duration = 5000) {
+            const bar = document.getElementById('notification-bar');
+            bar.textContent = message;
+            bar.className = 'notification-bar ' + type + ' show';
+            setTimeout(() => bar.classList.remove('show'), duration);
+        }
+        
+        async function apiCall(url, options = {}) {
+            const res = await fetch(url, options);
+            if (res.status === 401) {
+                showNotification('Session expired. Redirecting to login...', 'warning');
+                setTimeout(() => { window.location.href = '/admin/login'; }, 1500);
+                throw new Error('Session expired');
+            }
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.error || 'Request failed with status ' + res.status);
+            }
+            return res.json();
+        }
+        
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.tab === tab);
+            });
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.toggle('active', content.id === 'tab-' + tab);
+            });
+            if (tab === 'institutions') {
+                loadInstitutions();
+            }
+        }
+        
+        function formatDate(isoString) {
+            if (!isoString) return '—';
+            const d = new Date(isoString);
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        }
+        
+        function formatDateTime(isoString) {
+            if (!isoString) return '—';
+            const d = new Date(isoString);
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+        }
+        
+        function getStatusValue(ta) {
+            if (ta.indexing_status === 'running') return 'indexing';
+            if (ta.is_indexed) return 'ready';
+            return 'not-indexed';
+        }
+        
+        function getStatusBadge(ta) {
+            const status = getStatusValue(ta);
+            const labels = { ready: 'Ready', 'not-indexed': 'Not Indexed', indexing: 'Indexing...' };
+            return `<span class="status-badge ${status}">${labels[status]}</span>`;
+        }
+        
+        async function loadTAs() {
+            try {
+                allTAs = await apiCall('/admin/api/tas');
+                for (let ta of allTAs) {
+                    ta.docs = await apiCall('/admin/api/tas/' + ta.id).then(d => d.documents || []).catch(() => []);
+                    ta.indexed_count = ta.docs.filter(d => d.last_indexed_at).length;
+                    ta.pending_count = ta.docs.filter(d => !d.last_indexed_at).length;
+                }
+                filterTAs();
+                populateInstitutionFilter();
+            } catch (err) {
+                if (err.message !== 'Session expired') {
+                    showNotification('Failed to load TAs: ' + err.message, 'error');
+                }
+            }
+        }
+        
+        function populateInstitutionFilter() {
+            const select = document.getElementById('ta-institution-filter');
+            const currentVal = select.value;
+            select.innerHTML = '<option value="">All Institutions</option>';
+            const uniqueInsts = [...new Set(allTAs.filter(t => t.institution_name).map(t => t.institution_name))];
+            uniqueInsts.sort().forEach(name => {
+                select.innerHTML += `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`;
+            });
+            select.value = currentVal;
+        }
+        
+        function filterTAs() {
+            const search = document.getElementById('ta-search').value.toLowerCase();
+            const statusFilter = document.getElementById('ta-status-filter').value;
+            const instFilter = document.getElementById('ta-institution-filter').value;
+            
+            filteredTAs = allTAs.filter(ta => {
+                const matchesSearch = !search || ta.name.toLowerCase().includes(search) || (ta.course_name || '').toLowerCase().includes(search);
+                const taStatus = getStatusValue(ta);
+                const matchesStatus = !statusFilter || taStatus === statusFilter;
+                const matchesInst = !instFilter || ta.institution_name === instFilter;
+                return matchesSearch && matchesStatus && matchesInst;
+            });
+            
+            sortTAsInternal();
+            taPage = 1;
+            renderTAs();
+        }
+        
+        function sortTAs(field) {
+            if (taSortField === field) {
+                taSortDir = taSortDir === 'asc' ? 'desc' : 'asc';
+            } else {
+                taSortField = field;
+                taSortDir = 'asc';
+            }
+            sortTAsInternal();
+            renderTAs();
+        }
+        
+        function sortTAsInternal() {
+            filteredTAs.sort((a, b) => {
+                let aVal, bVal;
+                if (taSortField === 'status') {
+                    aVal = getStatusValue(a);
+                    bVal = getStatusValue(b);
+                } else if (taSortField === 'doc_health') {
+                    aVal = a.indexed_count;
+                    bVal = b.indexed_count;
+                } else if (taSortField === 'last_activity_at') {
+                    aVal = a.last_activity_at || '';
+                    bVal = b.last_activity_at || '';
+                } else {
+                    aVal = (a[taSortField] || '').toString().toLowerCase();
+                    bVal = (b[taSortField] || '').toString().toLowerCase();
+                }
+                if (aVal < bVal) return taSortDir === 'asc' ? -1 : 1;
+                if (aVal > bVal) return taSortDir === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+        
+        function renderTAs() {
+            const tbody = document.getElementById('ta-tbody');
+            const start = (taPage - 1) * taPerPage;
+            const end = start + taPerPage;
+            const pageTAs = filteredTAs.slice(start, end);
+            
+            if (pageTAs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No teaching assistants found</td></tr>';
+            } else {
+                tbody.innerHTML = pageTAs.map(ta => `
+                    <tr onclick="showEditTAModal('${ta.id}')">
+                        <td><strong>${escapeHtml(ta.name)}</strong><br><small style="color:var(--text-light)">${escapeHtml(ta.course_name)}</small></td>
+                        <td>${escapeHtml(ta.institution_name) || '—'}</td>
+                        <td>${getStatusBadge(ta)}</td>
+                        <td>${ta.indexed_count} indexed / ${ta.pending_count} pending</td>
+                        <td>${formatDateTime(ta.last_activity_at)}</td>
+                        <td><a href="/${ta.slug}" target="_blank" class="slug-link" onclick="event.stopPropagation()">/${ta.slug}</a></td>
+                    </tr>
+                `).join('');
+            }
+            
+            const totalPages = Math.ceil(filteredTAs.length / taPerPage) || 1;
+            document.getElementById('ta-page-info').textContent = `Page ${taPage} of ${totalPages}`;
+            document.getElementById('ta-prev-btn').disabled = taPage <= 1;
+            document.getElementById('ta-next-btn').disabled = taPage >= totalPages;
+        }
+        
+        function prevTAPage() {
+            if (taPage > 1) { taPage--; renderTAs(); }
+        }
+        function nextTAPage() {
+            const totalPages = Math.ceil(filteredTAs.length / taPerPage);
+            if (taPage < totalPages) { taPage++; renderTAs(); }
+        }
+        
+        async function loadInstitutions() {
+            try {
+                allInstitutions = await apiCall('/admin/api/institutions');
+                filterInstitutions();
+            } catch (err) {
+                if (err.message !== 'Session expired') {
+                    showNotification('Failed to load institutions: ' + err.message, 'error');
+                }
+            }
+        }
+        
+        function filterInstitutions() {
+            const search = document.getElementById('inst-search').value.toLowerCase();
+            filteredInstitutions = allInstitutions.filter(inst => 
+                !search || inst.name.toLowerCase().includes(search)
+            );
+            sortInstitutionsInternal();
+            renderInstitutions();
+        }
+        
+        function sortInstitutions(field) {
+            if (instSortField === field) {
+                instSortDir = instSortDir === 'asc' ? 'desc' : 'asc';
+            } else {
+                instSortField = field;
+                instSortDir = 'asc';
+            }
+            sortInstitutionsInternal();
+            renderInstitutions();
+        }
+        
+        function sortInstitutionsInternal() {
+            filteredInstitutions.sort((a, b) => {
+                let aVal = a[instSortField];
+                let bVal = b[instSortField];
+                if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+                if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+                aVal = aVal || '';
+                bVal = bVal || '';
+                if (aVal < bVal) return instSortDir === 'asc' ? -1 : 1;
+                if (aVal > bVal) return instSortDir === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+        
+        function renderInstitutions() {
+            const tbody = document.getElementById('inst-tbody');
+            if (filteredInstitutions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No institutions found</td></tr>';
+            } else {
+                tbody.innerHTML = filteredInstitutions.map(inst => `
+                    <tr onclick="showEditInstitutionModal(${inst.id})">
+                        <td><strong>${escapeHtml(inst.name)}</strong></td>
+                        <td>${escapeHtml(inst.customer_id) || '—'}</td>
+                        <td>${inst.ta_count}</td>
+                        <td>${formatDate(inst.created_at)}</td>
+                    </tr>
+                `).join('');
+            }
+        }
+        
+        function showCreateTAModal() {
+            document.getElementById('create-ta-form').reset();
+            populateInstitutionDropdown('new-ta-institution');
+            document.getElementById('create-ta-modal').classList.remove('hidden');
+        }
+        function hideCreateTAModal() {
+            document.getElementById('create-ta-modal').classList.add('hidden');
+        }
+        
+        async function populateInstitutionDropdown(selectId, selectedId = null) {
+            const select = document.getElementById(selectId);
+            try {
+                const insts = await apiCall('/admin/api/institutions');
+                select.innerHTML = '<option value="">None</option>' + 
+                    insts.map(i => `<option value="${i.id}" ${i.id == selectedId ? 'selected' : ''}>${escapeHtml(i.name)}</option>`).join('');
+            } catch (err) {
+                select.innerHTML = '<option value="">None</option>';
+            }
+        }
+        
+        async function createTA(e) {
+            e.preventDefault();
+            const data = {
+                slug: document.getElementById('new-ta-slug').value,
+                name: document.getElementById('new-ta-name').value,
+                course_name: document.getElementById('new-ta-course').value,
+                institution_id: document.getElementById('new-ta-institution').value || null,
+                system_prompt: document.getElementById('new-ta-prompt').value || undefined
+            };
+            
+            try {
+                await apiCall('/admin/api/tas', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                hideCreateTAModal();
+                showNotification('Teaching Assistant created successfully!', 'success');
+                loadTAs();
+            } catch (err) {
+                if (err.message !== 'Session expired') {
+                    showNotification(err.message, 'error');
+                }
+            }
+        }
+        
+        async function showEditTAModal(taId) {
+            currentTaId = taId;
+            try {
+                const ta = await apiCall('/admin/api/tas/' + taId);
+                document.getElementById('edit-ta-title').textContent = 'Edit: ' + ta.name;
+                
+                let indexingStatusHtml = '';
+                if (ta.indexing_status === 'running') {
+                    indexingStatusHtml = `<div class="indexing-status running"><div class="spinner"></div> Indexing in progress...</div>`;
+                    startIndexingPoll(taId);
+                } else if (ta.indexing_status === 'failed') {
+                    indexingStatusHtml = `<div class="indexing-status failed">Indexing failed: ${escapeHtml(ta.indexing_error) || 'Unknown error'}</div>`;
+                } else if (ta.indexing_status === 'completed') {
+                    indexingStatusHtml = `<div class="indexing-status completed">Indexing completed successfully</div>`;
+                }
+                
+                const docsHtml = ta.documents.length > 0 
+                    ? `<table class="doc-table">
+                        <thead><tr><th>Display Name</th><th>Type</th><th>Unit #</th><th>Original File</th><th>Actions</th></tr></thead>
+                        <tbody>
+                            ${ta.documents.map(doc => `
+                                <tr class="doc-row ${doc.needs_reindex ? 'needs-reindex' : ''}" data-doc-id="${doc.id}" data-ta-id="${ta.id}">
+                                    <td>
+                                        <div class="field-with-indicator">
+                                            <input type="text" class="doc-display-name" value="${escapeHtml(doc.display_name || doc.filename)}" data-original="${escapeHtml(doc.display_name || doc.filename)}">
+                                            ${doc.needs_reindex ? '<span class="reindex-indicator" title="Changes not yet indexed">*</span>' : ''}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <select class="doc-type-select" data-original="${doc.doc_type || ''}">
+                                            <option value="" ${!doc.doc_type ? 'selected' : ''}>--</option>
+                                            <option value="homework" ${doc.doc_type === 'homework' ? 'selected' : ''}>Homework</option>
+                                            <option value="exam" ${doc.doc_type === 'exam' ? 'selected' : ''}>Exam</option>
+                                            <option value="lecture" ${doc.doc_type === 'lecture' ? 'selected' : ''}>Lecture</option>
+                                            <option value="reading" ${doc.doc_type === 'reading' ? 'selected' : ''}>Reading</option>
+                                            <option value="syllabus" ${doc.doc_type === 'syllabus' ? 'selected' : ''}>Syllabus</option>
+                                            <option value="other" ${doc.doc_type === 'other' ? 'selected' : ''}>Other</option>
+                                        </select>
+                                    </td>
+                                    <td><input type="number" class="doc-unit-number unit-input" value="${doc.unit_number || ''}" data-original="${doc.unit_number || ''}" min="1" max="99"></td>
+                                    <td style="font-size: 12px; color: #6b7280;">${escapeHtml(doc.filename)}</td>
+                                    <td>
+                                        <div class="doc-actions">
+                                            <span class="save-status"></span>
+                                            <button type="button" class="delete-btn" onclick="deleteDocument('${ta.id}', ${doc.id})">Delete</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                    <p class="metadata-hint">Changes auto-save when you click out of a field. Documents marked with * have unindexed changes.</p>`
+                    : '<p style="color: var(--text-light);">No documents uploaded yet.</p>';
+                
+                const indexBtnDisabled = ta.document_count === 0 || ta.indexing_status === 'running';
+                const indexBtnText = ta.indexing_status === 'running' ? 'Indexing...' : (ta.is_indexed ? 'Re-index Documents' : 'Index Documents');
+                
+                document.getElementById('edit-ta-body').innerHTML = `
+                    ${indexingStatusHtml}
+                    <div class="form-group">
+                        <label>TA Name:</label>
+                        <input type="text" id="edit-ta-name" value="${escapeHtml(ta.name)}">
+                    </div>
+                    <div class="form-group">
+                        <label>Course Name:</label>
+                        <input type="text" id="edit-ta-course" value="${escapeHtml(ta.course_name)}">
+                    </div>
+                    <div class="form-group">
+                        <label>URL Path (slug):</label>
+                        <input type="text" id="edit-ta-slug" value="${escapeHtml(ta.slug)}" pattern="[a-z0-9-]+" title="Lowercase letters, numbers, and hyphens only">
+                        <small>Current URL: <a href="/${ta.slug}" target="_blank">/${ta.slug}</a></small>
+                    </div>
+                    <div class="form-group">
+                        <label>Institution:</label>
+                        <select id="edit-ta-institution"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>System Prompt:</label>
+                        <textarea id="edit-ta-prompt" rows="4">${escapeHtml(ta.system_prompt)}</textarea>
+                    </div>
+                    
+                    <h3 style="margin-top: 1.5rem; margin-bottom: 0.5rem;">Upload Documents</h3>
+                    <div class="drop-zone" id="drop-zone" onclick="document.getElementById('doc-files').click()">
+                        <input type="file" id="doc-files" multiple accept=".pdf,.docx,.doc,.xlsx,.xls,.txt,.pptx,.ppt" style="display:none" onchange="handleFileSelect(event, '${ta.id}')">
+                        <div class="drop-zone-content">
+                            <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="17 8 12 3 7 8"></polyline>
+                                <line x1="12" y1="3" x2="12" y2="15"></line>
+                            </svg>
+                            <p class="drop-text">Drag & drop files here or click to browse</p>
+                            <p class="drop-hint">PDF, DOCX, XLSX, TXT, PPTX supported</p>
+                        </div>
+                    </div>
+                    <div id="upload-progress" class="upload-progress"></div>
+                    
+                    <h3 style="margin-top: 1.5rem; margin-bottom: 0.5rem;">Documents</h3>
+                    ${docsHtml}
+                    
+                    <div style="margin-top: 1.5rem; display: flex; gap: 0.75rem;">
+                        <button type="button" onclick="reindexTA('${ta.id}')" class="btn btn-primary" ${indexBtnDisabled ? 'disabled' : ''}>${indexBtnText}</button>
+                    </div>
+                    
+                    <div class="danger-zone">
+                        <h4>Danger Zone</h4>
+                        <p style="font-size: 0.875rem; color: var(--text-light); margin-bottom: 0.75rem;">Deleting this TA cannot be undone.</p>
+                        <button type="button" class="btn btn-danger" onclick="deleteTA('${ta.id}')">Delete TA</button>
+                    </div>
+                `;
+                
+                await populateInstitutionDropdown('edit-ta-institution', ta.institution_id);
+                document.getElementById('edit-ta-modal').classList.remove('hidden');
+                
+                setTimeout(() => {
+                    setupDropZone();
+                    setupAutoSave();
+                }, 0);
+            } catch (err) {
+                if (err.message !== 'Session expired') {
+                    showNotification('Failed to load TA details: ' + err.message, 'error');
+                }
+            }
+        }
+        
+        function hideEditTAModal() {
+            document.getElementById('edit-ta-modal').classList.add('hidden');
+            if (indexingPollInterval) {
+                clearInterval(indexingPollInterval);
+                indexingPollInterval = null;
+            }
+            currentTaId = null;
+        }
+        
+        async function saveTA() {
+            if (!currentTaId) return;
+            
+            const data = {
+                name: document.getElementById('edit-ta-name').value,
+                course_name: document.getElementById('edit-ta-course').value,
+                slug: document.getElementById('edit-ta-slug').value.trim().toLowerCase().replace(/\s+/g, '-'),
+                institution_id: document.getElementById('edit-ta-institution').value || null,
+                system_prompt: document.getElementById('edit-ta-prompt').value
+            };
+            
+            try {
+                await apiCall('/admin/api/tas/' + currentTaId, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                showNotification('TA updated successfully!', 'success');
+                hideEditTAModal();
+                loadTAs();
+            } catch (err) {
+                if (err.message !== 'Session expired') {
+                    showNotification(err.message, 'error');
+                }
+            }
+        }
+        
+        function showCreateInstitutionModal() {
+            document.getElementById('create-inst-form').reset();
+            document.getElementById('create-inst-modal').classList.remove('hidden');
+        }
+        function hideCreateInstitutionModal() {
+            document.getElementById('create-inst-modal').classList.add('hidden');
+        }
+        
+        async function createInstitution(e) {
+            e.preventDefault();
+            const data = {
+                name: document.getElementById('new-inst-name').value,
+                customer_id: document.getElementById('new-inst-customer-id').value || null,
+                notes: document.getElementById('new-inst-notes').value || null
+            };
+            
+            try {
+                await apiCall('/admin/api/institutions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                hideCreateInstitutionModal();
+                showNotification('Institution created successfully!', 'success');
+                loadInstitutions();
+            } catch (err) {
+                if (err.message !== 'Session expired') {
+                    showNotification(err.message, 'error');
+                }
+            }
+        }
+        
+        async function showEditInstitutionModal(instId) {
+            currentInstId = instId;
+            try {
+                const inst = await apiCall('/admin/api/institutions/' + instId);
+                document.getElementById('edit-inst-id').value = inst.id;
+                document.getElementById('edit-inst-name').value = inst.name;
+                document.getElementById('edit-inst-customer-id').value = inst.customer_id || '';
+                document.getElementById('edit-inst-notes').value = inst.notes || '';
+                
+                const dangerZone = document.getElementById('inst-danger-zone');
+                if (inst.ta_count > 0) {
+                    dangerZone.innerHTML = `<h4>Danger Zone</h4><p style="font-size: 0.875rem; color: var(--text-light);">Cannot delete: ${inst.ta_count} TA(s) are assigned to this institution.</p>`;
+                } else {
+                    dangerZone.innerHTML = `<h4>Danger Zone</h4><p style="font-size: 0.875rem; color: var(--text-light); margin-bottom: 0.75rem;">Deleting an institution cannot be undone.</p><button type="button" class="btn btn-danger" onclick="deleteInstitution()">Delete Institution</button>`;
+                }
+                
+                document.getElementById('edit-inst-modal').classList.remove('hidden');
+            } catch (err) {
+                if (err.message !== 'Session expired') {
+                    showNotification('Failed to load institution: ' + err.message, 'error');
+                }
+            }
+        }
+        function hideEditInstitutionModal() {
+            document.getElementById('edit-inst-modal').classList.add('hidden');
+            currentInstId = null;
+        }
+        
+        async function updateInstitution(e) {
+            e.preventDefault();
+            const instId = document.getElementById('edit-inst-id').value;
+            const data = {
+                name: document.getElementById('edit-inst-name').value,
+                customer_id: document.getElementById('edit-inst-customer-id').value || null,
+                notes: document.getElementById('edit-inst-notes').value || null
+            };
+            
+            try {
+                await apiCall('/admin/api/institutions/' + instId, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                hideEditInstitutionModal();
+                showNotification('Institution updated successfully!', 'success');
+                loadInstitutions();
+            } catch (err) {
+                if (err.message !== 'Session expired') {
+                    showNotification(err.message, 'error');
+                }
+            }
+        }
+        
+        async function deleteInstitution() {
+            if (!currentInstId) return;
+            if (!confirm('Delete this institution? This cannot be undone.')) return;
+            
+            try {
+                await apiCall('/admin/api/institutions/' + currentInstId, { method: 'DELETE' });
+                hideEditInstitutionModal();
+                showNotification('Institution deleted', 'success');
+                loadInstitutions();
+            } catch (err) {
+                if (err.message !== 'Session expired') {
+                    showNotification(err.message, 'error');
+                }
+            }
         }
         
         async function saveDocumentMetadata(row) {
@@ -268,11 +1273,7 @@
                 await apiCall(`/admin/api/tas/${taId}/documents/${docId}`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        display_name: displayName,
-                        doc_type: docType,
-                        unit_number: unitNumber
-                    })
+                    body: JSON.stringify({ display_name: displayName, doc_type: docType, unit_number: unitNumber })
                 });
                 
                 row.querySelector('.doc-display-name').dataset.original = displayName;
@@ -293,20 +1294,13 @@
                     nameField.appendChild(indicator);
                 }
                 
-                setTimeout(() => {
-                    statusEl.textContent = '';
-                    row.classList.remove('saved');
-                }, 2000);
-                
+                setTimeout(() => { statusEl.textContent = ''; }, 2000);
             } catch (err) {
                 row.classList.remove('saving');
                 statusEl.textContent = 'Error';
                 statusEl.className = 'save-status error';
                 showNotification('Failed to save: ' + err.message, 'error');
-                
-                setTimeout(() => {
-                    statusEl.textContent = '';
-                }, 3000);
+                setTimeout(() => { statusEl.textContent = ''; }, 3000);
             }
         }
         
@@ -316,254 +1310,9 @@
                 inputs.forEach(input => {
                     input.addEventListener('blur', () => saveDocumentMetadata(row));
                     input.addEventListener('change', () => {
-                        if (input.tagName === 'SELECT') {
-                            saveDocumentMetadata(row);
-                        }
+                        if (input.tagName === 'SELECT') saveDocumentMetadata(row);
                     });
                 });
-            });
-        }
-        
-        function showNotification(message, type = 'info', duration = 5000) {
-            const bar = document.getElementById('notification-bar');
-            bar.textContent = message;
-            bar.className = 'notification-bar ' + type + ' show';
-            
-            setTimeout(() => {
-                bar.classList.remove('show');
-            }, duration);
-        }
-        
-        async function apiCall(url, options = {}) {
-            const res = await fetch(url, options);
-            if (res.status === 401) {
-                document.getElementById('ta-list').innerHTML = '<p class="loading">Session expired. Redirecting...</p>';
-                showNotification('Session expired. Redirecting to login...', 'warning');
-                setTimeout(() => { window.location.href = '/admin/login'; }, 1500);
-                throw new Error('Session expired');
-            }
-            if (!res.ok) {
-                const data = await res.json().catch(() => ({}));
-                throw new Error(data.error || 'Request failed with status ' + res.status);
-            }
-            return res.json();
-        }
-        
-        function getStatusDisplay(ta) {
-            if (ta.indexing_status === 'running') {
-                return '<span class="status indexing">Indexing...</span>';
-            } else if (ta.is_indexed) {
-                return '<span class="status indexed">Ready</span>';
-            } else {
-                return '<span class="status not-indexed">Not Indexed</span>';
-            }
-        }
-        
-        function loadTAs() {
-            apiCall('/admin/api/tas')
-            .then(tas => {
-                const list = document.getElementById('ta-list');
-                if (tas.length === 0) {
-                    list.innerHTML = '<p class="empty">No teaching assistants yet. Create your first one!</p>';
-                    return;
-                }
-                
-                list.innerHTML = tas.map(ta => `
-                    <div class="ta-card" onclick="showTADetail('${ta.id}')">
-                        <h3>${ta.name}</h3>
-                        <p class="course-name">${ta.course_name}</p>
-                        <p class="ta-slug">/${ta.slug}</p>
-                        <div class="ta-meta">
-                            ${getStatusDisplay(ta)}
-                            <span class="doc-count">${ta.document_count} documents</span>
-                        </div>
-                    </div>
-                `).join('');
-            })
-            .catch(err => {
-                if (err.message !== 'Session expired') {
-                    showNotification('Failed to load TAs: ' + err.message, 'error');
-                }
-            });
-        }
-        
-        function showTADetail(taId) {
-            apiCall('/admin/api/tas/' + taId)
-            .then(ta => {
-                document.getElementById('ta-list-section') && 
-                    (document.querySelector('.ta-list-section').style.display = 'none');
-                document.getElementById('ta-detail').style.display = 'block';
-                document.getElementById('detail-title').textContent = ta.name;
-                
-                const docsHtml = ta.documents.length > 0 
-                    ? `<table class="doc-table">
-                        <thead>
-                            <tr>
-                                <th>Display Name</th>
-                                <th>Type</th>
-                                <th>Unit #</th>
-                                <th>Original File</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${ta.documents.map(doc => `
-                                <tr class="doc-row ${doc.needs_reindex ? 'needs-reindex' : ''}" data-doc-id="${doc.id}" data-ta-id="${ta.id}">
-                                    <td>
-                                        <div class="field-with-indicator">
-                                            <input type="text" class="doc-display-name" value="${escapeHtml(doc.display_name || doc.filename)}" data-original="${escapeHtml(doc.display_name || doc.filename)}">
-                                            ${doc.needs_reindex ? '<span class="reindex-indicator" title="Changes not yet indexed">*</span>' : ''}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <select class="doc-type-select" data-original="${doc.doc_type || ''}">
-                                            <option value="" ${!doc.doc_type ? 'selected' : ''}>--</option>
-                                            <option value="homework" ${doc.doc_type === 'homework' ? 'selected' : ''}>Homework</option>
-                                            <option value="exam" ${doc.doc_type === 'exam' ? 'selected' : ''}>Exam</option>
-                                            <option value="lecture" ${doc.doc_type === 'lecture' ? 'selected' : ''}>Lecture</option>
-                                            <option value="reading" ${doc.doc_type === 'reading' ? 'selected' : ''}>Reading</option>
-                                            <option value="syllabus" ${doc.doc_type === 'syllabus' ? 'selected' : ''}>Syllabus</option>
-                                            <option value="other" ${doc.doc_type === 'other' ? 'selected' : ''}>Other</option>
-                                        </select>
-                                    </td>
-                                    <td>
-                                        <input type="number" class="doc-unit-number unit-input" value="${doc.unit_number || ''}" data-original="${doc.unit_number || ''}" min="1" max="99">
-                                    </td>
-                                    <td style="font-size: 12px; color: #6b7280;">${escapeHtml(doc.filename)}</td>
-                                    <td>
-                                        <div class="doc-actions">
-                                            <span class="save-status"></span>
-                                            <button class="delete-btn" onclick="deleteDocument('${ta.id}', ${doc.id})">Delete</button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                    <p class="metadata-hint">Changes auto-save when you click out of a field. Documents marked with * have unindexed changes.</p>`
-                    : '<p class="empty">No documents uploaded yet.</p>';
-                
-                let indexingStatusHtml = '';
-                if (ta.indexing_status === 'running') {
-                    indexingStatusHtml = `<div class="indexing-status running"><div class="spinner"></div> Indexing in progress... <button onclick="cancelIndexing('${ta.id}')" class="btn btn-secondary btn-sm" style="margin-left: 12px;">Cancel</button></div>`;
-                    startIndexingPoll(ta.id);
-                } else if (ta.indexing_status === 'failed') {
-                    indexingStatusHtml = `<div class="indexing-status failed">Indexing failed: ${ta.indexing_error || 'Unknown error'}</div>`;
-                } else if (ta.indexing_status === 'completed') {
-                    indexingStatusHtml = `<div class="indexing-status completed">Indexing completed successfully</div>`;
-                }
-                
-                const indexBtnDisabled = ta.document_count === 0 || ta.indexing_status === 'running';
-                const indexBtnText = ta.indexing_status === 'running' ? 'Indexing...' : (ta.is_indexed ? 'Re-index Documents' : 'Index Documents');
-                
-                document.getElementById('ta-detail-content').innerHTML = `
-                    ${indexingStatusHtml}
-                    <div class="detail-info">
-                        <p><strong>Course:</strong> ${ta.course_name}</p>
-                        <p><strong>Status:</strong> ${ta.is_indexed ? 'Ready' : 'Needs Indexing'}</p>
-                        <p><strong>Documents:</strong> ${ta.document_count}</p>
-                    </div>
-                    
-                    <div class="slug-section">
-                        <h3>URL Path</h3>
-                        <div class="slug-edit-group">
-                            <span class="slug-prefix">/</span>
-                            <input type="text" id="ta-slug-edit" value="${ta.slug}" pattern="[a-z0-9-]+" title="Lowercase letters, numbers, and hyphens only">
-                            <button onclick="updateSlug('${ta.id}')" class="btn btn-secondary">Update URL</button>
-                        </div>
-                        <p class="slug-hint">Current URL: <a href="/${ta.slug}" target="_blank">/${ta.slug}</a></p>
-                        <p id="slug-status"></p>
-                    </div>
-                    
-                    <div class="upload-section">
-                        <h3>Upload Documents</h3>
-                        <div class="drop-zone" id="drop-zone" onclick="document.getElementById('doc-files').click()">
-                            <input type="file" id="doc-files" multiple accept=".pdf,.docx,.doc,.xlsx,.xls,.txt,.pptx,.ppt" style="display:none" onchange="handleFileSelect(event, '${ta.id}')">
-                            <div class="drop-zone-content">
-                                <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                    <polyline points="17 8 12 3 7 8"></polyline>
-                                    <line x1="12" y1="3" x2="12" y2="15"></line>
-                                </svg>
-                                <p class="drop-text">Drag & drop files here or click to browse</p>
-                                <p class="drop-hint">PDF, DOCX, XLSX, TXT, PPTX supported</p>
-                            </div>
-                        </div>
-                        <div id="upload-progress" class="upload-progress"></div>
-                    </div>
-                    
-                    <div class="documents-section">
-                        <h3>Documents</h3>
-                        <div class="documents-list">${docsHtml}</div>
-                    </div>
-                    
-                    <div class="actions-section">
-                        <button onclick="reindexTA('${ta.id}')" class="btn btn-primary" ${indexBtnDisabled ? 'disabled' : ''}>
-                            ${indexBtnText}
-                        </button>
-                        <button onclick="deleteTA('${ta.id}')" class="btn btn-danger">Delete TA</button>
-                    </div>
-                    
-                    <div class="prompt-section">
-                        <h3>System Prompt</h3>
-                        <textarea id="system-prompt" rows="6">${ta.system_prompt}</textarea>
-                        <button onclick="updatePrompt('${ta.id}')" class="btn btn-secondary">Update Prompt</button>
-                    </div>
-                `;
-                currentTaId = ta.id;
-                setTimeout(() => {
-                    setupDropZone();
-                    setupAutoSave();
-                }, 0);
-            })
-            .catch(err => {
-                if (err.message !== 'Session expired') {
-                    showNotification('Failed to load TA details: ' + err.message, 'error');
-                }
-            });
-        }
-        
-        function hideDetail() {
-            document.getElementById('ta-detail').style.display = 'none';
-            document.querySelector('.ta-list-section').style.display = 'block';
-            loadTAs();
-        }
-        
-        function showCreateModal() {
-            document.getElementById('create-modal').style.display = 'flex';
-        }
-        
-        function hideCreateModal() {
-            document.getElementById('create-modal').style.display = 'none';
-        }
-        
-        function createTA(e) {
-            e.preventDefault();
-            
-            const data = {
-                slug: document.getElementById('ta-slug').value,
-                name: document.getElementById('ta-name').value,
-                course_name: document.getElementById('ta-course').value,
-                system_prompt: document.getElementById('ta-prompt').value || undefined
-            };
-            
-            apiCall('/admin/api/tas', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(data)
-            })
-            .then(result => {
-                hideCreateModal();
-                document.getElementById('create-ta-form').reset();
-                showNotification('Teaching Assistant created successfully!', 'success');
-                loadTAs();
-            })
-            .catch(err => {
-                if (err.message !== 'Session expired') {
-                    showNotification(err.message, 'error');
-                }
             });
         }
         
@@ -572,13 +1321,8 @@
             if (!dropZone) return;
             
             ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                dropZone.addEventListener(eventName, preventDefaults, false);
+                dropZone.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); }, false);
             });
-            
-            function preventDefaults(e) {
-                e.preventDefault();
-                e.stopPropagation();
-            }
             
             ['dragenter', 'dragover'].forEach(eventName => {
                 dropZone.addEventListener(eventName, () => dropZone.classList.add('drop-zone-active'), false);
@@ -598,9 +1342,7 @@
         
         function handleFileSelect(e, taId) {
             const files = e.target.files;
-            if (files.length > 0) {
-                uploadFiles(files, taId);
-            }
+            if (files.length > 0) uploadFiles(files, taId);
         }
         
         async function uploadFiles(files, taId) {
@@ -609,7 +1351,6 @@
             
             const fileArray = Array.from(files);
             let successCount = 0;
-            let errorCount = 0;
             
             for (let i = 0; i < fileArray.length; i++) {
                 const file = fileArray[i];
@@ -617,7 +1358,7 @@
                 
                 progressContainer.innerHTML += `
                     <div class="upload-item" id="${fileId}">
-                        <span class="upload-filename">${file.name}</span>
+                        <span class="upload-filename">${escapeHtml(file.name)}</span>
                         <span class="upload-status uploading">Uploading...</span>
                     </div>
                 `;
@@ -626,23 +1367,17 @@
                 formData.append('file', file);
                 
                 try {
-                    const res = await fetch('/admin/api/tas/' + taId + '/upload', {
-                        method: 'POST',
-                        body: formData
-                    });
+                    const res = await fetch('/admin/api/tas/' + taId + '/upload', { method: 'POST', body: formData });
                     if (res.status === 401) {
-                        progressContainer.innerHTML = '<p>Session expired. Redirecting to login...</p>';
                         showNotification('Session expired. Redirecting to login...', 'warning');
                         setTimeout(() => { window.location.href = '/admin/login'; }, 1500);
                         return;
                     }
                     const result = await res.json();
-                    
                     const statusEl = document.querySelector('#' + fileId + ' .upload-status');
                     if (result.error) {
                         statusEl.textContent = result.error;
                         statusEl.className = 'upload-status error';
-                        errorCount++;
                     } else {
                         statusEl.textContent = 'Done';
                         statusEl.className = 'upload-status success';
@@ -652,57 +1387,45 @@
                     const statusEl = document.querySelector('#' + fileId + ' .upload-status');
                     statusEl.textContent = 'Failed';
                     statusEl.className = 'upload-status error';
-                    errorCount++;
                 }
             }
             
             document.getElementById('doc-files').value = '';
-            
             if (successCount > 0) {
-                setTimeout(() => showTADetail(taId), 1000);
+                setTimeout(() => showEditTAModal(taId), 1000);
             }
         }
         
-        function deleteDocument(taId, docId) {
+        async function deleteDocument(taId, docId) {
             if (!confirm('Delete this document?')) return;
             
-            apiCall('/admin/api/tas/' + taId + '/documents/' + docId, {
-                method: 'DELETE'
-            })
-            .then(() => showTADetail(taId))
-            .catch(err => {
+            try {
+                await apiCall('/admin/api/tas/' + taId + '/documents/' + docId, { method: 'DELETE' });
+                showEditTAModal(taId);
+            } catch (err) {
                 if (err.message !== 'Session expired') {
                     showNotification('Failed to delete document: ' + err.message, 'error');
                 }
-            });
+            }
         }
         
-        function reindexTA(taId) {
+        async function reindexTA(taId) {
             if (!confirm('This will process all documents and create the search index. Continue?')) return;
             
-            const btn = event.target;
-            btn.disabled = true;
-            btn.textContent = 'Starting...';
-            
-            apiCall('/admin/api/tas/' + taId + '/reindex', {
-                method: 'POST'
-            })
-            .then(result => {
-                showNotification('Indexing started in the background. You can continue working.', 'info', 8000);
+            try {
+                await apiCall('/admin/api/tas/' + taId + '/reindex', { method: 'POST' });
+                showNotification('Indexing started in the background.', 'info', 8000);
                 startIndexingPoll(taId);
-            })
-            .catch(err => {
+                showEditTAModal(taId);
+            } catch (err) {
                 if (err.message !== 'Session expired') {
                     showNotification('Failed to start indexing: ' + err.message, 'error');
-                    showTADetail(taId);
                 }
-            });
+            }
         }
         
         function startIndexingPoll(taId) {
-            if (indexingPollInterval) {
-                clearInterval(indexingPollInterval);
-            }
+            if (indexingPollInterval) clearInterval(indexingPollInterval);
             
             indexingPollInterval = setInterval(() => {
                 apiCall('/admin/api/tas/' + taId + '/indexing-status')
@@ -711,129 +1434,40 @@
                         clearInterval(indexingPollInterval);
                         indexingPollInterval = null;
                         showNotification('Indexing completed successfully!', 'success');
-                        if (currentTaId === taId) {
-                            showTADetail(taId);
-                        }
+                        if (currentTaId === taId) showEditTAModal(taId);
                         loadTAs();
                     } else if (status.status === 'failed') {
                         clearInterval(indexingPollInterval);
                         indexingPollInterval = null;
                         showNotification('Indexing failed: ' + status.error, 'error', 10000);
-                        if (currentTaId === taId) {
-                            showTADetail(taId);
-                        }
+                        if (currentTaId === taId) showEditTAModal(taId);
                         loadTAs();
                     }
                 })
                 .catch(err => {
                     clearInterval(indexingPollInterval);
                     indexingPollInterval = null;
-                    if (err.message === 'Session expired') {
-                        showNotification('Session expired. Redirecting to login...', 'warning');
-                    }
                 });
             }, 3000);
         }
         
-        async function cancelIndexing(taId) {
-            if (!confirm('Cancel indexing? The TA will remain in its current state.')) return;
+        async function deleteTA(taId) {
+            if (!confirm('Delete this teaching assistant? This cannot be undone.')) return;
             
             try {
-                await apiCall('/admin/api/tas/' + taId + '/reset-indexing', {
-                    method: 'POST'
-                });
-                
-                if (indexingPollInterval) {
-                    clearInterval(indexingPollInterval);
-                    indexingPollInterval = null;
-                }
-                
-                showNotification('Indexing cancelled', 'info');
-                showTADetail(taId);
+                await apiCall('/admin/api/tas/' + taId, { method: 'DELETE' });
+                hideEditTAModal();
+                showNotification('Teaching Assistant deleted', 'success');
                 loadTAs();
             } catch (err) {
                 if (err.message !== 'Session expired') {
-                    showNotification('Failed to cancel indexing: ' + err.message, 'error');
-                }
-            }
-        }
-        
-        function deleteTA(taId) {
-            if (!confirm('Delete this teaching assistant? This cannot be undone.')) return;
-            
-            apiCall('/admin/api/tas/' + taId, {
-                method: 'DELETE'
-            })
-            .then(() => {
-                showNotification('Teaching Assistant deleted', 'success');
-                hideDetail();
-            })
-            .catch(err => {
-                if (err.message !== 'Session expired') {
                     showNotification('Failed to delete TA: ' + err.message, 'error');
                 }
-            });
-        }
-        
-        function updatePrompt(taId) {
-            const prompt = document.getElementById('system-prompt').value;
-            
-            apiCall('/admin/api/tas/' + taId, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ system_prompt: prompt })
-            })
-            .then(result => {
-                showNotification('System prompt updated!', 'success');
-            })
-            .catch(err => {
-                if (err.message !== 'Session expired') {
-                    showNotification('Failed to update prompt: ' + err.message, 'error');
-                }
-            });
-        }
-        
-        function updateSlug(taId) {
-            const newSlug = document.getElementById('ta-slug-edit').value.trim().toLowerCase().replace(/\s+/g, '-');
-            const statusEl = document.getElementById('slug-status');
-            
-            if (!newSlug) {
-                statusEl.textContent = 'URL path cannot be empty';
-                statusEl.style.color = '#ef4444';
-                return;
             }
-            
-            if (!/^[a-z0-9-]+$/.test(newSlug)) {
-                statusEl.textContent = 'Only lowercase letters, numbers, and hyphens allowed';
-                statusEl.style.color = '#ef4444';
-                return;
-            }
-            
-            statusEl.textContent = 'Updating...';
-            statusEl.style.color = '#64748b';
-            
-            apiCall('/admin/api/tas/' + taId, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ slug: newSlug })
-            })
-            .then(result => {
-                statusEl.textContent = 'URL updated successfully!';
-                statusEl.style.color = '#22c55e';
-                showTADetail(taId);
-            })
-            .catch(err => {
-                if (err.message === 'Session expired') return;
-                statusEl.textContent = err.message || 'Failed to update URL';
-                statusEl.style.color = '#ef4444';
-            });
         }
         
         loadTAs();
+        loadInstitutions();
     </script>
 </body>
 </html>
