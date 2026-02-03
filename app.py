@@ -749,6 +749,36 @@ def resume_interrupted_indexing_jobs():
     Uses atomic status update to prevent multiple workers from resuming the same job."""
     with app.app_context():
         try:
+            orphaned_tas = TeachingAssistant.query.filter(
+                TeachingAssistant.indexing_status == 'running'
+            ).all()
+            
+            for ta in orphaned_tas:
+                active_job = IndexingJob.query.filter(
+                    IndexingJob.ta_id == ta.id,
+                    IndexingJob.status.in_(['running', 'resuming', 'pending'])
+                ).first()
+                
+                if not active_job:
+                    logger.info(f"[{ta.id}] Found orphaned TA with indexing_status='running' but no active job - creating resume job...")
+                    new_job = IndexingJob(
+                        ta_id=ta.id,
+                        status='running',
+                        docs_total=ta.document_count,
+                        docs_processed=0,
+                        chunks_created=0
+                    )
+                    db.session.add(new_job)
+                    db.session.commit()
+                    
+                    thread = threading.Thread(
+                        target=run_indexing_task, 
+                        args=(ta.id, new_job.id, True)
+                    )
+                    thread.daemon = True
+                    thread.start()
+                    logger.info(f"[{ta.id}] Started resume job {new_job.id} for orphaned TA")
+            
             interrupted_jobs = IndexingJob.query.filter(
                 IndexingJob.status.in_(['running', 'resuming'])
             ).all()
