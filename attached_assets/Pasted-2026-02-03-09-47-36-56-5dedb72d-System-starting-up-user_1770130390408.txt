@@ -1,0 +1,84 @@
+2026-02-03 09:47:36.56
+5dedb72d
+System
+starting up user application
+2026-02-03 09:47:36.56
+5dedb72d
+System
+forwarding local port 5000 to external port 80 (mapped as 1104)
+2026-02-03 09:47:36.56
+5dedb72d
+System
+metasidecar: loaded enterprise status from environment is_enterprise=false
+2026-02-03 09:47:37.46
+5dedb72d
+User
+[2026-02-03 14:47:37 +0000] [27] [INFO] Starting gunicorn 23.0.0
+2026-02-03 09:47:37.46
+5dedb72d
+User
+[2026-02-03 14:47:37 +0000] [27] [INFO] Listening at: http://0.0.0.0:5000 (27)
+2026-02-03 09:47:37.46
+5dedb72d
+User
+[2026-02-03 14:47:37 +0000] [27] [INFO] Using worker: sync
+2026-02-03 09:47:37.46
+5dedb72d
+User
+[2026-02-03 14:47:37 +0000] [32] [INFO] Booting worker with pid: 32
+2026-02-03 09:47:37.52
+5dedb72d
+User
+[2026-02-03 14:47:37 +0000] [33] [INFO] Booting worker with pid: 33
+2026-02-03 09:47:48.65
+5dedb72d
+User
+2026-02-03 14:47:48,258 | INFO | [9DZjr-Y39RZGJ4Uj] Job 1 is actively being resumed by another worker, skipping
+2026-02-03 09:47:50.01
+5dedb72d
+User
+2026-02-03 14:47:50,019 | INFO | [9DZjr-Y39RZGJ4Uj] Job 1 is actively being resumed by another worker, skipping
+2026-02-03 09:47:50.01
+5dedb72d
+User
+2026-02-03 14:47:50,019 | INFO | [9DZjr-Y39RZGJ4Uj] Job 1 is actively being resumed by another worker, skipping
+2026-02-03 09:51:45.35
+5dedb72d
+User
+2026-02-03 14:51:45,358 | WARNING | [9DZjr-Y39RZGJ4Uj] Job 1 is stale (no update in 5+ min), marking as failed
+2026-02-03 09:51:45.74
+5dedb72d
+User
+2026-02-03 14:51:45,743 | INFO | [9DZjr-Y39RZGJ4Uj] Marked stale job 1 and TA as failed
+2026-02-03 09:51:45.92
+5dedb72d
+User
+2026-02-03 14:51:45,920 | INFO | [9DZjr-Y39RZGJ4Uj] Marked stale job 1 and TA as failed
+2026-02-03 09:51:55.41
+92ccabed
+System
+system: received signal terminated
+2026-02-03 09:51:55.41
+92ccabed
+User
+[2026-02-03 14:51:55 +0000] [28] [INFO] Handling signal: term
+2026-02-03 09:51:55.41
+92ccabed
+User
+[2026-02-03 14:51:55 +0000] [33] [INFO] Worker exiting (pid: 33)
+2026-02-03 09:51:55.41
+92ccabed
+User
+[2026-02-03 14:51:55 +0000] [34] [INFO] Worker exiting (pid: 34)
+2026-02-03 09:51:55.71
+92ccabed
+User
+[2026-02-03 14:51:55 +0000] [28] [INFO] Shutting down: Master
+2026-02-03 09:51:55.75
+92ccabed
+System
+main done, exiting
+2026-02-03 09:51:55.75
+92ccabed
+System
+command finished successfully with exit code 0

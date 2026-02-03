@@ -1,0 +1,152 @@
+2026-02-03 12:10:08.40
+5dedb72d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 1511, in wsgi_app
+2026-02-03 12:10:08.40
+5dedb72d
+User
+2026-02-03 17:10:08,404 | ERROR | Exception on /admin/api/institutions [POST]
+2026-02-03 12:10:08.40
+5dedb72d
+User
+rv = self.dispatch_request()
+2026-02-03 12:10:08.40
+5dedb72d
+User
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-03 12:10:08.40
+5dedb72d
+User
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-03 12:10:08.40
+5dedb72d
+User
+return f(*args, **kwargs)
+2026-02-03 12:10:08.40
+5dedb72d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 917, in full_dispatch_request
+2026-02-03 12:10:08.40
+5dedb72d
+User
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-03 12:10:08.40
+5dedb72d
+User
+^^^^^^^^^^^^^^^^^^
+2026-02-03 12:10:08.40
+5dedb72d
+User
+rv = self.handle_user_exception(e)
+2026-02-03 12:10:08.40
+5dedb72d
+User
+response = self.full_dispatch_request()
+2026-02-03 12:10:08.40
+5dedb72d
+User
+return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args) # type: ignore[no-any-return]
+2026-02-03 12:10:08.40
+5dedb72d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 902, in dispatch_request
+2026-02-03 12:10:08.40
+5dedb72d
+User
+AttributeError: 'NoneType' object has no attribute 'strip'
+2026-02-03 12:10:08.40
+5dedb72d
+User
+^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-03 12:10:08.40
+5dedb72d
+User
+File "/home/runner/workspace/app.py", line 168, in decorated_function
+2026-02-03 12:10:08.40
+5dedb72d
+User
+File "/home/runner/workspace/app.py", line 202, in create_institution
+2026-02-03 12:10:08.40
+5dedb72d
+User
+Traceback (most recent call last):
+2026-02-03 12:10:08.40
+5dedb72d
+User
+notes=data.get("notes", "").strip() or None
+2026-02-03 12:10:08.40
+5dedb72d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 919, in full_dispatch_request
+2026-02-03 12:10:08.40
+5dedb72d
+User
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-03 12:10:08.40
+5dedb72d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 1511, in wsgi_app
+2026-02-03 12:10:08.40
+5dedb72d
+User
+2026-02-03 17:10:08,404 | ERROR | Exception on /admin/api/institutions [POST]
+2026-02-03 12:10:08.40
+5dedb72d
+User
+rv = self.dispatch_request()
+2026-02-03 12:10:08.40
+5dedb72d
+User
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-03 12:10:08.40
+5dedb72d
+User
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-03 12:10:08.40
+5dedb72d
+User
+return f(*args, **kwargs)
+2026-02-03 12:10:08.40
+5dedb72d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 917, in full_dispatch_request
+2026-02-03 12:10:08.40
+5dedb72d
+User
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-03 12:10:08.40
+5dedb72d
+User
+^^^^^^^^^^^^^^^^^^
+2026-02-03 12:10:08.40
+5dedb72d
+User
+rv = self.handle_user_exception(e)
+2026-02-03 12:10:08.40
+5dedb72d
+User
+response = self.full_dispatch_request()
+2026-02-03 12:10:08.40
+5dedb72d
+User
+return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args) # type: ignore[no-any-return]
+2026-02-03 12:10:08.40
+5dedb72d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 902, in dispatch_request
+2026-02-03 12:10:08.40
+5dedb72d
+User
+AttributeError: 'NoneType' object has no attribute 'strip'
+2026-02-03 12:10:08.40
+5dedb72d
+User
+^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-03 12:10:08.40
+5dedb72d
+User
+File "/home/runner/workspace/app.py", line 168, in decorated_function
+2026-02-03 12:10:08.40
+5dedb72d
+User
+File "/home/runner/workspace/app.py", line 202, in create_institution
