@@ -2,7 +2,8 @@ import os
 import logging
 import secrets
 import threading
-from datetime import datetime
+import time
+from datetime import datetime, timedelta
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for, send_from_directory, Response, stream_with_context
 from config import Config
 from models import db, TeachingAssistant, Document, ChatSession, ChatMessage, DocumentChunk, Institution, IndexingJob
@@ -647,6 +648,7 @@ def update_indexing_progress(ta_id, progress, job_id=None, docs_processed=None, 
                     job.docs_processed = docs_processed
                 if chunks_created is not None:
                     job.chunks_created = chunks_created
+                job.updated_at = datetime.utcnow()
                 db.session.commit()
 
 def run_indexing_task(ta_id, job_id=None, is_resume=False):
@@ -1191,9 +1193,42 @@ def chat_stream_api(slug):
         }
     )
 
+def check_stale_indexing_jobs():
+    """Periodically check for stale indexing jobs and mark them as failed.
+    Runs every 30 seconds to detect jobs that haven't updated in 5+ minutes."""
+    while True:
+        try:
+            time.sleep(30)
+            with app.app_context():
+                stale_threshold = datetime.utcnow() - timedelta(minutes=5)
+                
+                stale_jobs = IndexingJob.query.filter(
+                    IndexingJob.status.in_(['running', 'resuming']),
+                    IndexingJob.updated_at < stale_threshold
+                ).all()
+                
+                for job in stale_jobs:
+                    logger.warning(f"[{job.ta_id}] Job {job.id} is stale (no update in 5+ min), marking as failed")
+                    job.status = 'failed'
+                    job.error_message = 'Job timed out - no progress for 5+ minutes'
+                    
+                    ta = TeachingAssistant.query.get(job.ta_id)
+                    if ta:
+                        ta.indexing_status = 'failed'
+                        ta.indexing_error = 'Job timed out - no progress for 5+ minutes'
+                    
+                    db.session.commit()
+                    logger.info(f"[{job.ta_id}] Marked stale job {job.id} and TA as failed")
+                    
+        except Exception as e:
+            logger.error(f"Error in stale job check: {e}")
+
 with app.app_context():
     db.create_all()
     threading.Timer(2.0, resume_interrupted_indexing_jobs).start()
+    
+    stale_checker = threading.Thread(target=check_stale_indexing_jobs, daemon=True)
+    stale_checker.start()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
