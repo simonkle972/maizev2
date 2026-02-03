@@ -209,7 +209,7 @@
             background: var(--card-bg);
             border-radius: 1rem;
             width: 100%;
-            max-width: 700px;
+            max-width: 950px;
             max-height: 90vh;
             overflow-y: auto;
             position: relative;
@@ -260,6 +260,7 @@
             width: 100%;
             border-collapse: collapse;
             margin-top: 12px;
+            table-layout: fixed;
         }
         .doc-table th, .doc-table td {
             padding: 10px 12px;
@@ -272,6 +273,11 @@
             font-size: 13px;
             color: #374151;
         }
+        .doc-table th:nth-child(1) { width: 28%; }
+        .doc-table th:nth-child(2) { width: 12%; }
+        .doc-table th:nth-child(3) { width: 8%; }
+        .doc-table th:nth-child(4) { width: 38%; }
+        .doc-table th:nth-child(5) { width: 14%; }
         .doc-table input, .doc-table select {
             width: 100%;
             padding: 6px 10px;
