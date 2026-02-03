@@ -199,7 +199,7 @@ def create_institution():
     inst = Institution(
         name=name,
         customer_id=customer_id,
-        notes=data.get("notes", "").strip() or None
+        notes=(data.get("notes") or "").strip() or None
     )
     
     db.session.add(inst)
