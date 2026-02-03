@@ -761,12 +761,16 @@ def resume_interrupted_indexing_jobs():
                 
                 if not active_job:
                     logger.info(f"[{ta.id}] Found orphaned TA with indexing_status='running' but no active job - creating resume job...")
+                    now = datetime.utcnow()
                     new_job = IndexingJob(
                         ta_id=ta.id,
-                        status='running',
-                        docs_total=ta.document_count,
+                        status='resuming',
+                        started_at=now,
+                        total_docs=ta.document_count,
                         docs_processed=0,
-                        chunks_created=0
+                        chunks_created=0,
+                        created_at=now,
+                        updated_at=now
                     )
                     db.session.add(new_job)
                     db.session.commit()
