@@ -1069,21 +1069,23 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
     diagnostics["followup_detected"] = followup_info["is_followup"]
     diagnostics["followup_type"] = followup_info["followup_type"]
     
-    # PATIENCE SYSTEM: Track answer attempts before retrieval
-    # This runs for ALL answer submissions, not just cached ones
-    if followup_info["followup_type"] == "answer_submission" and session_context:
+    # CONVERSATION-BASED ATTEMPT TRACKING
+    # Instead of relying on regex to detect answer submissions, count student exchanges
+    # in conversation history as a proxy for how many attempts have been made.
+    # The LLM itself will determine if the student is submitting an answer.
+    if session_context and conversation_history:
         problem_key = session_context.get("problem_reference", "unknown_problem")
         attempt_counts = session_context.get("attempt_counts", {})
         
-        # Increment attempt count for this problem
-        current_count = attempt_counts.get(problem_key, 0) + 1
-        attempt_counts[problem_key] = current_count
+        # Count student messages in conversation history as exchange count
+        student_messages = [m for m in conversation_history if m.get("role") == "user"]
+        exchange_count = len(student_messages)
         
-        diagnostics["attempt_count"] = current_count
+        attempt_counts[problem_key] = exchange_count
+        diagnostics["attempt_count"] = exchange_count
         diagnostics["current_problem_key"] = problem_key
-        logger.info(f"[{ta_id}] Answer attempt #{current_count} for problem '{problem_key}'")
+        logger.info(f"[{ta_id}] Conversation exchange #{exchange_count} for problem '{problem_key}'")
         
-        # Update session cache with new attempt count (will be saved later if cache is updated)
         session_context["attempt_counts"] = attempt_counts
     
     # If follow-up detected, enrich the query with context from history
@@ -1112,10 +1114,11 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         else:
             logger.info(f"[{ta_id}] Follow-up detected but no useful context in history, skipping enrichment")
     
-    # USE SESSION CACHE FOR FOLLOW-UPS
-    # If this is a follow-up AND we have cached document context, use it directly
-    # This prevents "lost context" issues when validating student answers
-    if followup_info["is_followup"] and session_context and session_context.get("document_content"):
+    # USE SESSION CACHE FOR CONVERSATIONAL CONTINUITY
+    # When there's cached document context AND conversation history, use the cache directly.
+    # This is NOT gated on regex follow-up detection - the LLM naturally understands
+    # conversational context (answer submissions, clarifications, etc.) without rigid patterns.
+    if session_context and session_context.get("document_content") and conversation_history:
         # Check if user is asking about something new (topic switch detection)
         # Look for explicit new problem/document references that differ from cached context
         query_lower = query.lower()
@@ -1138,46 +1141,26 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         
         is_topic_switch = False
         
-        # For ANSWER SUBMISSIONS, be very lenient - don't switch unless explicitly referencing a DIFFERENT document type
-        # The student is just referring back to the problem they're answering
-        if followup_info["followup_type"] == "answer_submission":
-            # Only consider it a topic switch if they mention a different document type (not just a problem number)
-            if doc_match:
-                # Check if the document type/number is different from what's cached
-                cached_doc = session_context.get("document_filename", "").lower()
-                new_doc_ref = doc_match.group(0)
-                new_doc_num = doc_match.group(2) if doc_match.group(2) else ""
-                # Extract number from cached filename
-                cached_doc_num = re.search(r'(\d+)', cached_doc)
-                cached_doc_num = cached_doc_num.group(1) if cached_doc_num else ""
-                
-                if new_doc_num and cached_doc_num and new_doc_num != cached_doc_num:
-                    is_topic_switch = True
-                    logger.info(f"[{ta_id}] Topic switch (answer submission): cached doc num='{cached_doc_num}', new='{new_doc_num}'")
-            # For answer submissions, problem reference (like "for question 8") is NOT a topic switch
-            # The student is just clarifying which problem their answer is for
-            if problem_match and not is_topic_switch:
-                logger.info(f"[{ta_id}] Answer submission with problem reference - NOT a topic switch")
-        else:
-            # For non-answer follow-ups, use the existing logic but compare normalized numbers
-            if problem_match:
-                new_problem_num = extract_problem_number(problem_match.group(0))
-                cached_problem_num = extract_problem_number(cached_problem)
-                
-                # Only switch if the numbers are explicitly different
-                if new_problem_num and cached_problem_num and new_problem_num != cached_problem_num:
-                    is_topic_switch = True
-                    logger.info(f"[{ta_id}] Topic switch: cached problem='{cached_problem_num}', new='{new_problem_num}'")
-            elif doc_match:
-                # Mentioning a specific document type - check if it's a different document
-                cached_doc = session_context.get("document_filename", "").lower()
-                new_doc_num = doc_match.group(2) if doc_match.group(2) else ""
-                cached_doc_num_match = re.search(r'(\d+)', cached_doc)
-                cached_doc_num = cached_doc_num_match.group(1) if cached_doc_num_match else ""
-                
-                if new_doc_num and cached_doc_num and new_doc_num != cached_doc_num:
-                    is_topic_switch = True
-                    logger.info(f"[{ta_id}] Topic switch: cached doc='{cached_doc_num}', new='{new_doc_num}'")
+        # Topic switch detection: only switch if the student explicitly references a DIFFERENT
+        # problem number or document. Short conversational messages (answers, clarifications)
+        # should NOT trigger a switch.
+        if problem_match:
+            new_problem_num = extract_problem_number(problem_match.group(0))
+            cached_problem_num = extract_problem_number(cached_problem)
+            
+            if new_problem_num and cached_problem_num and new_problem_num != cached_problem_num:
+                is_topic_switch = True
+                logger.info(f"[{ta_id}] Topic switch: cached problem='{cached_problem_num}', new='{new_problem_num}'")
+        
+        if not is_topic_switch and doc_match:
+            cached_doc = session_context.get("document_filename", "").lower()
+            new_doc_num = doc_match.group(2) if doc_match.group(2) else ""
+            cached_doc_num_match = re.search(r'(\d+)', cached_doc)
+            cached_doc_num = cached_doc_num_match.group(1) if cached_doc_num_match else ""
+            
+            if new_doc_num and cached_doc_num and new_doc_num != cached_doc_num:
+                is_topic_switch = True
+                logger.info(f"[{ta_id}] Topic switch: cached doc='{cached_doc_num}', new='{new_doc_num}'")
         
         if not is_topic_switch:
             # Use cached context - no need to re-search
@@ -1199,25 +1182,30 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                 except Exception as e:
                     logger.warning(f"[{ta_id}] Failed to save attempt count: {e}")
             
-            # For ANSWER SUBMISSIONS: Also fetch the solution document for verification
-            # This allows the LLM to give definitive correct/incorrect feedback
+            # Fetch solution document for answer validation when there's enough conversation
+            # context (2+ student messages means at least one Q&A exchange has occurred,
+            # so the student has had a chance to attempt the problem).
+            # This avoids exposing solution content on the very first help request.
             combined_content = session_context.get("document_content", "")
             solution_added = False
             
-            if followup_info["followup_type"] == "answer_submission":
+            student_messages = [m for m in conversation_history if m.get("role") == "user"]
+            if len(student_messages) >= 2:
                 problem_doc_name = session_context.get("document_filename", "")
                 solution_text, solution_filename, solution_tokens = find_solution_document(problem_doc_name, ta_id)
                 
                 if solution_text:
-                    logger.info(f"[{ta_id}] Adding solution document '{solution_filename}' for answer verification")
+                    logger.info(f"[{ta_id}] Including solution document '{solution_filename}' for answer verification (exchange #{len(student_messages)})")
                     combined_content = f"=== PROBLEM DOCUMENT: {problem_doc_name} ===\n\n{combined_content}\n\n=== SOLUTION DOCUMENT (for answer verification): {solution_filename} ===\n\n{solution_text}"
                     diagnostics["solution_doc_added"] = True
                     diagnostics["solution_doc_filename"] = solution_filename
                     solution_added = True
                 else:
-                    logger.info(f"[{ta_id}] No solution document found - LLM will calculate answer from problem context")
+                    logger.info(f"[{ta_id}] No solution document found - LLM will use problem context only")
                     diagnostics["solution_doc_added"] = False
-                    diagnostics["llm_calculation_mode"] = True
+            else:
+                logger.info(f"[{ta_id}] Early conversation (exchange #{len(student_messages)}) - solution doc not yet included")
+                diagnostics["solution_doc_added"] = False
             
             cached_chunk = {
                 "text": combined_content,
