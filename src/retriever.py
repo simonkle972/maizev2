@@ -1078,7 +1078,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         attempt_counts = session_context.get("attempt_counts", {})
         
         # Count student messages in conversation history as exchange count
-        student_messages = [m for m in conversation_history if m.get("role") == "user"]
+        student_messages = [m for m in conversation_history if getattr(m, 'role', None) == "user" or (isinstance(m, dict) and m.get("role") == "user")]
         exchange_count = len(student_messages)
         
         attempt_counts[problem_key] = exchange_count
@@ -1189,7 +1189,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
             combined_content = session_context.get("document_content", "")
             solution_added = False
             
-            student_messages = [m for m in conversation_history if m.get("role") == "user"]
+            student_messages = [m for m in conversation_history if getattr(m, 'role', None) == "user" or (isinstance(m, dict) and m.get("role") == "user")]
             if len(student_messages) >= 2:
                 problem_doc_name = session_context.get("document_filename", "")
                 solution_text, solution_filename, solution_tokens = find_solution_document(problem_doc_name, ta_id)
