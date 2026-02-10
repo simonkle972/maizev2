@@ -214,7 +214,107 @@ def extract_pdf(file_path: str) -> tuple:
     if text and len(text.strip()) > 100:
         return text, page_count
     
+    logger.info("Text extraction insufficient - attempting vision-based extraction for image/handwritten PDF...")
+    text, page_count = _extract_pdf_vision(file_path)
+    if text and len(text.strip()) > 50:
+        return text, page_count
+    
     return "", 0
+
+
+def _extract_pdf_vision(file_path: str) -> tuple:
+    """
+    Extract content from image-heavy/handwritten PDFs using GPT-4o vision.
+    Converts each page to an image and sends to GPT-4o for transcription.
+    Returns (text, page_count).
+    """
+    try:
+        import base64
+        from io import BytesIO
+        from pdf2image import convert_from_path
+        from openai import OpenAI
+
+        client = OpenAI(api_key=Config.OPENAI_API_KEY)
+
+        images = convert_from_path(file_path, dpi=200, fmt='jpeg')
+        page_count = len(images)
+        logger.info(f"Vision extraction: converted {page_count} pages to images")
+
+        if page_count == 0:
+            return "", 0
+
+        max_pages = 50
+        if page_count > max_pages:
+            logger.warning(f"Vision extraction: PDF has {page_count} pages, limiting to {max_pages}")
+            images = images[:max_pages]
+
+        text_parts = []
+        for page_num, img in enumerate(images, 1):
+            try:
+                img_buffer = BytesIO()
+                img.save(img_buffer, format='JPEG', quality=85)
+                img_base64 = base64.b64encode(img_buffer.getvalue()).decode()
+                img_size_kb = len(img_buffer.getvalue()) / 1024
+                logger.info(f"Vision extraction: processing page {page_num}/{len(images)} ({img_size_kb:.0f}KB)")
+
+                response = client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[{
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": (
+                                    f"This is page {page_num} of a lecture document. "
+                                    "Transcribe ALL visible content including:\n"
+                                    "- Handwritten text (preserve exact wording)\n"
+                                    "- Printed text\n"
+                                    "- Mathematical equations and formulas (use LaTeX notation)\n"
+                                    "- Diagrams and illustrations (describe them in [DIAGRAM: ...] tags)\n"
+                                    "- Tables (preserve structure)\n"
+                                    "- Labels, annotations, and margin notes\n\n"
+                                    "For mathematical content, use LaTeX notation like $x^2$ or $$\\int f(x) dx$$.\n"
+                                    "Preserve the logical flow and structure of the content. "
+                                    "If text is unclear, provide your best interpretation with [unclear] markers."
+                                )
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{img_base64}",
+                                    "detail": "high"
+                                }
+                            }
+                        ]
+                    }],
+                    max_tokens=4000,
+                    temperature=0.1
+                )
+
+                page_text = response.choices[0].message.content
+                if page_text and page_text.strip():
+                    text_parts.append(f"--- Page {page_num} ---\n{page_text.strip()}")
+                    logger.info(f"Vision extraction: page {page_num} yielded {len(page_text)} chars")
+                else:
+                    logger.warning(f"Vision extraction: page {page_num} returned empty content")
+
+            except Exception as page_e:
+                logger.warning(f"Vision extraction failed on page {page_num}: {page_e}")
+                continue
+
+        if not text_parts:
+            return "", 0
+
+        full_text = "\n\n".join(text_parts)
+        logger.info(f"Vision extraction complete: {len(full_text)} chars from {len(text_parts)}/{page_count} pages")
+        return full_text, page_count
+
+    except ImportError as e:
+        logger.warning(f"Vision extraction unavailable - missing dependency: {e}")
+        return "", 0
+    except Exception as e:
+        logger.error(f"Vision extraction failed: {e}")
+        return "", 0
 
 def _extract_pdf_pdfplumber(file_path: str) -> tuple:
     """Extract PDF text using pdfplumber with total time limit. Returns (text, page_count)."""
