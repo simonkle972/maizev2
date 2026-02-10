@@ -1731,6 +1731,7 @@ dependencies = [
     { name = "openai" },
     { name = "openpyxl" },
     { name = "pandas" },
+    { name = "pdf2image" },
     { name = "pdfplumber" },
     { name = "pgvector" },
     { name = "psycopg2-binary" },
@@ -1756,6 +1757,7 @@ requires-dist = [
     { name = "openai", specifier = ">=1.0.0" },
     { name = "openpyxl", specifier = ">=3.1.0" },
     { name = "pandas", specifier = ">=2.0.0" },
+    { name = "pdf2image", specifier = ">=1.17.0" },
     { name = "pdfplumber", specifier = ">=0.11.9" },
     { name = "pgvector", specifier = ">=0.4.2" },
     { name = "psycopg2-binary", specifier = ">=2.9.0" },
@@ -2517,6 +2519,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/24/71/2462530f2e70991c1d19c03423a0bc1cdde8e49a415762edaebe7c19f9a3/paragraphs-1.0.1.tar.gz", hash = "sha256:ad393f2e99432740f36c115280aa454c53c8048e6a2cda0b81df4effc8043a60", size = 7045, upload-time = "2024-08-11T18:15:57.551Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/18/79/806f22675c50f9cc827376756186c8601ef52a9cf08d2c7b80964e1daba2/paragraphs-1.0.1-py3-none-any.whl", hash = "sha256:9a189d8dfc6241b5caa9b3ae730ee6ccce53e483d3b45183d13f657f7d0d1b35", size = 5139, upload-time = "2024-08-11T18:15:56.188Z" },
+]
+
+[[package]]
+name = "pdf2image"
+version = "1.17.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pillow" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/00/d8/b280f01045555dc257b8153c00dee3bc75830f91a744cd5f84ef3a0a64b1/pdf2image-1.17.0.tar.gz", hash = "sha256:eaa959bc116b420dd7ec415fcae49b98100dda3dd18cd2fdfa86d09f112f6d57", size = 12811, upload-time = "2024-01-07T20:33:01.965Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/62/33/61766ae033518957f877ab246f87ca30a85b778ebaad65b7f74fa7e52988/pdf2image-1.17.0-py3-none-any.whl", hash = "sha256:ecdd58d7afb810dffe21ef2b1bbc057ef434dabbac6c33778a38a3f7744a27e2", size = 11618, upload-time = "2024-01-07T20:32:59.957Z" },
 ]
 
 [[package]]

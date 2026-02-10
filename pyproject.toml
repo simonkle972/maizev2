@@ -25,4 +25,5 @@ dependencies = [
     "google-auth>=2.47.0",
     "pdfplumber>=0.11.9",
     "docx2python>=3.5.0",
+    "pdf2image>=1.17.0",
 ]
