@@ -291,11 +291,30 @@ def generate_response(
         response = client.chat.completions.create(
             model=Config.LLM_MODEL,
             messages=messages,
-            max_completion_tokens=1500,
+            max_completion_tokens=Config.LLM_MAX_COMPLETION_TOKENS,
             reasoning_effort=Config.LLM_REASONING_HIGH
         )
         
-        return response.choices[0].message.content
+        content = response.choices[0].message.content
+        finish_reason = response.choices[0].finish_reason
+        usage = getattr(response, 'usage', None)
+        if usage:
+            logger.info(f"LLM usage: completion_tokens={usage.completion_tokens}, total_tokens={usage.total_tokens}, finish_reason={finish_reason}")
+        
+        if not content or not content.strip():
+            logger.warning(f"Empty LLM response. finish_reason={finish_reason}, usage={usage}. Retrying with medium reasoning.")
+            response = client.chat.completions.create(
+                model=Config.LLM_MODEL,
+                messages=messages,
+                max_completion_tokens=Config.LLM_MAX_COMPLETION_TOKENS,
+                reasoning_effort=Config.LLM_REASONING_MEDIUM
+            )
+            content = response.choices[0].message.content
+            if not content or not content.strip():
+                logger.error(f"Empty LLM response on retry. finish_reason={response.choices[0].finish_reason}")
+                return "I'm having trouble formulating a response right now. Please try sending your question again."
+        
+        return content
     
     except Exception as e:
         logger.error(f"Response generation failed: {e}")
@@ -324,14 +343,31 @@ def generate_response_stream(
         stream = client.chat.completions.create(
             model=Config.LLM_MODEL,
             messages=messages,
-            max_completion_tokens=1500,
+            max_completion_tokens=Config.LLM_MAX_COMPLETION_TOKENS,
             stream=True,
             reasoning_effort=Config.LLM_REASONING_HIGH
         )
         
+        has_content = False
         for chunk in stream:
             if chunk.choices[0].delta.content:
+                has_content = True
                 yield chunk.choices[0].delta.content
+        
+        if not has_content:
+            logger.warning("Streaming produced zero content tokens. Falling back to non-streaming retry.")
+            response = OpenAI(api_key=Config.OPENAI_API_KEY).chat.completions.create(
+                model=Config.LLM_MODEL,
+                messages=messages,
+                max_completion_tokens=Config.LLM_MAX_COMPLETION_TOKENS,
+                reasoning_effort=Config.LLM_REASONING_MEDIUM
+            )
+            fallback = response.choices[0].message.content
+            if fallback and fallback.strip():
+                yield fallback
+            else:
+                logger.error("Fallback also returned empty content.")
+                yield "I'm having trouble formulating a response right now. Please try sending your question again."
     
     except Exception as e:
         logger.error(f"Response streaming failed: {e}")

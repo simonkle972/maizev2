@@ -49,6 +49,6 @@ Key architectural decisions include:
 - **Demo Requests**: Submitted via /api/demo-request, emails sent to simon.kleffner@yale.edu if SMTP configured
 
 ## External Dependencies
-- **OpenAI API**: Used for generating embeddings (`text-embedding-3-small`) and all Large Language Model (LLM) operations (`GPT-5.2 Thinking` with reasoning_effort=high for student-facing responses, medium for metadata extraction and reranking).
+- **OpenAI API**: Used for generating embeddings (`text-embedding-3-small`) and all Large Language Model (LLM) operations (`GPT-5.2 Thinking` with reasoning_effort=high for student-facing responses, medium for metadata extraction and reranking). max_completion_tokens is set to 16000 (Config.LLM_MAX_COMPLETION_TOKENS) to ensure reasoning tokens don't consume the entire budget, leaving zero visible output. Both streaming and non-streaming paths include empty-response detection with automatic retry at medium reasoning effort.
 - **PostgreSQL**: Primary database for all persistent data, including SQLAlchemy models and vector embeddings (via `pgvector` extension).
 - **Google Sheets API**: Used for logging QA and indexing diagnostics.
