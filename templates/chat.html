@@ -132,8 +132,9 @@
             
             messageDiv.innerHTML = html;
             messagesEl.appendChild(messageDiv);
-            messagesEl.scrollTop = messagesEl.scrollHeight;
             renderLatex(messageDiv);
+            const chatMain = document.querySelector('.chat-main');
+            chatMain.scrollTop = chatMain.scrollHeight;
         }
         
         function preprocessLatex(text) {
@@ -324,7 +325,8 @@
                 </div>
             `;
             messagesEl.appendChild(messageDiv);
-            messagesEl.scrollTop = messagesEl.scrollHeight;
+            const chatMain = document.querySelector('.chat-main');
+            chatMain.scrollTop = chatMain.scrollHeight;
             return messageDiv;
         }
         
@@ -346,8 +348,8 @@
             const contentEl = document.getElementById('streaming-content');
             if (contentEl) {
                 contentEl.textContent += token;
-                const messagesEl = document.getElementById('messages');
-                messagesEl.scrollTop = messagesEl.scrollHeight;
+                const chatMain = document.querySelector('.chat-main');
+                chatMain.scrollTop = chatMain.scrollHeight;
             }
         }
         
@@ -378,8 +380,8 @@
             streamingMsg.innerHTML = html;
             renderLatex(streamingMsg);
             requestAnimationFrame(() => {
-                const messagesEl = document.getElementById('messages');
-                messagesEl.scrollTop = messagesEl.scrollHeight;
+                const chatMain = document.querySelector('.chat-main');
+                chatMain.scrollTop = chatMain.scrollHeight;
             });
         }
         
