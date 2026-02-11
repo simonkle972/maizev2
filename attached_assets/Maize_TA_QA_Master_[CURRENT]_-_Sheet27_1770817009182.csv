@@ -1,0 +1,52 @@
+timestamp,ta_id,ta_slug,ta_name,course_name,session_id,query,answer,sources,chunk_count,latency_ms,retrieval_latency_ms,generation_latency_ms,token_count,total_chunks_in_ta,filters_applied,filter_match_count,retrieval_method,is_conceptual,score_top1,score_top8,score_mean,score_spread,chunk_scores,chunk_sources_detail,rerank_applied,rerank_method,rerank_latency_ms,llm_score_top1,llm_score_top8,vector_score_top1,top_reasons,pre_rerank_candidates,hybrid_fallback_triggered,hybrid_fallback_reason,hybrid_doc_filename,hybrid_doc_tokens,hybrid_doc_id_method,validation_performed,validation_passed,validation_expected_ref,validation_matches_found
+2026-02-11T13:25:30.735158Z,9DZjr-Y39RZGJ4Uj,mgt404,MGT 404 Economics & Game Theory,MGT 404 Economics & Game Theory,BWhN6_-tdIqZ2dGV6u052A,I need help with question d) from section 1 in the 2024 final,,MGT_404 2024_final_exam (1).pdf,1,34299,4757,24119,0,1048,,0,early_hybrid_full_doc,False,0.0,0.0,0.0,0.0,[],[],False,,,,,,[],[],True,early_routing_specific_ref_1d,MGT_404 2024_final_exam (1).pdf,3318,filename_year_match,False,None,1d,0
+2026-02-11T13:26:11.142028Z,9DZjr-Y39RZGJ4Uj,mgt404,MGT 404 Economics & Game Theory,MGT 404 Economics & Game Theory,BWhN6_-tdIqZ2dGV6u052A,I need help with question d) from section 1 in the 2024 final,"Section I(d) is a SCREENING problem (second degree price discrimination): Basic is meant for beginners, Elite for hardcore.
+
+Let the hardcore trainer’s total value for 4 classes be $V_H(4)$ and for 8 classes be $V_H(8)$. Then their surpluses are
+
+$$
+U_H(Basic)=V_H(4)-79
+$$
+
+$$
+U_H(Elite)=V_H(8)-119
+$$
+
+“Orange Theory is pricing OPTIMALLY” typically means the hardcore type’s INCENTIVE COMPATIBILITY constraint binds: Orange Theory sets the Elite price as high as possible while still making hardcore choose Elite over downgrading to Basic. If that constraint is binding, you can relate $U_H(Basic)$ directly to the given $U_H(Elite)=20$.
+
+Write down the hardcore IC condition and use $U_H(Elite)=20$ to solve for what $U_H(Basic)$ must be. What number do you get?",MGT_404 2024_final_exam (1).pdf,1,26025,2495,22380,114,1048,,0,early_hybrid_full_doc,False,0.0,0.0,0.0,0.0,[],[],False,,,,,,[],[],True,early_routing_specific_ref_1d,MGT_404 2024_final_exam (1).pdf,3318,filename_year_match,False,None,1d,0
+2026-02-11T13:29:23.598407Z,9DZjr-Y39RZGJ4Uj,mgt404,MGT 404 Economics & Game Theory,MGT 404 Economics & Game Theory,BWhN6_-tdIqZ2dGV6u052A,So the hardcore trainers need to be at least indifferent between plans to choose elite right?,,MGT_404 2024_final_exam (1).pdf,1,25852,2338,23162,0,0,,0,unfiltered,False,0.0,0.0,0.0,0.0,[],[],False,,,,,,[],[],True,session_cache,MGT_404 2024_final_exam (1).pdf,0,,False,None,,0
+2026-02-11T13:30:10.198086Z,CeSYshCJdGnXCUu5,mgt404,MGT 404 Economics & Game Theory,MGT 404 Economics & Game Theory,h6kh7oA-W2orY3K20SY8cQ,I need help with question d) from section 1 in the 2024 final,"Section I(d) asks: given hardcore trainers get surplus $25$ from the Elite plan, and Orange Theory is pricing OPTIMALLY with two types, what surplus would a hardcore trainer get from the Basic plan?
+
+Let a hardcore trainer’s total willingness to pay for $k$ classes be $V_H(k)$. Their consumer surplus from a plan is
+
+$$
+\text{Surplus} = V_H(k) - \text{Price}.
+$$
+
+You’re told for Elite (8 classes at $119$):
+
+$$
+V_H(8) - 119 = 25.
+$$
+
+Under optimal screening with a high type (hardcore) and low type (beginner), the high type’s INCENTIVE COMPATIBILITY constraint typically binds, meaning the hardcore trainer is indifferent between Elite and Basic:
+
+$$
+V_H(8) - 119 = V_H(4) - 79.
+$$
+
+Use the two equations above to solve for the hardcore trainer’s surplus on the Basic plan, $V_H(4) - 79$. What number do you get?",MGT_404 2024_final_exam_with_solutions (1).pdf,1,15562,2145,12545,138,1048,,0,early_hybrid_full_doc,False,0.0,0.0,0.0,0.0,[],[],False,,,,,,[],[],True,early_routing_specific_ref_1d,MGT_404 2024_final_exam_with_solutions (1).pdf,5342,filename_year_match,False,None,1d,0
+2026-02-11T13:31:11.605981Z,CeSYshCJdGnXCUu5,mgt404,MGT 404 Economics & Game Theory,MGT 404 Economics & Game Theory,h6kh7oA-W2orY3K20SY8cQ,So the hardcore trainers need to be at least indifferent between plans to choose elite right?,"For a hardcore trainer to choose Elite over Basic, you need the INCENTIVE COMPATIBILITY condition
+
+$$U_H(E) \ge U_H(B)$$
+
+where
+
+$$U_H(E)=V_H(8)-119,\quad U_H(B)=V_H(4)-79.$$
+
+“Pricing optimally” is what tells you whether it is strict or indifference: if $U_H(E) \gt U_H(B)$, then Orange Theory could raise the Elite fee a tiny bit, still keep hardcore on Elite, and increase profit. So in an optimum you typically expect the constraint to BIND:
+
+$$U_H(E)=U_H(B).$$
+
+You’re given $U_H(E)=25$. Use the binding condition to pin down $U_H(B)$ and report that value.",MGT_404 2024_final_exam_with_solutions (1).pdf,1,24974,1138,23790,83,0,,0,unfiltered,False,0.0,0.0,0.0,0.0,[],[],False,,,,,,[],[],True,session_cache,MGT_404 2024_final_exam_with_solutions (1).pdf,0,,False,None,,0
