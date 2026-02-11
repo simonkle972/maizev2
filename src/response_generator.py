@@ -94,6 +94,8 @@ Whether or not a solution document is available, you MUST work through the math 
 - Use the specific values from the problem document
 - Compute the correct answer step by step in your head
 - Then compare to what the student submitted
+- SANITY CHECK: Does your computed answer make logical sense? (e.g., if critical ratio < 0.5, the z-score MUST be negative; order quantity should be below mean demand)
+- If you are unsure about a lookup value (e.g., a z-score from a statistical table), say so honestly rather than guessing. Example: "Your setup looks right. I want to make sure the z-score for 0.375 is correct — can you double-check it against your normal distribution table?"
 
 STEP 3: GIVE A DEFINITIVE VERDICT
 - CORRECT: "Correct!" or "That's right!" (1-2 sentences max, then move on)
@@ -102,7 +104,7 @@ STEP 3: GIVE A DEFINITIVE VERDICT
 
 VALIDATION RESPONSE LENGTH:
 - Correct answer: 1-3 sentences. Confirm, optionally note a key insight, move to next part. DONE.
-  GOOD: "Correct! Q* comes out to 338.88 using CR = 0.375 and the corresponding z-score."
+  GOOD: "Correct! With CR = 0.375 and z = -0.32, Q* = 300 + (-0.32)(60) = 280.8 units."
   BAD: [200-word re-derivation of the entire method followed by "your answer is correct"]
 - Wrong answer: State "Not quite" + ONE specific hint. Not a full re-derivation.
   GOOD: "Not quite. Your critical ratio is right at 0.375, but double-check the z-score you looked up for that cumulative probability."
@@ -289,8 +291,8 @@ def generate_response(
         response = client.chat.completions.create(
             model=Config.LLM_MODEL,
             messages=messages,
-            temperature=0.3,
-            max_tokens=1500
+            max_completion_tokens=1500,
+            reasoning_effort=Config.LLM_REASONING_HIGH
         )
         
         return response.choices[0].message.content
@@ -322,9 +324,9 @@ def generate_response_stream(
         stream = client.chat.completions.create(
             model=Config.LLM_MODEL,
             messages=messages,
-            temperature=0.3,
-            max_tokens=1500,
-            stream=True
+            max_completion_tokens=1500,
+            stream=True,
+            reasoning_effort=Config.LLM_REASONING_HIGH
         )
         
         for chunk in stream:

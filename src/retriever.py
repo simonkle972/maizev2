@@ -457,11 +457,11 @@ Example: {{"scores": [{{"index": 0, "score": 8, "reason": "Contains problem 2f s
     try:
         client = get_openai_client()
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=Config.LLM_MODEL,
             messages=[{"role": "user", "content": prompt}],
-            temperature=0,
-            max_tokens=2000,
-            response_format={"type": "json_object"}
+            max_completion_tokens=2000,
+            response_format={"type": "json_object"},
+            reasoning_effort=Config.LLM_REASONING_MEDIUM
         )
         
         rerank_latency_ms = int((time.time() - rerank_start) * 1000)

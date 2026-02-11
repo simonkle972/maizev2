@@ -6,7 +6,9 @@ load_dotenv()
 class Config:
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
     EMBEDDING_MODEL = "text-embedding-3-small"
-    LLM_MODEL = "gpt-4o"
+    LLM_MODEL = "gpt-5.2"
+    LLM_REASONING_HIGH = "high"
+    LLM_REASONING_MEDIUM = "medium"
     
     ADMIN_SECRET_KEY = os.getenv("ADMIN_SECRET_KEY", "maize-admin-2024")
     ADMIN_USERNAME = os.getenv("admin_id", "")

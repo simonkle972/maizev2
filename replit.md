@@ -49,6 +49,6 @@ Key architectural decisions include:
 - **Demo Requests**: Submitted via /api/demo-request, emails sent to simon.kleffner@yale.edu if SMTP configured
 
 ## External Dependencies
-- **OpenAI API**: Used for generating embeddings (`text-embedding-3-small`) and all Large Language Model (LLM) operations (`GPT-4o`).
+- **OpenAI API**: Used for generating embeddings (`text-embedding-3-small`) and all Large Language Model (LLM) operations (`GPT-5.2 Thinking` with reasoning_effort=high for student-facing responses, medium for metadata extraction and reranking).
 - **PostgreSQL**: Primary database for all persistent data, including SQLAlchemy models and vector embeddings (via `pgvector` extension).
 - **Google Sheets API**: Used for logging QA and indexing diagnostics.

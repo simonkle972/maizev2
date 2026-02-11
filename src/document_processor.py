@@ -258,7 +258,9 @@ def _extract_pdf_vision(file_path: str) -> tuple:
                 logger.info(f"Vision extraction: processing page {page_num}/{len(images)} ({img_size_kb:.0f}KB)")
 
                 response = client.chat.completions.create(
-                    model="gpt-4o",
+                    model=Config.LLM_MODEL,
+                    reasoning_effort=Config.LLM_REASONING_MEDIUM,
+                    max_completion_tokens=2000,
                     messages=[{
                         "role": "user",
                         "content": [
@@ -287,8 +289,6 @@ def _extract_pdf_vision(file_path: str) -> tuple:
                             }
                         ]
                     }],
-                    max_tokens=4000,
-                    temperature=0.1
                 )
 
                 page_text = response.choices[0].message.content
@@ -602,10 +602,10 @@ Return ONLY valid JSON, no other text."""
     for attempt in range(3):
         try:
             response = client.chat.completions.create(
-                model="gpt-4o",
+                model=Config.LLM_MODEL,
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.1,
-                max_tokens=500
+                max_completion_tokens=500,
+                reasoning_effort=Config.LLM_REASONING_MEDIUM
             )
             
             content = response.choices[0].message.content.strip()
