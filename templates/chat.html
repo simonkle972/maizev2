@@ -377,6 +377,10 @@
             html += `</div>`;
             streamingMsg.innerHTML = html;
             renderLatex(streamingMsg);
+            requestAnimationFrame(() => {
+                const messagesEl = document.getElementById('messages');
+                messagesEl.scrollTop = messagesEl.scrollHeight;
+            });
         }
         
         async function sendMessage(e) {
