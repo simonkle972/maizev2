@@ -260,7 +260,7 @@ def _extract_pdf_vision(file_path: str) -> tuple:
                 response = client.chat.completions.create(
                     model=Config.LLM_MODEL,
                     reasoning_effort=Config.LLM_REASONING_MEDIUM,
-                    max_completion_tokens=2000,
+                    max_tokens=2000,
                     messages=[{
                         "role": "user",
                         "content": [
@@ -604,7 +604,7 @@ Return ONLY valid JSON, no other text."""
             response = client.chat.completions.create(
                 model=Config.LLM_MODEL,
                 messages=[{"role": "user", "content": prompt}],
-                max_completion_tokens=500,
+                max_tokens=500,
                 reasoning_effort=Config.LLM_REASONING_MEDIUM
             )
             
