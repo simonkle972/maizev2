@@ -459,7 +459,7 @@ Example: {{"scores": [{{"index": 0, "score": 8, "reason": "Contains problem 2f s
         response = client.chat.completions.create(
             model=Config.LLM_MODEL,
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=2000,
+            max_completion_tokens=2000,
             response_format={"type": "json_object"},
             reasoning_effort=Config.LLM_REASONING_MEDIUM
         )

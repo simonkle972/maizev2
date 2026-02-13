@@ -291,7 +291,7 @@ def generate_response(
         response = client.chat.completions.create(
             model=Config.LLM_MODEL,
             messages=messages,
-            max_tokens=Config.LLM_MAX_COMPLETION_TOKENS,
+            max_completion_tokens=Config.LLM_MAX_COMPLETION_TOKENS,
             reasoning_effort=Config.LLM_REASONING_HIGH
         )
         
@@ -306,7 +306,7 @@ def generate_response(
             response = client.chat.completions.create(
                 model=Config.LLM_MODEL,
                 messages=messages,
-                max_tokens=Config.LLM_MAX_COMPLETION_TOKENS,
+                max_completion_tokens=Config.LLM_MAX_COMPLETION_TOKENS,
                 reasoning_effort=Config.LLM_REASONING_MEDIUM
             )
             content = response.choices[0].message.content
@@ -343,7 +343,7 @@ def generate_response_stream(
         stream = client.chat.completions.create(
             model=Config.LLM_MODEL,
             messages=messages,
-            max_tokens=Config.LLM_MAX_COMPLETION_TOKENS,
+            max_completion_tokens=Config.LLM_MAX_COMPLETION_TOKENS,
             stream=True,
             reasoning_effort=Config.LLM_REASONING_HIGH
         )
@@ -359,7 +359,7 @@ def generate_response_stream(
             response = OpenAI(api_key=Config.OPENAI_API_KEY).chat.completions.create(
                 model=Config.LLM_MODEL,
                 messages=messages,
-                max_tokens=Config.LLM_MAX_COMPLETION_TOKENS,
+                max_completion_tokens=Config.LLM_MAX_COMPLETION_TOKENS,
                 reasoning_effort=Config.LLM_REASONING_MEDIUM
             )
             fallback = response.choices[0].message.content
