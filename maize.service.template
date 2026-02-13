@@ -1,0 +1,22 @@
+[Unit]
+Description=Maize Teaching Assistant Application
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=notify
+User=maize
+Group=maize
+WorkingDirectory=/opt/maize
+Environment="PATH=/opt/maize/venv/bin"
+EnvironmentFile=/opt/maize/.env
+ExecStart=/opt/maize/venv/bin/gunicorn --config gunicorn_config.py app:app
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=5
+PrivateTmp=true
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
