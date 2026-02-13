@@ -6,8 +6,8 @@ set -e
 
 echo "🚀 Starting Maize deployment..."
 
-# Variables (update DOMAIN with your actual domain)
-DOMAIN="your-domain.com"
+# Variables
+DOMAIN="getmaize.ai"
 APP_DIR="/opt/maize"
 DB_URL="postgres://vultradmin:AVNS_6V1BH0tYL23lFjsjGRL@vultr-prod-72d325ef-c651-4219-8d54-35da77e71244-vultr-prod-9472.vultrdb.com:16751/defaultdb"
 
