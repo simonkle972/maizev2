@@ -6,10 +6,10 @@ set -e
 
 echo "🚀 Starting Maize deployment..."
 
-# Variables (update these)
+# Variables (update DOMAIN with your actual domain)
 DOMAIN="your-domain.com"
 APP_DIR="/opt/maize"
-DB_URL="postgresql://user:password@host:port/database"
+DB_URL="postgres://vultradmin:AVNS_6V1BH0tYL23lFjsjGRL@vultr-prod-72d325ef-c651-4219-8d54-35da77e71244-vultr-prod-9472.vultrdb.com:16751/defaultdb"
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -51,7 +51,11 @@ SMTP_USER=
 SMTP_PASS=
 EOF
 
-echo -e "${YELLOW}🗄️  Initializing database...${NC}"
+echo -e "${YELLOW}🗄️  Setting up database (enabling pgvector)...${NC}"
+chmod +x setup_database.sh
+./setup_database.sh "$DB_URL"
+
+echo -e "${YELLOW}🗄️  Initializing database schema...${NC}"
 sudo -u maize ./venv/bin/python init_db.py
 
 echo -e "${YELLOW}⚙️  Configuring systemd service...${NC}"
