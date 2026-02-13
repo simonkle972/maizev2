@@ -117,8 +117,12 @@ def admin_required(f):
     from functools import wraps
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not session.get('admin_logged_in'):
+        is_logged_in = session.get('admin_logged_in')
+        logger.info(f"[ADMIN REQUIRED] Checking auth for {f.__name__}: logged_in={is_logged_in}, session_id={session.get('_id', 'N/A')}")
+        if not is_logged_in:
+            logger.warning(f"[ADMIN REQUIRED] Not authenticated, redirecting to login")
             return redirect(url_for('admin_login'))
+        logger.info(f"[ADMIN REQUIRED] Authenticated, allowing access to {f.__name__}")
         return f(*args, **kwargs)
     return decorated_function
 
@@ -129,29 +133,46 @@ def admin_panel():
 
 @app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
+    logger.info(f"[ADMIN LOGIN] Request method: {request.method}, Session exists: {bool(session.get('admin_logged_in'))}")
+
     if session.get('admin_logged_in'):
+        logger.info("[ADMIN LOGIN] Already logged in, redirecting to admin panel")
         return redirect(url_for('admin_panel'))
-    
+
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
-        
+
+        logger.info(f"[ADMIN LOGIN] Received credentials - username: '{username}', password length: {len(password)}")
+
         if not username or not password:
+            logger.warning("[ADMIN LOGIN] Missing username or password")
             return render_template('admin_login.html', error='Please enter both username and password')
-        
+
         valid_username = Config.ADMIN_USERNAME
         valid_password = Config.ADMIN_PASSWORD
-        
+
+        logger.info(f"[ADMIN LOGIN] Config credentials - username: '{valid_username}', password length: {len(valid_password) if valid_password else 0}")
+
         if not valid_username or not valid_password:
+            logger.error("[ADMIN LOGIN] Admin credentials not configured in environment")
             return render_template('admin_login.html', error='Admin credentials not configured')
-        
-        if username == valid_username and password == valid_password:
+
+        username_match = username == valid_username
+        password_match = password == valid_password
+
+        logger.info(f"[ADMIN LOGIN] Username match: {username_match}, Password match: {password_match}")
+
+        if username_match and password_match:
+            logger.info("[ADMIN LOGIN] Credentials valid! Setting session and redirecting...")
             session['admin_logged_in'] = True
             session.permanent = True
+            logger.info(f"[ADMIN LOGIN] Session set: {session.get('admin_logged_in')}, Session ID: {session.get('_id', 'N/A')}")
             return redirect(url_for('admin_panel'))
         else:
+            logger.warning(f"[ADMIN LOGIN] Invalid credentials - user entered: '{username}' / password length {len(password)}")
             return render_template('admin_login.html', error='Invalid username or password')
-    
+
     return render_template('admin_login.html')
 
 @app.route('/admin/logout')
