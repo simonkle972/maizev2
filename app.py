@@ -111,7 +111,7 @@ def health_check():
 
 @app.route('/')
 def landing():
-    return redirect('/mgt422')
+    return render_template('landing.html')
 
 def admin_required(f):
     from functools import wraps
