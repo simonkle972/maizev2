@@ -88,7 +88,7 @@ Submitted at: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}
         try:
             msg = MIMEMultipart()
             msg['From'] = smtp_user
-            msg['To'] = 'simon.kleffner@yale.edu'
+            msg['To'] = 'simon.kleffner98@gmail.com'
             msg['Subject'] = f'Maize Demo Request: {name} from {institution}'
             msg.attach(MIMEText(email_body, 'plain'))
             
