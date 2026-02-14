@@ -22,6 +22,8 @@ wheels/
 
 # Virtual environments
 .env
+.env.local
+.env.production
 .venv
 env/
 venv/
@@ -39,10 +41,13 @@ ENV/
 .upm/
 
 # Project specific
-data/courses/*/docs/*
+data/
 chroma_db/
 *.log
 .DS_Store
+
+# Database (local Docker volume data is in docker-compose volumes)
+# migrations/ folder IS tracked (contains schema versioning)
 
 # Keep directories
 !data/courses/.gitkeep

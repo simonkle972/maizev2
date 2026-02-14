@@ -1,7 +1,9 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+# Load environment file (defaults to .env, can override with DOTENV_PATH)
+dotenv_path = os.getenv('DOTENV_PATH', '.env')
+load_dotenv(dotenv_path)
 
 class Config:
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")

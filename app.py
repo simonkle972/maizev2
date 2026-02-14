@@ -5,6 +5,7 @@ import threading
 import time
 from datetime import datetime, timedelta
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for, send_from_directory, Response, stream_with_context
+from flask_migrate import Migrate
 from config import Config
 from models import db, TeachingAssistant, Document, ChatSession, ChatMessage, DocumentChunk, Institution, IndexingJob
 
@@ -33,6 +34,7 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 }
 
 db.init_app(app)
+migrate = Migrate(app, db)
 
 @app.route('/health')
 def health():
