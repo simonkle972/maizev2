@@ -1112,7 +1112,7 @@ def chat_stream_api(slug):
         
         try:
             from src.retriever import retrieve_context
-            from src.response_generator import generate_response_stream
+            from src.response_generator import generate_response_stream, escape_hash_in_latex
             
             yield f"data: {json.dumps({'type': 'status', 'message': 'Searching course materials...'})}\n\n"
             
@@ -1164,7 +1164,10 @@ def chat_stream_api(slug):
                 full_response += token
                 yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
             generation_latency_ms = int((time.time() - generation_start) * 1000)
-            
+
+            # Sanitize LaTeX # characters before saving
+            full_response = escape_hash_in_latex(full_response)
+
             chat_session_update = ChatSession.query.get(session_id)
             assistant_message = ChatMessage(
                 session_id=session_id, 

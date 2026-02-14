@@ -1,9 +1,38 @@
 import logging
+import re
 from typing import Optional
 from openai import OpenAI
 from config import Config
 
 logger = logging.getLogger(__name__)
+
+def escape_hash_in_latex(text: str) -> str:
+    """
+    Escape # characters inside LaTeX math delimiters.
+
+    In LaTeX, # is a special character used for macro parameters.
+    This function finds # within math mode and escapes them as \#.
+    """
+    # Handle inline math $...$
+    # Match $ followed by content with #, then closing $
+    def escape_inline(match):
+        content = match.group(1)
+        # Only escape # that aren't already escaped
+        content = re.sub(r'(?<!\\)#', r'\\#', content)
+        return f'${content}$'
+
+    # Handle display math $$...$$
+    def escape_display(match):
+        content = match.group(1)
+        content = re.sub(r'(?<!\\)#', r'\\#', content)
+        return f'$${content}$$'
+
+    # Process display math first (to avoid matching $$ as two inline $)
+    text = re.sub(r'\$\$(.+?)\$\$', escape_display, text, flags=re.DOTALL)
+    # Then process inline math
+    text = re.sub(r'\$(.+?)\$', escape_inline, text, flags=re.DOTALL)
+
+    return text
 
 BASE_INSTRUCTIONS = """
 You are a teaching assistant for a college/university-level course.
@@ -313,7 +342,9 @@ def generate_response(
             if not content or not content.strip():
                 logger.error(f"Empty LLM response on retry. finish_reason={response.choices[0].finish_reason}")
                 return "I'm having trouble formulating a response right now. Please try sending your question again."
-        
+
+        # Escape # characters in LaTeX expressions
+        content = escape_hash_in_latex(content)
         return content
     
     except Exception as e:
