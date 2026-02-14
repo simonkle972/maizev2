@@ -211,7 +211,27 @@
                 // Match *text* where text doesn't start/end with * and has no newlines
                 sanitized = sanitized.replace(/\*([^*\n]+)\*/g, '$1');
             }
-            
+
+            // 11. Escape # characters in LaTeX expressions
+            // In LaTeX, # is a special character for macro parameters and must be escaped as \#
+            // Process display math $$...$$ first to avoid matching $$ as two inline $
+            sanitized = sanitized.replace(/\$\$([\s\S]+?)\$\$/g, function(match, content) {
+                // Escape # that aren't already escaped (Safari-compatible)
+                // Split by \#, then rejoin with \#, escaping any remaining #
+                let escaped = content.split('\\#').map(function(part) {
+                    return part.replace(/#/g, '\\#');
+                }).join('\\#');
+                return '$$' + escaped + '$$';
+            });
+            // Process inline math $...$
+            sanitized = sanitized.replace(/\$([^$]+?)\$/g, function(match, content) {
+                // Escape # that aren't already escaped (Safari-compatible)
+                let escaped = content.split('\\#').map(function(part) {
+                    return part.replace(/#/g, '\\#');
+                }).join('\\#');
+                return '$' + escaped + '$';
+            });
+
             return sanitized;
         }
         
