@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
 Seed script to create local admin user.
-Usage: python seed_admin.py
+Usage: export DOTENV_PATH=.env.local && python seed_admin.py
 """
 
 import os
 from dotenv import load_dotenv
 from app import app
+from models import db, User
 
 # Load local environment
 dotenv_path = os.getenv('DOTENV_PATH', '.env.local')
@@ -15,22 +16,33 @@ load_dotenv(dotenv_path)
 def seed_admin():
     """Create local admin user if it doesn't exist."""
     with app.app_context():
-        # For now, just set config values
-        # When you add User model with auth, this will create actual users
+        admin_email = "simon.kleffner98@gmail.com"
 
-        print("🔐 Setting up local admin credentials...")
+        # Check if admin already exists
+        existing_admin = User.query.filter_by(email=admin_email, role='admin').first()
 
-        # Temporarily set admin config (until User model exists)
-        os.environ['admin_id'] = 'dev_admin'
-        os.environ['admin_pw'] = 'dev_password_123'
-        os.environ['ADMIN_SECRET_KEY'] = 'dev-secret-key-2024'
+        if existing_admin:
+            print(f"✅ Admin user already exists: {admin_email}")
+            print(f"   Login at: http://localhost:5000/admin/login")
+            return
 
-        print("✅ Admin credentials configured:")
-        print("   Username: dev_admin")
-        print("   Password: dev_password_123")
-        print("")
-        print("⚠️  Note: These credentials are temporary until User model is added.")
-        print("   When auth is implemented, this script will create actual database users.")
+        # Create admin user
+        admin = User(
+            email=admin_email,
+            role='admin',
+            first_name='Simon',
+            last_name='Kleffner',
+            is_active=True
+        )
+        admin.set_password('@KLEFFNER98')
+
+        db.session.add(admin)
+        db.session.commit()
+
+        print("🔐 Local admin user created successfully!")
+        print(f"   Email: {admin_email}")
+        print("   Password: @KLEFFNER98")
+        print(f"\n✅ Login at: http://localhost:5000/admin/login")
 
 if __name__ == '__main__':
     seed_admin()

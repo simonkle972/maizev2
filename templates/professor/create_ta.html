@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create TA - Maize TA</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .tier-options {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin: 24px 0;
+        }
+
+        .tier-option {
+            display: flex;
+            align-items: flex-start;
+            padding: 20px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .tier-option:hover {
+            border-color: #2563eb;
+            background: #f9fafb;
+        }
+
+        .tier-option input[type="radio"] {
+            margin: 4px 16px 0 0;
+            flex-shrink: 0;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .tier-content {
+            flex: 1;
+        }
+
+        .tier-option h4 {
+            margin: 0 0 8px 0;
+            font-size: 18px;
+            color: #111827;
+        }
+
+        .tier-option .price {
+            font-size: 28px;
+            font-weight: 700;
+            color: #2563eb;
+            margin: 4px 0 8px 0;
+        }
+
+        .tier-option .capacity {
+            color: #6b7280;
+            font-size: 14px;
+            margin-bottom: 0;
+        }
+
+        .tier-option .custom-note {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 12px;
+            margin-top: 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #92400e;
+            display: none;
+        }
+
+        .tier-option input[type="radio"]:checked ~ .tier-content .custom-note {
+            display: block;
+        }
+
+        .tier-option input[type="radio"]:checked {
+            accent-color: #2563eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <header class="admin-header">
+            <h1>Create New Teaching Assistant</h1>
+            <a href="{{ url_for('professor.dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
+        </header>
+
+        <main class="admin-main">
+            <div class="auth-section">
+                <div class="auth-card" style="max-width: 700px;">
+                    <h2>TA Details</h2>
+
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="{% if category == 'error' %}error-message{% else %}success-message{% endif %}">
+                                    {{ message }}
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+
+                    <form method="POST">
+                        <div class="form-group">
+                            <label for="ta_name">TA Name</label>
+                            <input type="text" id="ta_name" name="ta_name" required placeholder="e.g., Professor Smith's TA">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="course_name">Course Name</label>
+                            <input type="text" id="course_name" name="course_name" required placeholder="e.g., Introduction to Biology">
+                        </div>
+
+                        <hr style="margin: 32px 0; border: none; border-top: 1px solid #e5e7eb;">
+
+                        <h3 style="margin-bottom: 8px;">Select Your Tier</h3>
+                        <p style="color: #6b7280; font-size: 14px; margin-bottom: 24px;">Choose the plan that matches your class size</p>
+
+                        <div class="tier-options">
+                            <label class="tier-option">
+                                <input type="radio" name="tier" value="tier1" required>
+                                <div class="tier-content">
+                                    <h4>{{ billing_tiers['tier1']['name'] }}</h4>
+                                    <div class="price">${{ "%.2f"|format(billing_tiers['tier1']['price_monthly']) }}<span style="font-size: 16px; font-weight: 400; color: #6b7280;">/month</span></div>
+                                    <p class="capacity">Up to {{ billing_tiers['tier1']['max_students'] }} students</p>
+                                </div>
+                            </label>
+
+                            <label class="tier-option">
+                                <input type="radio" name="tier" value="tier2" required>
+                                <div class="tier-content">
+                                    <h4>{{ billing_tiers['tier2']['name'] }}</h4>
+                                    <div class="price">${{ "%.2f"|format(billing_tiers['tier2']['price_monthly']) }}<span style="font-size: 16px; font-weight: 400; color: #6b7280;">/month</span></div>
+                                    <p class="capacity">Up to {{ billing_tiers['tier2']['max_students'] }} students</p>
+                                </div>
+                            </label>
+
+                            <label class="tier-option">
+                                <input type="radio" name="tier" value="tier3" required>
+                                <div class="tier-content">
+                                    <h4>{{ billing_tiers['tier3']['name'] }}</h4>
+                                    <div class="price">${{ "%.2f"|format(billing_tiers['tier3']['price_monthly']) }}<span style="font-size: 16px; font-weight: 400; color: #6b7280;">/month</span></div>
+                                    <p class="capacity">Up to {{ billing_tiers['tier3']['max_students'] }} students</p>
+                                </div>
+                            </label>
+
+                            <label class="tier-option">
+                                <input type="radio" name="tier" value="custom" required>
+                                <div class="tier-content">
+                                    <h4>Custom (250+ students)</h4>
+                                    <div class="price">Contact Us<span style="font-size: 16px; font-weight: 400; color: #6b7280;"></span></div>
+                                    <p class="capacity">For larger courses requiring more than 250 students</p>
+                                    <div class="custom-note">
+                                        <strong>Note:</strong> Your TA will be created with a 250-student cap at $19.99/month. Our team will contact you within 24 hours to discuss custom pricing for your larger class.
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-full" style="margin-top: 24px;">Proceed to Payment</button>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

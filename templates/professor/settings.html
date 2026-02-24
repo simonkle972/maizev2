@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Maize TA</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="admin-container">
+        <header class="admin-header">
+            <h1>Settings</h1>
+            <a href="{{ url_for('professor.dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
+        </header>
+
+        <main class="admin-main">
+            <h2>Account Information</h2>
+            <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
+                <p><strong>Name:</strong> {{ current_user.first_name }} {{ current_user.last_name }}</p>
+                <p><strong>Email:</strong> {{ current_user.email }}</p>
+                <p><strong>Institution:</strong> {{ current_user.institution.name if current_user.institution else 'N/A' }}</p>
+            </div>
+
+            <h2>Billing Summary</h2>
+            <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                <p><strong>Active TAs:</strong> {{ active_tas|length }}</p>
+                <p><strong>Paused TAs:</strong> {{ paused_tas|length }}</p>
+                <p style="font-size: 24px; font-weight: bold; margin-top: 20px;">
+                    Total Monthly Cost: ${{ "%.2f"|format(total_monthly_cost) }}
+                </p>
+            </div>
+
+            <a href="{{ url_for('professor.billing') }}" class="btn btn-primary">View Detailed Billing</a>
+            <a href="{{ url_for('professor.billing_portal') }}" class="btn btn-secondary">Manage Subscriptions (Stripe)</a>
+        </main>
+    </div>
+</body>
+</html>

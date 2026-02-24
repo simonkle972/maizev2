@@ -506,6 +506,7 @@
             <div class="tab-bar">
                 <button class="tab-btn active" data-tab="tas" onclick="switchTab('tas')">Teaching Assistants</button>
                 <button class="tab-btn" data-tab="institutions" onclick="switchTab('institutions')">Institutions</button>
+                <button class="tab-btn" data-tab="users" onclick="switchTab('users')">Users</button>
             </div>
             
             <div id="tab-tas" class="tab-content active">
@@ -553,7 +554,7 @@
                     <div style="flex:1"></div>
                     <button onclick="showCreateInstitutionModal()" class="btn btn-primary">Add Institution</button>
                 </div>
-                
+
                 <table class="data-table" id="inst-table">
                     <thead>
                         <tr>
@@ -565,6 +566,38 @@
                     </thead>
                     <tbody id="inst-tbody">
                         <tr><td colspan="4" class="empty-state">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="tab-users" class="tab-content">
+                <div class="filters-bar">
+                    <input type="text" id="user-search" class="search-input" placeholder="Search by name or email..." oninput="filterUsers()">
+                    <select id="user-role-filter" class="filter-select" onchange="filterUsers()">
+                        <option value="">All Roles</option>
+                        <option value="admin">Admin</option>
+                        <option value="professor">Professor</option>
+                        <option value="student">Student</option>
+                    </select>
+                    <select id="user-institution-filter" class="filter-select" onchange="filterUsers()">
+                        <option value="">All Institutions</option>
+                    </select>
+                    <div style="flex:1"></div>
+                </div>
+
+                <table class="data-table" id="user-table">
+                    <thead>
+                        <tr>
+                            <th onclick="sortUsers('email')">Email <span class="sort-icon">↕</span></th>
+                            <th onclick="sortUsers('first_name')">Name <span class="sort-icon">↕</span></th>
+                            <th onclick="sortUsers('role')">Role <span class="sort-icon">↕</span></th>
+                            <th onclick="sortUsers('institution_name')">Institution <span class="sort-icon">↕</span></th>
+                            <th onclick="sortUsers('last_login_at')">Last Login <span class="sort-icon">↕</span></th>
+                            <th onclick="sortUsers('created_at')">Created <span class="sort-icon">↕</span></th>
+                        </tr>
+                    </thead>
+                    <tbody id="user-tbody">
+                        <tr><td colspan="6" class="empty-state">Loading...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -695,6 +728,8 @@
         let filteredTAs = [];
         let allInstitutions = [];
         let filteredInstitutions = [];
+        let allUsers = [];
+        let filteredUsers = [];
         let currentTaId = null;
         let currentInstId = null;
         let indexingPollInterval = null;
@@ -707,6 +742,9 @@
         
         let instSortField = 'name';
         let instSortDir = 'asc';
+
+        let userSortField = 'created_at';
+        let userSortDir = 'desc';
         
         function escapeHtml(text) {
             if (!text) return '';
@@ -745,6 +783,8 @@
             });
             if (tab === 'institutions') {
                 loadInstitutions();
+            } else if (tab === 'users') {
+                loadUsers();
             }
         }
         
@@ -1242,7 +1282,7 @@
         async function deleteInstitution() {
             if (!currentInstId) return;
             if (!confirm('Delete this institution? This cannot be undone.')) return;
-            
+
             try {
                 await apiCall('/admin/api/institutions/' + currentInstId, { method: 'DELETE' });
                 hideEditInstitutionModal();
@@ -1254,7 +1294,98 @@
                 }
             }
         }
-        
+
+        async function loadUsers() {
+            try {
+                allUsers = await apiCall('/admin/api/users');
+                filterUsers();
+                populateUserInstitutionFilter();
+            } catch (err) {
+                if (err.message !== 'Session expired') {
+                    showNotification('Failed to load users: ' + err.message, 'error');
+                }
+            }
+        }
+
+        function populateUserInstitutionFilter() {
+            const select = document.getElementById('user-institution-filter');
+            const currentVal = select.value;
+            select.innerHTML = '<option value="">All Institutions</option>';
+            const uniqueInsts = [...new Set(allUsers.filter(u => u.institution_name).map(u => u.institution_name))];
+            uniqueInsts.sort().forEach(name => {
+                select.innerHTML += `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`;
+            });
+            select.value = currentVal;
+        }
+
+        function filterUsers() {
+            const search = document.getElementById('user-search').value.toLowerCase();
+            const roleFilter = document.getElementById('user-role-filter').value;
+            const instFilter = document.getElementById('user-institution-filter').value;
+
+            filteredUsers = allUsers.filter(user => {
+                const matchesSearch = !search ||
+                    user.email.toLowerCase().includes(search) ||
+                    (user.first_name + ' ' + user.last_name).toLowerCase().includes(search);
+                const matchesRole = !roleFilter || user.role === roleFilter;
+                const matchesInst = !instFilter || user.institution_name === instFilter;
+                return matchesSearch && matchesRole && matchesInst;
+            });
+
+            sortUsersInternal();
+            renderUsers();
+        }
+
+        function sortUsers(field) {
+            if (userSortField === field) {
+                userSortDir = userSortDir === 'asc' ? 'desc' : 'asc';
+            } else {
+                userSortField = field;
+                userSortDir = 'asc';
+            }
+            sortUsersInternal();
+            renderUsers();
+        }
+
+        function sortUsersInternal() {
+            filteredUsers.sort((a, b) => {
+                let aVal = a[userSortField];
+                let bVal = b[userSortField];
+                if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+                if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+                aVal = aVal || '';
+                bVal = bVal || '';
+                if (aVal < bVal) return userSortDir === 'asc' ? -1 : 1;
+                if (aVal > bVal) return userSortDir === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+
+        function renderUsers() {
+            const tbody = document.getElementById('user-tbody');
+            if (filteredUsers.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No users found</td></tr>';
+            } else {
+                tbody.innerHTML = filteredUsers.map(user => {
+                    const roleBadgeColors = {
+                        admin: 'background: #fee2e2; color: #991b1b;',
+                        professor: 'background: #dbeafe; color: #1e40af;',
+                        student: 'background: #d1fae5; color: #065f46;'
+                    };
+                    return `
+                        <tr>
+                            <td>${escapeHtml(user.email)}</td>
+                            <td><strong>${escapeHtml(user.first_name)} ${escapeHtml(user.last_name)}</strong></td>
+                            <td><span class="status-badge" style="${roleBadgeColors[user.role]}">${user.role}</span></td>
+                            <td>${escapeHtml(user.institution_name) || '—'}</td>
+                            <td>${formatDateTime(user.last_login_at)}</td>
+                            <td>${formatDate(user.created_at)}</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+        }
+
         async function saveDocumentMetadata(row) {
             const taId = row.dataset.taId;
             const docId = row.dataset.docId;

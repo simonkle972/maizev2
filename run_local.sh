@@ -46,4 +46,6 @@ echo "🌐 Starting Flask dev server on http://localhost:5000"
 echo "   To create admin user, run: python seed_admin.py"
 echo "   Press Ctrl+C to stop"
 echo ""
+echo "💡 Reminder: If you modified models.py, run 'flask db migrate -m \"Description\"' before committing"
+echo ""
 python app.py

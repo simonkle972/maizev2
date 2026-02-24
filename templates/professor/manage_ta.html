@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage {{ ta.name }} - Maize TA</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .warning-banner {
+            background: #fff3cd;
+            border-left: 4px solid #ff9800;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        .warning-banner h3 {
+            margin-top: 0;
+            color: #ff9800;
+        }
+        .drop-zone {
+            border: 2px dashed #cbd5e0;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: #f9fafb;
+        }
+        .drop-zone:hover, .drop-zone-active {
+            border-color: #2563eb;
+            background: #eff6ff;
+        }
+        .drop-icon {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 16px;
+            color: #6b7280;
+        }
+        .drop-text {
+            font-size: 16px;
+            color: #374151;
+            margin: 0 0 8px 0;
+        }
+        .drop-hint {
+            font-size: 14px;
+            color: #9ca3af;
+            margin: 0;
+        }
+        .upload-progress {
+            margin-top: 16px;
+        }
+        .upload-item {
+            background: #f3f4f6;
+            padding: 12px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .upload-item-name {
+            flex: 1;
+            font-size: 14px;
+        }
+        .upload-item-status {
+            font-size: 14px;
+            color: #6b7280;
+        }
+        .doc-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+        }
+        .doc-table th {
+            background: #f9fafb;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        .doc-table td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .doc-table input, .doc-table select {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+        }
+        .doc-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .save-status {
+            font-size: 12px;
+            color: #6b7280;
+        }
+        .delete-btn {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .delete-btn:hover {
+            background: #dc2626;
+        }
+        .indexing-status {
+            background: #e0f2fe;
+            border-left: 4px solid #0ea5e9;
+            padding: 16px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .indexing-status.running {
+            background: #fef3c7;
+            border-left-color: #f59e0b;
+        }
+        .indexing-status.error {
+            background: #fee2e2;
+            border-left-color: #ef4444;
+        }
+        .metadata-hint {
+            font-size: 13px;
+            color: #6b7280;
+            margin-top: 8px;
+        }
+        .enrollment-link-disabled {
+            background: #f3f4f6;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            border: 2px dashed #cbd5e0;
+        }
+        .enrollment-link-disabled h3 {
+            color: #6b7280;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <header class="admin-header">
+            <h1>Manage TA: {{ ta.name }}</h1>
+            <a href="{{ url_for('professor.dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
+        </header>
+
+        <main class="admin-main">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="{% if category == 'error' %}error-message{% else %}success-message{% endif %}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            {% if not ta.is_indexed %}
+                <div class="warning-banner">
+                    <h3>⚠️ Your TA is not yet active</h3>
+                    <p>Upload course documents and index them before sharing the enrollment link with students.</p>
+                </div>
+            {% endif %}
+
+            <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
+                <h3>TA Information</h3>
+                <p><strong>Course:</strong> {{ ta.course_name }}</p>
+                <p><strong>Tier:</strong> {{ tier_info.name if ta.requires_billing else 'Admin TA' }}</p>
+                <p><strong>Status:</strong>
+                    {% if ta.is_paused %}
+                        <span style="color: #ff9800;">Paused</span>
+                    {% else %}
+                        <span style="color: #4caf50;">Active</span>
+                    {% endif %}
+                </p>
+                <p><strong>Documents:</strong> {{ documents|length }} uploaded</p>
+                <p><strong>Indexed:</strong>
+                    {% if ta.is_indexed %}
+                        <span style="color: #4caf50;">✓ Yes</span>
+                    {% else %}
+                        <span style="color: #ff9800;">✗ Not yet</span>
+                    {% endif %}
+                </p>
+                <p><strong>Enrolled:</strong> {{ ta.current_enrollment_count }} / {{ ta.max_students }} students</p>
+            </div>
+
+            {% if ta.is_indexed and enrollment_url %}
+                <div style="background: #e8f5e9; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
+                    <h3>Enrollment Link</h3>
+                    <p>Share this link with students to enroll:</p>
+                    <input type="text" value="{{ enrollment_url }}" readonly style="width: 100%; padding: 10px; margin: 10px 0; font-family: monospace;">
+                    <button onclick="copyEnrollmentLink()" class="btn btn-secondary">Copy Link</button>
+                </div>
+            {% elif not ta.is_indexed %}
+                <div class="enrollment-link-disabled">
+                    <h3>Enrollment Link (Not Available)</h3>
+                    <p style="color: #6b7280;">Complete document indexing to generate the enrollment link.</p>
+                </div>
+            {% endif %}
+
+            <div style="margin: 30px 0;">
+                {% if ta.is_paused %}
+                    <form method="POST" action="{{ url_for('professor.resume_ta', ta_id=ta.id) }}" style="display: inline;">
+                        <button type="submit" class="btn btn-primary">Resume TA (Restart Billing)</button>
+                    </form>
+                {% else %}
+                    <form method="POST" action="{{ url_for('professor.pause_ta', ta_id=ta.id) }}" style="display: inline;">
+                        <button type="submit" class="btn btn-secondary" onclick="return confirm('Are you sure you want to pause this TA? Once paused, it must remain paused for at least 7 days before you can resume. Billing will be stopped during this time.')">Pause TA</button>
+                    </form>
+                {% endif %}
+            </div>
+
+            <!-- Danger Zone -->
+            <hr style="margin: 40px 0; border: none; border-top: 2px solid #fee2e2;">
+
+            <div style="background: #fef2f2; padding: 24px; border-radius: 8px; border: 1px solid #fecaca;">
+                <h3 style="color: #991b1b; margin: 0 0 8px 0;">⚠️ Danger Zone</h3>
+                <p style="color: #7f1d1d; margin: 0 0 16px 0;">
+                    Once you delete a TA, there is no going back. All documents, chat history, and enrollment data will be permanently removed.
+                </p>
+                <button onclick="confirmDeleteTA()" class="btn"
+                        style="background: #dc2626; color: white; border: none; font-weight: 600;">
+                    Delete This TA Permanently
+                </button>
+            </div>
+
+            <div id="indexing-status-container"></div>
+
+            <h3 style="margin-top: 40px;">Upload Documents</h3>
+            <div class="drop-zone" id="drop-zone" onclick="document.getElementById('doc-files').click()">
+                <input type="file" id="doc-files" multiple accept=".pdf,.docx,.doc,.xlsx,.xls,.txt,.pptx,.ppt" style="display:none" onchange="handleFileSelect(event)">
+                <div class="drop-zone-content">
+                    <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    <p class="drop-text">Drag & drop files here or click to browse</p>
+                    <p class="drop-hint">PDF, DOCX, XLSX, TXT, PPTX supported</p>
+                </div>
+            </div>
+            <div id="upload-progress" class="upload-progress"></div>
+
+            <h3 style="margin-top: 40px;">Documents</h3>
+            <div id="documents-container">
+                {% if documents %}
+                    <table class="doc-table">
+                        <thead>
+                            <tr>
+                                <th>Display Name</th>
+                                <th>Type</th>
+                                <th>Unit #</th>
+                                <th>Original File</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="doc-tbody">
+                            {% for doc in documents %}
+                                <tr data-doc-id="{{ doc.id }}" data-ta-id="{{ ta.id }}">
+                                    <td><input type="text" class="doc-display-name" value="{{ doc.display_name }}" data-original="{{ doc.display_name }}"></td>
+                                    <td>
+                                        <select class="doc-type-select" data-original="{{ doc.doc_type or '' }}">
+                                            <option value="">—</option>
+                                            <option value="homework" {% if doc.doc_type == 'homework' %}selected{% endif %}>Homework</option>
+                                            <option value="exam" {% if doc.doc_type == 'exam' %}selected{% endif %}>Exam</option>
+                                            <option value="lecture" {% if doc.doc_type == 'lecture' %}selected{% endif %}>Lecture</option>
+                                            <option value="reading" {% if doc.doc_type == 'reading' %}selected{% endif %}>Reading</option>
+                                            <option value="syllabus" {% if doc.doc_type == 'syllabus' %}selected{% endif %}>Syllabus</option>
+                                            <option value="other" {% if doc.doc_type == 'other' %}selected{% endif %}>Other</option>
+                                        </select>
+                                    </td>
+                                    <td><input type="number" class="doc-unit-number" value="{{ doc.instructional_unit_number or '' }}" data-original="{{ doc.instructional_unit_number or '' }}" min="1" max="99"></td>
+                                    <td style="font-size: 12px; color: #6b7280;">{{ doc.original_filename }}</td>
+                                    <td>
+                                        <div class="doc-actions">
+                                            <span class="save-status"></span>
+                                            <button type="button" class="delete-btn" onclick="deleteDocument({{ doc.id }})">Delete</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    <p class="metadata-hint">Changes auto-save when you click out of a field.</p>
+                {% else %}
+                    <p style="color: #6b7280;">No documents uploaded yet.</p>
+                {% endif %}
+            </div>
+
+            <div style="margin-top: 30px;">
+                <button type="button" id="reindex-btn" onclick="reindexTA()" class="btn btn-primary" {% if documents|length == 0 %}disabled{% endif %}>
+                    {% if ta.indexing_status == 'running' %}Indexing...{% elif ta.is_indexed %}Re-index Documents{% else %}Index Documents{% endif %}
+                </button>
+            </div>
+
+            <h3 style="margin-top: 40px;">Enrolled Students ({{ enrollments|length }})</h3>
+            {% if enrollments %}
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background: #f5f5f5;">
+                            <th style="padding: 12px; text-align: left;">Student</th>
+                            <th style="padding: 12px; text-align: left;">Email</th>
+                            <th style="padding: 12px; text-align: center;">Enrolled</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for enrollment in enrollments %}
+                            <tr style="border-bottom: 1px solid #eee;">
+                                <td style="padding: 12px;">{{ enrollment.student.first_name }} {{ enrollment.student.last_name }}</td>
+                                <td style="padding: 12px;">{{ enrollment.student.email }}</td>
+                                <td style="padding: 12px; text-align: center;">{{ enrollment.enrolled_at.strftime('%Y-%m-%d') }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p style="color: #666;">No students enrolled yet.</p>
+            {% endif %}
+        </main>
+    </div>
+
+    <script>
+        const taId = '{{ ta.id }}';
+        let indexingPollInterval = null;
+
+        function copyEnrollmentLink() {
+            const input = document.querySelector('input[readonly]');
+            input.select();
+            document.execCommand('copy');
+            alert('Enrollment link copied to clipboard!');
+        }
+
+        // Setup drag-and-drop
+        function setupDropZone() {
+            const dropZone = document.getElementById('drop-zone');
+            if (!dropZone) return;
+
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); }, false);
+            });
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, () => dropZone.classList.add('drop-zone-active'), false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, () => dropZone.classList.remove('drop-zone-active'), false);
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    uploadFiles(files);
+                }
+            }, false);
+        }
+
+        function handleFileSelect(e) {
+            const files = e.target.files;
+            if (files.length > 0) uploadFiles(files);
+        }
+
+        async function uploadFiles(files) {
+            const progressContainer = document.getElementById('upload-progress');
+            progressContainer.innerHTML = '';
+
+            for (let file of files) {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'upload-item';
+                itemDiv.innerHTML = `
+                    <span class="upload-item-name">${file.name}</span>
+                    <span class="upload-item-status">Uploading...</span>
+                `;
+                progressContainer.appendChild(itemDiv);
+
+                const formData = new FormData();
+                formData.append('file', file);
+
+                try {
+                    const res = await fetch(`/professor/ta/${taId}/upload`, {
+                        method: 'POST',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: formData
+                    });
+
+                    if (!res.ok) {
+                        const data = await res.json();
+                        throw new Error(data.error || 'Upload failed');
+                    }
+
+                    const data = await res.json();
+
+                    if (data.success) {
+                        itemDiv.querySelector('.upload-item-status').textContent = 'Done!';
+                        itemDiv.style.background = '#d1fae5';
+                    } else {
+                        itemDiv.querySelector('.upload-item-status').textContent = 'Error: ' + data.error;
+                        itemDiv.style.background = '#fee2e2';
+                    }
+                } catch (err) {
+                    itemDiv.querySelector('.upload-item-status').textContent = 'Error: ' + err.message;
+                    itemDiv.style.background = '#fee2e2';
+                }
+            }
+
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        }
+
+        // Auto-save metadata
+        function setupAutoSave() {
+            document.querySelectorAll('.doc-display-name, .doc-type-select, .doc-unit-number').forEach(input => {
+                input.addEventListener('blur', saveDocumentMetadata);
+                input.addEventListener('change', saveDocumentMetadata);
+            });
+        }
+
+        async function saveDocumentMetadata(e) {
+            const row = e.target.closest('tr');
+            if (!row) return;
+
+            const docId = row.dataset.docId;
+            const taId = row.dataset.taId;
+            const displayName = row.querySelector('.doc-display-name').value.trim();
+            const docType = row.querySelector('.doc-type-select').value || null;
+            const unitNumber = row.querySelector('.doc-unit-number').value || null;
+            const statusEl = row.querySelector('.save-status');
+
+            statusEl.textContent = 'Saving...';
+
+            try {
+                const res = await fetch(`/professor/ta/${taId}/documents/${docId}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify({
+                        display_name: displayName,
+                        doc_type: docType,
+                        instructional_unit_number: unitNumber
+                    })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    statusEl.textContent = '✓ Saved';
+                    setTimeout(() => { statusEl.textContent = ''; }, 2000);
+                } else {
+                    statusEl.textContent = '✗ Error';
+                }
+            } catch (err) {
+                statusEl.textContent = '✗ Error';
+            }
+        }
+
+        async function deleteDocument(docId) {
+            if (!confirm('Delete this document? This cannot be undone.')) return;
+
+            try {
+                const res = await fetch(`/professor/ta/${taId}/documents/${docId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                if (!res.ok) {
+                    const data = await res.json();
+                    throw new Error(data.error || 'Delete failed');
+                }
+
+                const data = await res.json();
+
+                if (data.success) {
+                    window.location.reload();
+                } else {
+                    alert('Error deleting document');
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        async function reindexTA() {
+            const btn = document.getElementById('reindex-btn');
+            btn.disabled = true;
+            btn.textContent = 'Starting indexing...';
+
+            try {
+                const res = await fetch(`/professor/ta/${taId}/reindex`, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                if (!res.ok) {
+                    const data = await res.json();
+                    throw new Error(data.error || 'Indexing failed');
+                }
+
+                const data = await res.json();
+
+                if (data.success) {
+                    btn.textContent = 'Indexing...';
+                    startPollingIndexingStatus();
+                } else {
+                    btn.textContent = 'Index Documents';
+                    btn.disabled = false;
+                    alert('Error: ' + data.error);
+                }
+            } catch (err) {
+                btn.textContent = 'Index Documents';
+                btn.disabled = false;
+                alert('Error: ' + err.message);
+            }
+        }
+
+        function startPollingIndexingStatus() {
+            if (indexingPollInterval) {
+                clearInterval(indexingPollInterval);
+            }
+
+            indexingPollInterval = setInterval(async () => {
+                try {
+                    const res = await fetch(`/professor/ta/${taId}/indexing-status`, {
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+
+                    if (!res.ok) {
+                        const data = await res.json();
+                        throw new Error(data.error || 'Status check failed');
+                    }
+
+                    const data = await res.json();
+
+                    updateIndexingStatus(data);
+
+                    if (data.status !== 'running') {
+                        clearInterval(indexingPollInterval);
+                        indexingPollInterval = null;
+
+                        if (data.is_indexed) {
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 2000);
+                        }
+                    }
+                } catch (err) {
+                    console.error('Error polling indexing status:', err);
+                }
+            }, 2000);
+        }
+
+        function updateIndexingStatus(data) {
+            const container = document.getElementById('indexing-status-container');
+            const btn = document.getElementById('reindex-btn');
+
+            if (data.status === 'running') {
+                container.innerHTML = `
+                    <div class="indexing-status running">
+                        <strong>⏳ Indexing in progress...</strong>
+                        <p>Progress: ${data.progress}%</p>
+                    </div>
+                `;
+                btn.textContent = 'Indexing...';
+                btn.disabled = true;
+            } else if (data.status === 'failed') {
+                container.innerHTML = `
+                    <div class="indexing-status error">
+                        <strong>✗ Indexing failed</strong>
+                        <p>${data.error || 'Unknown error'}</p>
+                    </div>
+                `;
+                btn.textContent = 'Retry Indexing';
+                btn.disabled = false;
+            } else if (data.is_indexed) {
+                container.innerHTML = `
+                    <div class="indexing-status">
+                        <strong>✓ Indexing complete!</strong>
+                        <p>Your TA is ready to use. The enrollment link is now available.</p>
+                    </div>
+                `;
+                btn.textContent = 'Re-index Documents';
+                btn.disabled = false;
+            } else {
+                container.innerHTML = '';
+                btn.textContent = 'Index Documents';
+                btn.disabled = false;
+            }
+        }
+
+        // Initialize
+        // Delete TA with double-confirmation
+        function confirmDeleteTA() {
+            const taName = "{{ ta.name }}";
+            const confirmText = `Are you absolutely sure you want to delete "${taName}"?\n\nThis will:\n• Cancel the Stripe subscription\n• Delete all documents and chat history\n• Remove all student enrollments\n• Permanently erase all data\n\nType "${taName}" to confirm:`;
+
+            const userInput = prompt(confirmText);
+
+            if (userInput === taName) {
+                if (confirm(`Final confirmation: Delete "${taName}" permanently?`)) {
+                    fetch('/professor/ta/{{ ta.id }}/delete', {
+                        method: 'POST',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            return response.json().then(data => {
+                                throw new Error(data.error || 'Delete failed');
+                            });
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data.success) {
+                            window.location.href = '/professor/dashboard';
+                        } else {
+                            alert('Error deleting TA: ' + data.error);
+                        }
+                    })
+                    .catch(error => {
+                        alert('Error: ' + error);
+                    });
+                }
+            } else if (userInput !== null) {
+                alert('TA name did not match. Deletion canceled.');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            setupDropZone();
+            setupAutoSave();
+
+            // Check indexing status on page load
+            {% if ta.indexing_status == 'running' %}
+                startPollingIndexingStatus();
+            {% endif %}
+        });
+    </script>
+</body>
+</html>

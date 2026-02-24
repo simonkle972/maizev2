@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Dashboard - Maize TA</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css?v=12">
+    <link rel="stylesheet" href="/static/css/chat-brand.css?v=12">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            overflow: hidden;
+        }
+
+        .student-dashboard {
+            display: flex;
+            height: 100vh;
+            width: 100%;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 320px;
+            background: #f9fafb;
+            border-right: 1px solid #e5e7eb;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid #e5e7eb;
+            background: white;
+        }
+
+        .sidebar-header h2 {
+            margin: 0 0 12px 0;
+            font-size: 20px;
+            color: #111827;
+        }
+
+        .user-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 12px;
+        }
+
+        .user-name {
+            font-size: 14px;
+            color: #6b7280;
+        }
+
+        .logout-btn {
+            padding: 6px 12px;
+            font-size: 13px;
+            background: #f3f4f6;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            cursor: pointer;
+            text-decoration: none;
+            color: #374151;
+        }
+
+        .logout-btn:hover {
+            background: #e5e7eb;
+        }
+
+        .ta-list {
+            flex: 1;
+            overflow-y: auto;
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .ta-item {
+            padding: 16px 20px;
+            cursor: pointer;
+            border-bottom: 1px solid #e5e7eb;
+            background: white;
+            transition: background 0.15s;
+            position: relative;
+        }
+
+        .ta-item:hover {
+            background: #f9fafb;
+        }
+
+        .ta-item.active {
+            background: #eff6ff;
+            border-left: 4px solid #2563eb;
+            padding-left: 16px;
+        }
+
+        .ta-item .ta-name {
+            font-weight: 600;
+            font-size: 15px;
+            color: #111827;
+            margin-bottom: 4px;
+        }
+
+        .ta-item.active .ta-name {
+            color: #2563eb;
+        }
+
+        .ta-item .course-name {
+            font-size: 13px;
+            color: #6b7280;
+            margin-bottom: 6px;
+        }
+
+        .ta-item .last-message {
+            font-size: 12px;
+            color: #9ca3af;
+        }
+
+        .new-badge {
+            display: inline-block;
+            background: #10b981;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .empty-sidebar {
+            padding: 40px 20px;
+            text-align: center;
+            color: #6b7280;
+        }
+
+        /* Main Chat Area */
+        .chat-main-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .welcome-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            background: white;
+            padding: 40px;
+        }
+
+        .welcome-container h1 {
+            font-size: 32px;
+            color: #111827;
+            margin-bottom: 12px;
+        }
+
+        .welcome-container p {
+            font-size: 16px;
+            color: #6b7280;
+        }
+
+        /* Embedded Chat */
+        .chat-container-embedded {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            background: white;
+        }
+
+        .chat-header-embedded {
+            padding: 20px 24px;
+            border-bottom: 1px solid #e5e7eb;
+            background: white;
+        }
+
+        .chat-header-embedded h1 {
+            margin: 0 0 4px 0;
+            font-size: 24px;
+            color: #111827;
+        }
+
+        .chat-header-embedded .course-name {
+            margin: 0;
+            font-size: 14px;
+            color: #6b7280;
+        }
+
+        .chat-messages-embedded {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            background: #f9fafb;
+        }
+
+        .chat-footer-embedded {
+            padding: 16px 24px;
+            border-top: 1px solid #e5e7eb;
+            background: white;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+
+        .btn-clear {
+            padding: 10px;
+            background: #f3f4f6;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            cursor: pointer;
+            color: #6b7280;
+            flex-shrink: 0;
+        }
+
+        .btn-clear:hover {
+            background: #e5e7eb;
+        }
+
+        #query-input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 14px;
+            resize: none;
+            min-height: 44px;
+            max-height: 150px;
+        }
+
+        #query-input:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        #send-btn {
+            padding: 12px 24px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        #send-btn:hover:not(:disabled) {
+            background: #1d4ed8;
+        }
+
+        #send-btn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+
+        .disclaimer {
+            margin: 8px 0 0 0;
+            font-size: 12px;
+            color: #9ca3af;
+            text-align: center;
+        }
+
+        /* Messages */
+        .message {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .message.user {
+            flex-direction: row-reverse;
+        }
+
+        .ta-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .message.user .message-content {
+            background: #2563eb;
+            color: white;
+            padding: 12px 16px;
+            border-radius: 16px 16px 4px 16px;
+            max-width: 70%;
+        }
+
+        .message.assistant .message-content {
+            background: white;
+            border: 1px solid #e5e7eb;
+            padding: 16px;
+            border-radius: 16px 16px 16px 4px;
+            max-width: 80%;
+        }
+
+        .message-wrapper {
+            flex: 1;
+            max-width: 80%;
+        }
+
+        .message-status {
+            margin-bottom: 12px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: #6b7280;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #2563eb;
+            border-radius: 50%;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .message-sources {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #e5e7eb;
+            font-size: 12px;
+        }
+
+        .sources-label {
+            font-weight: 600;
+            color: #6b7280;
+            margin-right: 8px;
+        }
+
+        .source-tag {
+            display: inline-block;
+            background: #f3f4f6;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin: 4px 4px 4px 0;
+            color: #374151;
+        }
+    </style>
+</head>
+<body>
+    <div class="student-dashboard">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>My Courses</h2>
+                <div class="user-info">
+                    <span class="user-name">{{ current_student.first_name }} {{ current_student.last_name }}</span>
+                    <a href="{{ url_for('auth.student_logout') }}" class="logout-btn">Logout</a>
+                </div>
+            </div>
+
+            {% if tas %}
+                <ul class="ta-list">
+                    {% for item in tas %}
+                    <li class="ta-item {% if selected_ta and item.ta.id == selected_ta.id %}active{% endif %}"
+                        onclick="location.href='{{ url_for('student.dashboard', ta_id=item.ta.id) }}'">
+                        <div class="ta-name">{{ item.ta.name }}</div>
+                        <div class="course-name">{{ item.ta.course_name }}</div>
+                        <div class="last-message">
+                            {% if item.is_new %}
+                                <span class="new-badge">New</span>
+                            {% else %}
+                                Last active {{ item.last_message_time.strftime('%b %d, %Y') }}
+                            {% endif %}
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <div class="empty-sidebar">
+                    <p>No courses yet. Wait for your professor to enroll you!</p>
+                </div>
+            {% endif %}
+        </aside>
+
+        <!-- Main Chat Area -->
+        <div class="chat-main-wrapper">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div style="padding: 16px;">
+                        {% for category, message in messages %}
+                            <div class="{% if category == 'error' %}error-message{% else %}success-message{% endif %}">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            {% if selected_ta %}
+                <!-- Embedded Chat Interface -->
+                <div class="chat-container-embedded">
+                    <div class="chat-header-embedded">
+                        <h1>{{ selected_ta.name }}</h1>
+                        <p class="course-name">{{ selected_ta.course_name }}</p>
+                    </div>
+
+                    <div id="messages" class="chat-messages-embedded">
+                        <div class="message assistant" id="welcome-message">
+                            <img src="/static/images/maize-logo.png" alt="Maize" class="ta-avatar">
+                            <div class="message-content">
+                                <p>Hello! I'm your teaching assistant for <strong>{{ selected_ta.course_name }}</strong>. I'm here to help you understand course concepts, work through problems, and prepare for exams.</p>
+                                <p>How can I help you today?</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="chat-footer-embedded">
+                        <form id="chat-form" onsubmit="sendMessage(event)">
+                            <div class="input-group">
+                                <button type="button" id="clear-btn" class="btn-clear" onclick="clearHistory()" title="Start new conversation">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                                        <path d="M3 3v5h5"/>
+                                    </svg>
+                                </button>
+                                <textarea
+                                    id="query-input"
+                                    placeholder="Ask a question about the course..."
+                                    rows="1"
+                                    onkeydown="handleKeydown(event)"
+                                ></textarea>
+                                <button type="submit" id="send-btn">Send</button>
+                            </div>
+                        </form>
+                        <p class="disclaimer">This TA helps explain concepts but won't give direct homework answers.</p>
+                    </div>
+                </div>
+
+                <script>
+                    let sessionId = '';
+                    const taId = '{{ selected_ta.id }}';
+
+                    function handleKeydown(e) {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            sendMessage(e);
+                        }
+                    }
+
+                    function generateSessionId() {
+                        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                            const r = Math.random() * 16 | 0;
+                            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                            return v.toString(16);
+                        });
+                    }
+
+                    function clearHistory() {
+                        const messagesEl = document.getElementById('messages');
+                        messagesEl.innerHTML = `
+                            <div class="message assistant">
+                                <img src="/static/images/maize-logo.png" alt="Maize" class="ta-avatar">
+                                <div class="message-content">
+                                    <p>Hello! I'm your teaching assistant for <strong>{{ selected_ta.course_name }}</strong>. I'm here to help you understand course concepts, work through problems, and prepare for exams.</p>
+                                    <p>How can I help you today?</p>
+                                </div>
+                            </div>
+                        `;
+
+                        sessionId = generateSessionId();
+
+                        const input = document.getElementById('query-input');
+                        input.value = '';
+                        input.focus();
+                    }
+
+                    function autoResize(el) {
+                        el.style.height = 'auto';
+                        el.style.height = Math.min(el.scrollHeight, 150) + 'px';
+                    }
+
+                    document.getElementById('query-input').addEventListener('input', function() {
+                        autoResize(this);
+                    });
+
+                    function addMessage(role, content, sources = []) {
+                        const messagesEl = document.getElementById('messages');
+                        const messageDiv = document.createElement('div');
+                        messageDiv.className = `message ${role}`;
+
+                        let html = '';
+                        if (role === 'user') {
+                            html = `<div class="message-content">${formatContent(content)}</div>`;
+                        } else {
+                            html = `<img src="/static/images/maize-logo.png" alt="Maize" class="ta-avatar">`;
+                            html += `<div class="message-content">${formatContent(content)}`;
+
+                            if (sources && sources.length > 0) {
+                                const uniqueSources = [...new Set(sources)];
+                                html += `
+                                    <div class="message-sources">
+                                        <span class="sources-label">Sources:</span>
+                                        ${uniqueSources.map(s => `<span class="source-tag">${s}</span>`).join('')}
+                                    </div>
+                                `;
+                            }
+                            html += `</div>`;
+                        }
+
+                        messageDiv.innerHTML = html;
+                        messagesEl.appendChild(messageDiv);
+                        renderLatex(messageDiv);
+                        const chatMain = document.querySelector('.chat-messages-embedded');
+                        chatMain.scrollTop = chatMain.scrollHeight;
+                    }
+
+                    function preprocessLatex(text) {
+                        let processed = text;
+                        processed = processed.replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$1$$$$');
+                        processed = processed.replace(/\\\(([\s\S]*?)\\\)/g, '$$$1$$');
+                        return processed;
+                    }
+
+                    function sanitizeForRendering(text) {
+                        let sanitized = text;
+                        sanitized = sanitized.replace(/\*+(\$[^\$]+\$)\*+/g, '$1');
+                        sanitized = sanitized.replace(/\*+(\$\$[\s\S]*?\$\$)\*+/g, '$1');
+                        sanitized = sanitized.replace(/\*+(\\[a-zA-Z]+)/g, '$1');
+                        sanitized = sanitized.replace(/(\\[a-zA-Z]+)\*+/g, '$1');
+                        sanitized = sanitized.replace(/\s\*+\s*$/gm, '');
+                        sanitized = sanitized.replace(/\.\s*\*+\s/g, '. ');
+                        sanitized = sanitized.replace(/\.\s*\*+$/gm, '.');
+                        sanitized = sanitized.replace(/^\*+\s*(\d+[a-zA-Z]?\))/gm, '$1');
+                        sanitized = sanitized.replace(/\*+\s*(\d+[a-zA-Z]?\))/g, '$1');
+                        sanitized = sanitized.replace(/:\s*\*+\s*$/gm, ':');
+                        sanitized = sanitized.replace(/:\s*\*+\s*\n/g, ':\n');
+
+                        const dollarMatches = sanitized.match(/\$/g);
+                        if (dollarMatches && dollarMatches.length % 2 === 1) {
+                            sanitized = sanitized.replace(/\$(?=\d+[,.]?\d*(?:[^$]|$))/g, '\\$');
+                        }
+
+                        sanitized = sanitized.replace(/(\w)\*(\w+)\*(\w)/g, '$1\\*$2\\*$3');
+
+                        if (sanitized.includes('$') || sanitized.includes('\\frac') || sanitized.includes('\\varepsilon')) {
+                            sanitized = sanitized.replace(/\*\*([^*]+)\*\*/g, '$1');
+                            sanitized = sanitized.replace(/\*([^*\n]+)\*/g, '$1');
+                        }
+
+                        sanitized = sanitized.replace(/\$\$([\s\S]+?)\$\$/g, function(match, content) {
+                            let escaped = content.split('\\#').map(function(part) {
+                                return part.replace(/#/g, '\\#');
+                            }).join('\\#');
+                            return '$$' + escaped + '$$';
+                        });
+                        sanitized = sanitized.replace(/\$([^$]+?)\$/g, function(match, content) {
+                            let escaped = content.split('\\#').map(function(part) {
+                                return part.replace(/#/g, '\\#');
+                            }).join('\\#');
+                            return '$' + escaped + '$';
+                        });
+
+                        return sanitized;
+                    }
+
+                    function formatContent(content) {
+                        content = sanitizeForRendering(content);
+                        content = preprocessLatex(content);
+
+                        const mathPlaceholders = [];
+                        let placeholderIndex = 0;
+
+                        content = content.replace(/\$\$([\s\S]*?)\$\$/g, (match) => {
+                            mathPlaceholders.push(match);
+                            return `%%%MATH_DISPLAY_${placeholderIndex++}%%%`;
+                        });
+
+                        content = content.replace(/\$([^\$\n]+?)\$/g, (match, inner) => {
+                            if (/^\d+[,.]?\d*$/.test(inner.trim())) {
+                                return match;
+                            }
+                            mathPlaceholders.push(match);
+                            return `%%%MATH_INLINE_${placeholderIndex++}%%%`;
+                        });
+
+                        content = content.replace(/\n/g, '<br>');
+                        content = content.replace(/\*\*(.{1,80}?)\*\*/g, '<strong>$1</strong>');
+                        content = content.replace(/\*([^\*\n]{1,80}?)\*/g, '<em>$1</em>');
+                        content = content.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+                        for (let i = 0; i < mathPlaceholders.length; i++) {
+                            content = content.replace(`%%%MATH_DISPLAY_${i}%%%`, mathPlaceholders[i]);
+                            content = content.replace(`%%%MATH_INLINE_${i}%%%`, mathPlaceholders[i]);
+                        }
+
+                        return `<p>${content}</p>`;
+                    }
+
+                    function renderLatex(element) {
+                        if (typeof renderMathInElement !== 'undefined') {
+                            try {
+                                renderMathInElement(element, {
+                                    delimiters: [
+                                        {left: '$$', right: '$$', display: true},
+                                        {left: '$', right: '$', display: false},
+                                        {left: '\\[', right: '\\]', display: true},
+                                        {left: '\\(', right: '\\)', display: false}
+                                    ],
+                                    throwOnError: false,
+                                    errorColor: '#cc0000',
+                                    strict: false,
+                                    trust: true,
+                                    macros: {
+                                        "\\R": "\\mathbb{R}",
+                                        "\\N": "\\mathbb{N}",
+                                        "\\Z": "\\mathbb{Z}",
+                                        "\\Q": "\\mathbb{Q}",
+                                        "\\C": "\\mathbb{C}"
+                                    },
+                                    errorCallback: function(msg, err) {
+                                        console.warn('KaTeX error:', msg, err);
+                                    }
+                                });
+
+                                const errorSpans = element.querySelectorAll('.katex-error');
+                                errorSpans.forEach(span => {
+                                    const originalText = span.getAttribute('title') || span.textContent;
+                                    const cleanText = originalText.replace(/^\$+|\$+$/g, '');
+                                    span.className = 'math-fallback';
+                                    span.style.cssText = 'font-family: "Times New Roman", serif; font-style: italic; color: inherit;';
+                                    span.textContent = cleanText;
+                                });
+                            } catch (e) {
+                                console.warn('LaTeX rendering error:', e);
+                            }
+                        }
+                    }
+
+                    function addStreamingMessage() {
+                        const messagesEl = document.getElementById('messages');
+                        const messageDiv = document.createElement('div');
+                        messageDiv.className = 'message assistant streaming';
+                        messageDiv.id = 'streaming-message';
+                        messageDiv.innerHTML = `
+                            <img src="/static/images/maize-logo.png" alt="Maize" class="ta-avatar">
+                            <div class="message-wrapper">
+                                <div class="message-status">
+                                    <div class="status-indicator">
+                                        <span class="status-dot"></span>
+                                        <span class="status-text">Preparing...</span>
+                                    </div>
+                                </div>
+                                <div class="message-content" id="streaming-content"></div>
+                            </div>
+                        `;
+                        messagesEl.appendChild(messageDiv);
+                        const chatMain = document.querySelector('.chat-messages-embedded');
+                        chatMain.scrollTop = chatMain.scrollHeight;
+                        return messageDiv;
+                    }
+
+                    function updateStreamingStatus(message) {
+                        const statusText = document.querySelector('#streaming-message .status-text');
+                        if (statusText) {
+                            statusText.textContent = message;
+                        }
+                    }
+
+                    function hideStreamingStatus() {
+                        const statusDiv = document.querySelector('#streaming-message .message-status');
+                        if (statusDiv) {
+                            statusDiv.style.display = 'none';
+                        }
+                    }
+
+                    function appendToStreamingContent(token) {
+                        const contentEl = document.getElementById('streaming-content');
+                        if (contentEl) {
+                            contentEl.textContent += token;
+                            const chatMain = document.querySelector('.chat-messages-embedded');
+                            chatMain.scrollTop = chatMain.scrollHeight;
+                        }
+                    }
+
+                    function finalizeStreamingMessage(sources) {
+                        const streamingMsg = document.getElementById('streaming-message');
+                        if (!streamingMsg) return;
+
+                        const contentEl = document.getElementById('streaming-content');
+                        const rawContent = contentEl.textContent;
+
+                        streamingMsg.id = '';
+                        streamingMsg.className = 'message assistant';
+
+                        let html = `<img src="/static/images/maize-logo.png" alt="Maize" class="ta-avatar">`;
+                        html += `<div class="message-content">${formatContent(rawContent)}`;
+
+                        if (sources && sources.length > 0) {
+                            const uniqueSources = [...new Set(sources)];
+                            html += `
+                                <div class="message-sources">
+                                    <span class="sources-label">Sources:</span>
+                                    ${uniqueSources.map(s => `<span class="source-tag">${s}</span>`).join('')}
+                                </div>
+                            `;
+                        }
+
+                        html += `</div>`;
+                        streamingMsg.innerHTML = html;
+                        renderLatex(streamingMsg);
+                        requestAnimationFrame(() => {
+                            const chatMain = document.querySelector('.chat-messages-embedded');
+                            chatMain.scrollTop = chatMain.scrollHeight;
+                        });
+                    }
+
+                    async function sendMessage(e) {
+                        e.preventDefault();
+
+                        const input = document.getElementById('query-input');
+                        const query = input.value.trim();
+
+                        if (!query) return;
+
+                        addMessage('user', query);
+                        input.value = '';
+                        autoResize(input);
+
+                        const sendBtn = document.getElementById('send-btn');
+                        sendBtn.disabled = true;
+
+                        let sources = [];
+                        addStreamingMessage();
+
+                        try {
+                            const response = await fetch(`/student/ta/${taId}/api/chat/stream`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ query, session_id: sessionId })
+                            });
+
+                            if (!response.ok) {
+                                const errorData = await response.json();
+                                throw new Error(errorData.error || 'Request failed');
+                            }
+
+                            const reader = response.body.getReader();
+                            const decoder = new TextDecoder();
+                            let buffer = '';
+                            let hasStartedContent = false;
+
+                            while (true) {
+                                const { done, value } = await reader.read();
+                                if (done) break;
+
+                                buffer += decoder.decode(value, { stream: true });
+
+                                const events = buffer.split('\n\n');
+                                buffer = events.pop() || '';
+
+                                for (const event of events) {
+                                    const lines = event.split('\n');
+                                    for (const line of lines) {
+                                        if (line.startsWith('data: ')) {
+                                            try {
+                                                const data = JSON.parse(line.slice(6));
+
+                                                switch (data.type) {
+                                                    case 'status':
+                                                        updateStreamingStatus(data.message);
+                                                        break;
+                                                    case 'sources':
+                                                        sources = data.sources;
+                                                        break;
+                                                    case 'token':
+                                                        if (!hasStartedContent) {
+                                                            hideStreamingStatus();
+                                                            hasStartedContent = true;
+                                                        }
+                                                        appendToStreamingContent(data.content);
+                                                        break;
+                                                    case 'done':
+                                                        sessionId = data.session_id;
+                                                        finalizeStreamingMessage(sources);
+                                                        break;
+                                                    case 'error':
+                                                        throw new Error(data.message);
+                                                }
+                                            } catch (parseErr) {
+                                                if (parseErr.message !== 'Unexpected end of JSON input') {
+                                                    console.warn('Parse error:', parseErr);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                        } catch (err) {
+                            console.error('Stream error:', err);
+                            const streamingMsg = document.getElementById('streaming-message');
+                            if (streamingMsg) {
+                                streamingMsg.remove();
+                            }
+                            addMessage('assistant', `I apologize, but I had trouble processing your request: ${err.message}`);
+                        } finally {
+                            sendBtn.disabled = false;
+                            input.focus();
+                        }
+                    }
+                </script>
+            {% else %}
+                <!-- Welcome Screen -->
+                <div class="welcome-container">
+                    <h1>Welcome to Maize TA</h1>
+                    <p>Select a course from the sidebar to start chatting with your teaching assistant.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

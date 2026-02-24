@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Professor Dashboard - Maize TA</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="admin-container">
+        <header class="admin-header">
+            <h1>Professor Dashboard</h1>
+            <div style="display: flex; gap: 15px; align-items: center;">
+                <span>{{ current_user.first_name }} {{ current_user.last_name }}</span>
+                <a href="{{ url_for('professor.settings') }}" class="btn btn-secondary">Settings</a>
+                <a href="{{ url_for('auth.logout') }}" class="btn btn-secondary">Logout</a>
+            </div>
+        </header>
+
+        <main class="admin-main">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="{% if category == 'error' %}error-message{% else %}success-message{% endif %}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 30px;">
+                <div style="padding: 20px; background: #f5f5f5; border-radius: 8px;">
+                    <h3 style="margin: 0 0 10px 0;">Total TAs</h3>
+                    <p style="font-size: 32px; font-weight: bold; margin: 0;">{{ tas|length }}</p>
+                </div>
+                <div style="padding: 20px; background: #f5f5f5; border-radius: 8px;">
+                    <h3 style="margin: 0 0 10px 0;">Total Students</h3>
+                    <p style="font-size: 32px; font-weight: bold; margin: 0;">{{ total_students }}</p>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2>Your Teaching Assistants</h2>
+                <a href="{{ url_for('professor.create_ta') }}" class="btn btn-primary">Create New TA</a>
+            </div>
+
+            {% if tas %}
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background: #f5f5f5;">
+                            <th style="padding: 12px; text-align: left;">TA Name</th>
+                            <th style="padding: 12px; text-align: left;">Course</th>
+                            <th style="padding: 12px; text-align: center;">Tier</th>
+                            <th style="padding: 12px; text-align: center;">Enrolled</th>
+                            <th style="padding: 12px; text-align: center;">Status</th>
+                            <th style="padding: 12px; text-align: center;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ta in tas %}
+                            <tr style="border-bottom: 1px solid #eee;">
+                                <td style="padding: 12px;">{{ ta.name }}</td>
+                                <td style="padding: 12px;">{{ ta.course_name }}</td>
+                                <td style="padding: 12px; text-align: center;">
+                                    {{ billing_tiers[ta.billing_tier]['name'] if ta.requires_billing else 'Admin' }}
+                                </td>
+                                <td style="padding: 12px; text-align: center;">
+                                    {{ ta.current_enrollment_count }} / {{ ta.max_students }}
+                                </td>
+                                <td style="padding: 12px; text-align: center;">
+                                    {% if ta.is_paused %}
+                                        <span style="color: #ff9800;">Paused</span>
+                                    {% elif ta.is_active %}
+                                        <span style="color: #4caf50;">Active</span>
+                                    {% else %}
+                                        <span style="color: #999;">Inactive</span>
+                                    {% endif %}
+                                </td>
+                                <td style="padding: 12px; text-align: center;">
+                                    <a href="{{ url_for('professor.manage_ta', ta_id=ta.id) }}" class="btn btn-secondary" style="font-size: 12px; padding: 5px 10px;">Manage</a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p style="text-align: center; color: #666; padding: 40px;">
+                    No TAs yet. Create your first teaching assistant to get started!
+                </p>
+            {% endif %}
+        </main>
+    </div>
+</body>
+</html>

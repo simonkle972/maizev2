@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Professor Signup - Maize TA</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="admin-container">
+        <header class="admin-header">
+            <h1>Maize TA</h1>
+        </header>
+
+        <main class="admin-main">
+            <div class="auth-section">
+                <div class="auth-card">
+                    <h2>Professor Signup</h2>
+
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="{% if category == 'error' %}error-message{% else %}success-message{% endif %}">
+                                    {{ message }}
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+
+                    <form method="POST">
+                        <div class="form-group">
+                            <label for="email">Email (.edu address required)</label>
+                            <input type="email" id="email" name="email" required autocomplete="email"
+                                   placeholder="professor@university.edu">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="first_name">First Name</label>
+                            <input type="text" id="first_name" name="first_name" required autocomplete="given-name">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="last_name">Last Name</label>
+                            <input type="text" id="last_name" name="last_name" required autocomplete="family-name">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="password">Password</label>
+                            <input type="password" id="password" name="password" required autocomplete="new-password">
+                            <small style="color: #666; font-size: 12px;">
+                                Must be at least 8 characters with uppercase, lowercase, and number
+                            </small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="confirm_password">Confirm Password</label>
+                            <input type="password" id="confirm_password" name="confirm_password" required autocomplete="new-password">
+                        </div>
+
+                        <hr style="margin: 20px 0; border: none; border-top: 1px solid #eee;">
+
+                        <div class="form-group">
+                            <label>Institution</label>
+                            {% if suggested_institution %}
+                                <div style="padding: 10px; background-color: #e8f5e9; border-radius: 4px; margin-bottom: 10px;">
+                                    <strong>Suggested:</strong> {{ suggested_institution.name }}
+                                </div>
+                            {% endif %}
+
+                            <select id="institution_id" name="institution_id" onchange="toggleNewInstitution()">
+                                <option value="">Select institution...</option>
+                                {% if suggested_institution %}
+                                    <option value="{{ suggested_institution.id }}" selected>{{ suggested_institution.name }}</option>
+                                {% endif %}
+                                {% for inst in institutions %}
+                                    {% if not suggested_institution or inst.id != suggested_institution.id %}
+                                        <option value="{{ inst.id }}">{{ inst.name }}</option>
+                                    {% endif %}
+                                {% endfor %}
+                                <option value="new">Create new institution...</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group" id="new_institution_group" style="display: none;">
+                            <label for="new_institution_name">New Institution Name</label>
+                            <input type="text" id="new_institution_name" name="new_institution_name" placeholder="University Name">
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-full">Create Account</button>
+                    </form>
+
+                    <div style="margin-top: 20px; text-align: center;">
+                        <a href="{{ url_for('auth.professor_login') }}" style="color: #666; font-size: 14px;">Already have an account? Login</a>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        function toggleNewInstitution() {
+            const select = document.getElementById('institution_id');
+            const newInstGroup = document.getElementById('new_institution_group');
+            const newInstInput = document.getElementById('new_institution_name');
+
+            if (select.value === 'new') {
+                newInstGroup.style.display = 'block';
+                newInstInput.required = true;
+            } else {
+                newInstGroup.style.display = 'none';
+                newInstInput.required = false;
+                newInstInput.value = '';
+            }
+        }
+    </script>
+</body>
+</html>

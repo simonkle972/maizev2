@@ -6,12 +6,50 @@ dotenv_path = os.getenv('DOTENV_PATH', '.env')
 load_dotenv(dotenv_path)
 
 class Config:
+    # OpenAI Configuration
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
     EMBEDDING_MODEL = "text-embedding-3-small"
     LLM_MODEL = "gpt-5.2"
     LLM_REASONING_HIGH = "high"
     LLM_REASONING_MEDIUM = "medium"
     LLM_MAX_COMPLETION_TOKENS = 16000
+
+    # Stripe Configuration
+    USE_STRIPE_TEST_MODE = os.getenv('USE_STRIPE_TEST_MODE', 'True') == 'True'
+
+    if USE_STRIPE_TEST_MODE:
+        STRIPE_PUBLIC_KEY = 'pk_test_51T0pFGI30M44KtHd01UT5URk0LXNYLzsjihP7oSybDXFI6tfZgfcijjUuB5NKMb1rN7s3iwL7pBD8xarxvMurNKB00sVvsTyC5'
+        STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY_TEST')
+        STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET_TEST', '')
+    else:
+        STRIPE_PUBLIC_KEY = 'pk_live_51T0pF5IM4QLaEDfyu2Qb5K6V2VRT5ocyPRNw4DMliQxPLBLKUuW1WD9wfboVuWw613072q2IewQ5CMAPHt42sdTk00gRCiaAM7'
+        STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY_LIVE')
+        STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET_LIVE', '')
+
+    # Billing tiers with Stripe price IDs
+    BILLING_TIERS = {
+        'tier1': {
+            'name': 'Small Course',
+            'max_students': 50,
+            'price_monthly': 9.99,
+            'stripe_price_id': os.getenv('STRIPE_PRICE_TIER1')
+        },
+        'tier2': {
+            'name': 'Medium Course',
+            'max_students': 100,
+            'price_monthly': 14.99,
+            'stripe_price_id': os.getenv('STRIPE_PRICE_TIER2')
+        },
+        'tier3': {
+            'name': 'Large Course',
+            'max_students': 250,
+            'price_monthly': 19.99,
+            'stripe_price_id': os.getenv('STRIPE_PRICE_TIER3')
+        },
+    }
+
+    # Email validation settings
+    REQUIRE_EDU_EMAIL = True
     
     ADMIN_SECRET_KEY = os.getenv("ADMIN_SECRET_KEY", "maize-admin-2024")
     ADMIN_USERNAME = os.getenv("admin_id", "")

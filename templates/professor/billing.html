@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Billing - Maize TA</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="admin-container">
+        <header class="admin-header">
+            <h1>Billing</h1>
+            <a href="{{ url_for('professor.settings') }}" class="btn btn-secondary">Back to Settings</a>
+        </header>
+
+        <main class="admin-main">
+            <div style="background: #e8f5e9; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
+                <h2 style="margin: 0 0 10px 0;">Total Monthly Cost</h2>
+                <p style="font-size: 36px; font-weight: bold; margin: 0;">${{ "%.2f"|format(total_monthly_cost) }}</p>
+            </div>
+
+            <h2>Subscription Breakdown</h2>
+            {% if tas %}
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background: #f5f5f5;">
+                            <th style="padding: 12px; text-align: left;">TA Name</th>
+                            <th style="padding: 12px; text-align: center;">Tier</th>
+                            <th style="padding: 12px; text-align: center;">Status</th>
+                            <th style="padding: 12px; text-align: right;">Monthly Cost</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ta in tas %}
+                            <tr style="border-bottom: 1px solid #eee;">
+                                <td style="padding: 12px;">{{ ta.name }}</td>
+                                <td style="padding: 12px; text-align: center;">{{ billing_tiers[ta.billing_tier]['name'] }}</td>
+                                <td style="padding: 12px; text-align: center;">
+                                    {% if ta.is_paused %}
+                                        <span style="color: #ff9800;">Paused ($0)</span>
+                                    {% else %}
+                                        <span style="color: #4caf50;">Active</span>
+                                    {% endif %}
+                                </td>
+                                <td style="padding: 12px; text-align: right;">
+                                    ${{ "%.2f"|format(billing_tiers[ta.billing_tier]['price_monthly'] if not ta.is_paused else 0) }}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p style="color: #666;">No active subscriptions.</p>
+            {% endif %}
+
+            <div style="margin-top: 30px;">
+                <a href="{{ url_for('professor.billing_portal') }}" class="btn btn-primary">Manage Subscriptions in Stripe</a>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

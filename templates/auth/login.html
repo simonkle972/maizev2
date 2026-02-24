@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Maize TA</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="admin-container">
+        <header class="admin-header">
+            <h1>Maize TA</h1>
+        </header>
+
+        <main class="admin-main">
+            <div class="auth-section">
+                <div class="auth-card">
+                    {% if role == 'student' %}
+                        <h2>Student Login</h2>
+                        <p style="color: #666; font-size: 14px; margin-bottom: 20px;">Log in to access your courses and chat with your TAs.</p>
+                    {% elif role == 'professor' %}
+                        <h2>Professor Login</h2>
+                        <p style="color: #666; font-size: 14px; margin-bottom: 20px;">Log in to manage your teaching assistants.</p>
+                    {% elif role == 'admin' %}
+                        <h2>Admin Login</h2>
+                        <p style="color: #666; font-size: 14px; margin-bottom: 20px;">Company personnel only.</p>
+                    {% else %}
+                        <h2>Login</h2>
+                    {% endif %}
+
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="{% if category == 'error' %}error-message{% else %}success-message{% endif %}">
+                                    {{ message }}
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+
+                    <form method="POST">
+                        <div class="form-group">
+                            <label for="email">Email</label>
+                            <input type="email" id="email" name="email" required autocomplete="email">
+                        </div>
+                        <div class="form-group">
+                            <label for="password">Password</label>
+                            <input type="password" id="password" name="password" required autocomplete="current-password">
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-full">Login</button>
+                    </form>
+
+                    <div style="margin-top: 20px; text-align: center;">
+                        <a href="{{ url_for('auth.forgot_password') }}" style="color: #666; font-size: 14px;">Forgot password?</a>
+                    </div>
+
+                    {% if role == 'student' %}
+                        <div style="margin-top: 15px; text-align: center;">
+                            <a href="{{ url_for('auth.professor_login') }}" style="color: #666; font-size: 14px;">Professor? Click here</a>
+                        </div>
+                    {% elif role == 'professor' %}
+                        <div style="margin-top: 15px; text-align: center;">
+                            <a href="{{ url_for('auth.student_login') }}" style="color: #666; font-size: 14px;">Student? Click here</a>
+                        </div>
+                    {% endif %}
+
+                    <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
+
+                    <div style="text-align: center;">
+                        <p style="color: #666; margin-bottom: 10px;">Don't have an account?</p>
+                        <a href="{{ url_for('auth.professor_signup') }}" class="btn btn-secondary" style="margin-right: 10px;">Sign up as Professor</a>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

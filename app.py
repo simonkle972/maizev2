@@ -4,10 +4,11 @@ import secrets
 import threading
 import time
 from datetime import datetime, timedelta
-from flask import Flask, request, jsonify, render_template, session, redirect, url_for, send_from_directory, Response, stream_with_context
+from flask import Flask, request, jsonify, render_template, session, redirect, url_for, send_from_directory, Response, stream_with_context, flash
 from flask_migrate import Migrate
+from flask_login import LoginManager, login_required, current_user
 from config import Config
-from models import db, TeachingAssistant, Document, ChatSession, ChatMessage, DocumentChunk, Institution, IndexingJob
+from models import db, User, TeachingAssistant, Document, ChatSession, ChatMessage, DocumentChunk, Institution, IndexingJob, Enrollment
 
 logging.basicConfig(
     level=logging.INFO,
@@ -35,6 +36,56 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 
 db.init_app(app)
 migrate = Migrate(app, db)
+
+# Flask-Login setup
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'auth.professor_login'  # Professors/admin use Flask-Login
+
+@login_manager.unauthorized_handler
+def unauthorized():
+    """Handle unauthorized access - return JSON for API calls, HTML redirect for pages."""
+    if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({"error": "Authentication required. Please log in."}), 401
+    return redirect(url_for('auth.professor_login'))
+
+@login_manager.user_loader
+def load_user(user_id):
+    """Load user by ID for Flask-Login."""
+    return User.query.get(int(user_id))
+
+# Student authentication (parallel session system)
+from auth_student import current_student, get_current_student
+
+@app.context_processor
+def inject_current_student():
+    """Make current_student available in all templates (like current_user)."""
+    return dict(current_student=current_student)
+
+@app.before_request
+def migrate_student_sessions():
+    """
+    One-time migration: Move existing student sessions from Flask-Login to new session key.
+    This runs once per session after deployment. Can be removed after 30 days (all sessions expired).
+    """
+    if '_user_id' in session and '_student_id' not in session:
+        # Check if the old session contains a student
+        user = User.query.get(session['_user_id'])
+        if user and user.role == 'student':
+            # Migrate to new student session key
+            session['_student_id'] = user.id
+            # Remove old Flask-Login session (student no longer uses it)
+            del session['_user_id']
+            session.modified = True
+            logger.info(f"Migrated student session for user {user.id} to parallel session system")
+
+# Register blueprints
+from auth import auth_bp
+from professor import professor_bp
+from student import student_bp
+app.register_blueprint(auth_bp)
+app.register_blueprint(professor_bp)
+app.register_blueprint(student_bp)
 
 @app.route('/health')
 def health():
@@ -111,6 +162,81 @@ Submitted at: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}
 def health_check():
     return 'OK', 200
 
+@app.route('/webhook/stripe', methods=['POST'])
+def stripe_webhook():
+    """Handle Stripe webhook events."""
+    import stripe
+    from config import Config
+
+    stripe.api_key = Config.STRIPE_SECRET_KEY
+    payload = request.get_data(as_text=True)
+    sig_header = request.headers.get('Stripe-Signature')
+
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, Config.STRIPE_WEBHOOK_SECRET
+        )
+    except ValueError:
+        # Invalid payload
+        logger.error("Stripe webhook: Invalid payload")
+        return jsonify({'error': 'Invalid payload'}), 400
+    except stripe.error.SignatureVerificationError:
+        # Invalid signature
+        logger.error("Stripe webhook: Invalid signature")
+        return jsonify({'error': 'Invalid signature'}), 400
+
+    # Handle the event
+    event_type = event['type']
+    logger.info(f"Stripe webhook received: {event_type}")
+
+    if event_type == 'checkout.session.completed':
+        # Payment successful - TA creation handled in professor.create_ta_success
+        session = event['data']['object']
+        logger.info(f"Checkout completed: {session.get('id')}")
+
+    elif event_type == 'invoice.payment_succeeded':
+        # Payment succeeded - update subscription status
+        invoice = event['data']['object']
+        subscription_id = invoice.get('subscription')
+        if subscription_id:
+            ta = TeachingAssistant.query.filter_by(stripe_subscription_id=subscription_id).first()
+            if ta:
+                ta.subscription_status = 'active'
+                db.session.commit()
+                logger.info(f"Payment succeeded for TA {ta.id}")
+
+    elif event_type == 'invoice.payment_failed':
+        # Payment failed - notify professor
+        invoice = event['data']['object']
+        subscription_id = invoice.get('subscription')
+        if subscription_id:
+            ta = TeachingAssistant.query.filter_by(stripe_subscription_id=subscription_id).first()
+            if ta:
+                logger.warning(f"Payment failed for TA {ta.id}")
+                # TODO: Send email notification to professor
+
+    elif event_type == 'customer.subscription.updated':
+        # Subscription updated
+        subscription = event['data']['object']
+        subscription_id = subscription.get('id')
+        ta = TeachingAssistant.query.filter_by(stripe_subscription_id=subscription_id).first()
+        if ta:
+            ta.subscription_status = subscription.get('status')
+            db.session.commit()
+            logger.info(f"Subscription updated for TA {ta.id}: {subscription.get('status')}")
+
+    elif event_type == 'customer.subscription.deleted':
+        # Subscription canceled
+        subscription = event['data']['object']
+        subscription_id = subscription.get('id')
+        ta = TeachingAssistant.query.filter_by(stripe_subscription_id=subscription_id).first()
+        if ta:
+            ta.subscription_status = 'canceled'
+            db.session.commit()
+            logger.info(f"Subscription canceled for TA {ta.id}")
+
+    return jsonify({'status': 'success'}), 200
+
 @app.route('/')
 def landing():
     return render_template('landing.html')
@@ -119,12 +245,10 @@ def admin_required(f):
     from functools import wraps
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        is_logged_in = session.get('admin_logged_in')
-        logger.info(f"[ADMIN REQUIRED] Checking auth for {f.__name__}: logged_in={is_logged_in}, session_id={session.get('_id', 'N/A')}")
-        if not is_logged_in:
-            logger.warning(f"[ADMIN REQUIRED] Not authenticated, redirecting to login")
-            return redirect(url_for('admin_login'))
-        logger.info(f"[ADMIN REQUIRED] Authenticated, allowing access to {f.__name__}")
+        if not current_user.is_authenticated or current_user.role != 'admin':
+            logger.warning(f"[ADMIN REQUIRED] Not authenticated as admin, redirecting to login")
+            return redirect(url_for('auth.admin_login'))
+        logger.info(f"[ADMIN REQUIRED] Admin authenticated, allowing access to {f.__name__}")
         return f(*args, **kwargs)
     return decorated_function
 
@@ -133,60 +257,16 @@ def admin_required(f):
 def admin_panel():
     return render_template('admin.html')
 
-@app.route('/admin/login', methods=['GET', 'POST'])
-def admin_login():
-    logger.info(f"[ADMIN LOGIN] Request method: {request.method}, Session exists: {bool(session.get('admin_logged_in'))}")
-
-    if session.get('admin_logged_in'):
-        logger.info("[ADMIN LOGIN] Already logged in, redirecting to admin panel")
-        return redirect(url_for('admin_panel'))
-
-    if request.method == 'POST':
-        username = request.form.get('username', '').strip()
-        password = request.form.get('password', '')
-
-        logger.info(f"[ADMIN LOGIN] Received credentials - username: '{username}', password length: {len(password)}")
-
-        if not username or not password:
-            logger.warning("[ADMIN LOGIN] Missing username or password")
-            return render_template('admin_login.html', error='Please enter both username and password')
-
-        valid_username = Config.ADMIN_USERNAME
-        valid_password = Config.ADMIN_PASSWORD
-
-        logger.info(f"[ADMIN LOGIN] Config credentials - username: '{valid_username}', password length: {len(valid_password) if valid_password else 0}")
-
-        if not valid_username or not valid_password:
-            logger.error("[ADMIN LOGIN] Admin credentials not configured in environment")
-            return render_template('admin_login.html', error='Admin credentials not configured')
-
-        username_match = username == valid_username
-        password_match = password == valid_password
-
-        logger.info(f"[ADMIN LOGIN] Username match: {username_match}, Password match: {password_match}")
-
-        if username_match and password_match:
-            logger.info("[ADMIN LOGIN] Credentials valid! Setting session and redirecting...")
-            session['admin_logged_in'] = True
-            session.permanent = True
-            logger.info(f"[ADMIN LOGIN] Session set: {session.get('admin_logged_in')}, Session ID: {session.get('_id', 'N/A')}")
-            return redirect(url_for('admin_panel'))
-        else:
-            logger.warning(f"[ADMIN LOGIN] Invalid credentials - user entered: '{username}' / password length {len(password)}")
-            return render_template('admin_login.html', error='Invalid username or password')
-
-    return render_template('admin_login.html')
-
 @app.route('/admin/logout')
 def admin_logout():
-    session.pop('admin_logged_in', None)
-    return redirect(url_for('admin_login'))
+    """Redirect old admin logout to new unified logout."""
+    return redirect(url_for('auth.logout'))
 
 def admin_api_required(f):
     from functools import wraps
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not session.get('admin_logged_in'):
+        if not current_user.is_authenticated or current_user.role != 'admin':
             return jsonify({"error": "Unauthorized"}), 401
         return f(*args, **kwargs)
     return decorated_function
@@ -306,6 +386,25 @@ def delete_institution(inst_id):
     db.session.commit()
     
     return jsonify({"success": True})
+
+@app.route('/admin/api/users', methods=['GET'])
+@admin_api_required
+def list_users():
+    """List all users (professors, students, admins)."""
+    users = User.query.order_by(User.created_at.desc()).all()
+    return jsonify([{
+        "id": user.id,
+        "email": user.email,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "role": user.role,
+        "institution_id": user.institution_id,
+        "institution_name": user.institution.name if user.institution else None,
+        "is_active": user.is_active,
+        "created_at": user.created_at.isoformat() if user.created_at else None,
+        "last_login_at": user.last_login_at.isoformat() if user.last_login_at else None,
+        "stripe_customer_id": user.stripe_customer_id if user.role == 'professor' else None
+    } for user in users])
 
 @app.route('/admin/api/tas', methods=['GET'])
 @admin_api_required
@@ -935,289 +1034,329 @@ def test_qa_logging():
     result = test_connection()
     return jsonify(result)
 
-@app.route('/<slug>')
-def ta_chat(slug):
-    ta = TeachingAssistant.query.filter_by(slug=slug, is_active=True).first()
-    if not ta:
-        return render_template('404.html'), 404
-    
-    return render_template('chat.html', ta=ta)
+# DISABLED: Public slug-based routes removed for security/privacy
+# TAs are now only accessible through authenticated dashboard routes
+# Students access via /student/dashboard/<ta_id> with embedded chat
+# See student.py for new authenticated chat API endpoints
 
-@app.route('/<slug>/api/chat', methods=['POST'])
-def chat_api(slug):
-    ta = TeachingAssistant.query.filter_by(slug=slug, is_active=True).first()
-    if not ta:
-        return jsonify({"error": "TA not found"}), 404
-    
-    if not ta.is_indexed:
-        return jsonify({"error": "This teaching assistant is not ready yet. Please check back later."}), 400
-    
-    data = request.json
-    query = data.get('query', '').strip()
-    session_id = data.get('session_id', '')
-    
-    if not query:
-        return jsonify({"error": "Query required"}), 400
-    
-    if not session_id:
-        session_id = secrets.token_urlsafe(16)
-        chat_session = ChatSession(id=session_id, ta_id=ta.id)
-        db.session.add(chat_session)
-        db.session.commit()
-    else:
-        chat_session = ChatSession.query.filter_by(id=session_id, ta_id=ta.id).first()
-        if not chat_session:
-            session_id = secrets.token_urlsafe(16)
-            chat_session = ChatSession(id=session_id, ta_id=ta.id)
-            db.session.add(chat_session)
-            db.session.commit()
-    
-    try:
-        import time
-        from src.retriever import retrieve_context
-        from src.response_generator import generate_response
-        from src.qa_logger import log_qa_entry
-        
-        start_time = time.time()
-        
-        recent_messages = ChatMessage.query.filter_by(session_id=session_id).order_by(ChatMessage.created_at.desc()).limit(10).all()
-        conversation_history = list(reversed(recent_messages))
-        
-        retrieval_start = time.time()
-        chunks, retrieval_diagnostics = retrieve_context(ta.id, query, top_k=8, conversation_history=conversation_history, session_id=session_id)
-        retrieval_latency_ms = int((time.time() - retrieval_start) * 1000)
-        
-        context = "\n\n---\n\n".join([
-            f"[From: {c['file_name']}]\n{c['text']}" 
-            for c in chunks
-        ])
-        
-        history_text = ""
-        if conversation_history:
-            history_parts = []
-            for msg in conversation_history[-6:]:
-                role = "Student" if msg.role == "user" else "Assistant"
-                history_parts.append(f"{role}: {msg.content[:300]}...")
-            history_text = "\n".join(history_parts)
-        
-        generation_start = time.time()
-        hybrid_mode = retrieval_diagnostics.get("hybrid_fallback_triggered", False)
-        hybrid_doc_filename = retrieval_diagnostics.get("hybrid_doc_filename")
-        query_reference = retrieval_diagnostics.get("validation_expected_ref")
-        
-        response_text = generate_response(
-            query=query,
-            context=context,
-            system_prompt=ta.system_prompt,
-            conversation_history=history_text,
-            course_name=ta.course_name,
-            hybrid_mode=hybrid_mode,
-            hybrid_doc_filename=hybrid_doc_filename,
-            query_reference=query_reference
-        )
-        generation_latency_ms = int((time.time() - generation_start) * 1000)
-        
-        user_message = ChatMessage(session_id=session_id, role="user", content=query)
-        sources = [c['file_name'] for c in chunks[:3]]
-        assistant_message = ChatMessage(
-            session_id=session_id, 
-            role="assistant", 
-            content=response_text,
-            sources=sources
-        )
-        db.session.add(user_message)
-        db.session.add(assistant_message)
-        chat_session.last_activity = datetime.utcnow()
-        db.session.commit()
-        
-        total_latency_ms = int((time.time() - start_time) * 1000)
-        token_count = len(response_text.split())
-        
-        log_qa_entry(
-            ta_id=str(ta.id),
-            ta_slug=ta.slug,
-            ta_name=ta.name,
-            course_name=ta.course_name,
-            session_id=session_id,
-            query=query,
-            answer=response_text,
-            sources=sources,
-            chunk_count=len(chunks),
-            latency_ms=total_latency_ms,
-            retrieval_latency_ms=retrieval_latency_ms,
-            generation_latency_ms=generation_latency_ms,
-            token_count=token_count,
-            retrieval_diagnostics=retrieval_diagnostics
-        )
-        
-        return jsonify({
-            "response": response_text,
-            "session_id": session_id,
-            "sources": sources
-        })
-        
-    except Exception as e:
-        logger.error(f"Chat error for {slug}: {e}")
-        return jsonify({"error": "An error occurred processing your question. Please try again."}), 500
+# @app.route('/<slug>')
+# def ta_chat(slug):
+#     ta = TeachingAssistant.query.filter_by(slug=slug, is_active=True).first()
+#     if not ta:
+#         return render_template('404.html'), 404
+#
+#     # Check if TA is paused
+#     if ta.is_paused:
+#         flash('This course is currently paused and unavailable.', 'error')
+#         if current_user.is_authenticated and current_user.role == 'professor' and ta.professor_id == current_user.id:
+#             return redirect(url_for('professor.manage_ta', ta_id=ta.id))
+#         return redirect(url_for('landing'))
+#
+#     # Access control for non-anonymous TAs
+#     if not ta.allow_anonymous_chat:
+#         if not current_user.is_authenticated:
+#             flash('Please log in to access this TA.', 'info')
+#             return redirect(url_for('auth.login'))
+#
+#         if current_user.role == 'student':
+#             # Check enrollment
+#             enrollment = Enrollment.query.filter_by(
+#                 student_id=current_user.id,
+#                 ta_id=ta.id
+#             ).first()
+#             if not enrollment:
+#                 flash('You are not enrolled in this course.', 'error')
+#                 return redirect(url_for('student.dashboard'))
+#         elif current_user.role == 'professor':
+#             # Professors can only access their own TAs
+#             if ta.professor_id != current_user.id:
+#                 flash('Access denied.', 'error')
+#                 return redirect(url_for('professor.dashboard'))
+#         # Admins can access any TA
+#
+#     return render_template('chat.html', ta=ta)
 
-@app.route('/<slug>/api/chat/stream', methods=['POST'])
-def chat_stream_api(slug):
-    import json
-    
-    ta = TeachingAssistant.query.filter_by(slug=slug, is_active=True).first()
-    if not ta:
-        return jsonify({"error": "TA not found"}), 404
-    
-    if not ta.is_indexed:
-        return jsonify({"error": "This teaching assistant is not ready yet. Please check back later."}), 400
-    
-    data = request.json
-    query = data.get('query', '').strip()
-    session_id = data.get('session_id', '')
-    
-    if not query:
-        return jsonify({"error": "Query required"}), 400
-    
-    if not session_id:
-        session_id = secrets.token_urlsafe(16)
-        chat_session = ChatSession(id=session_id, ta_id=ta.id)
-        db.session.add(chat_session)
-        db.session.commit()
-    else:
-        chat_session = ChatSession.query.filter_by(id=session_id, ta_id=ta.id).first()
-        if not chat_session:
-            session_id = secrets.token_urlsafe(16)
-            chat_session = ChatSession(id=session_id, ta_id=ta.id)
-            db.session.add(chat_session)
-            db.session.commit()
-    
-    user_message = ChatMessage(session_id=session_id, role="user", content=query)
-    db.session.add(user_message)
-    db.session.commit()
-    
-    ta_id = ta.id
-    ta_slug = ta.slug
-    ta_name = ta.name
-    ta_system_prompt = ta.system_prompt
-    ta_course_name = ta.course_name
-    
-    def generate():
-        import time
-        from src.qa_logger import log_qa_entry
-        
-        start_time = time.time()
-        retrieval_latency_ms = 0
-        generation_latency_ms = 0
-        chunk_count = 0
-        sources = []
-        full_response = ""
-        
-        try:
-            from src.retriever import retrieve_context
-            from src.response_generator import generate_response_stream, escape_hash_in_latex
-            
-            yield f"data: {json.dumps({'type': 'status', 'message': 'Searching course materials...'})}\n\n"
-            
-            recent_messages = ChatMessage.query.filter_by(session_id=session_id).order_by(ChatMessage.created_at.desc()).limit(10).all()
-            conversation_history = list(reversed(recent_messages))
-            
-            history_text = ""
-            if conversation_history:
-                history_parts = []
-                for msg in conversation_history[-6:]:
-                    role = "Student" if msg.role == "user" else "Assistant"
-                    history_parts.append(f"{role}: {msg.content[:300]}...")
-                history_text = "\n".join(history_parts)
-            
-            retrieval_start = time.time()
-            chunks, retrieval_diagnostics = retrieve_context(ta_id, query, top_k=8, conversation_history=conversation_history, session_id=session_id)
-            retrieval_latency_ms = int((time.time() - retrieval_start) * 1000)
-            chunk_count = len(chunks)
-            
-            yield f"data: {json.dumps({'type': 'status', 'message': 'Analyzing relevant content...'})}\n\n"
-            
-            context = "\n\n---\n\n".join([
-                f"[From: {c['file_name']}]\n{c['text']}" 
-                for c in chunks
-            ])
-            
-            sources = [c['file_name'] for c in chunks[:3]]
-            yield f"data: {json.dumps({'type': 'sources', 'sources': sources})}\n\n"
-            
-            yield f"data: {json.dumps({'type': 'status', 'message': 'Generating response...'})}\n\n"
-            
-            hybrid_mode = retrieval_diagnostics.get("hybrid_fallback_triggered", False)
-            hybrid_doc_filename = retrieval_diagnostics.get("hybrid_doc_filename")
-            query_reference = retrieval_diagnostics.get("validation_expected_ref")
-            attempt_count = retrieval_diagnostics.get("attempt_count", 0)
-            
-            generation_start = time.time()
-            for token in generate_response_stream(
-                query=query,
-                context=context,
-                system_prompt=ta_system_prompt,
-                conversation_history=history_text,
-                course_name=ta_course_name,
-                hybrid_mode=hybrid_mode,
-                hybrid_doc_filename=hybrid_doc_filename,
-                query_reference=query_reference,
-                attempt_count=attempt_count
-            ):
-                full_response += token
-                yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
-            generation_latency_ms = int((time.time() - generation_start) * 1000)
+# @app.route('/<slug>/api/chat', methods=['POST'])
+# def chat_api(slug):
+#     ta = TeachingAssistant.query.filter_by(slug=slug, is_active=True).first()
+#     if not ta:
+#         return jsonify({"error": "TA not found"}), 404
+#
+#     if not ta.is_indexed:
+#         return jsonify({"error": "This teaching assistant is not ready yet. Please check back later."}), 400
+#
+#     data = request.json
+#     query = data.get('query', '').strip()
+#     session_id = data.get('session_id', '')
+#
+#     if not query:
+#         return jsonify({"error": "Query required"}), 400
+#
+#     if not session_id:
+#         session_id = secrets.token_urlsafe(16)
+#         chat_session = ChatSession(id=session_id, ta_id=ta.id)
+#         db.session.add(chat_session)
+#         db.session.commit()
+#     else:
+#         chat_session = ChatSession.query.filter_by(id=session_id, ta_id=ta.id).first()
+#         if not chat_session:
+#             session_id = secrets.token_urlsafe(16)
+#             chat_session = ChatSession(id=session_id, ta_id=ta.id)
+#             db.session.add(chat_session)
+#             db.session.commit()
+#
+#     try:
+#         import time
+#         from src.retriever import retrieve_context
+#         from src.response_generator import generate_response
+#         from src.qa_logger import log_qa_entry
+#
+#         start_time = time.time()
+#
+#         recent_messages = ChatMessage.query.filter_by(session_id=session_id).order_by(ChatMessage.created_at.desc()).limit(10).all()
+#         conversation_history = list(reversed(recent_messages))
+#
+#         retrieval_start = time.time()
+#         chunks, retrieval_diagnostics = retrieve_context(ta.id, query, top_k=8, conversation_history=conversation_history, session_id=session_id)
+#         retrieval_latency_ms = int((time.time() - retrieval_start) * 1000)
+#
+#         context = "\n\n---\n\n".join([
+#             f"[From: {c['file_name']}]\n{c['text']}"
+#             for c in chunks
+#         ])
+#
+#         history_text = ""
+#         if conversation_history:
+#             history_parts = []
+#             for msg in conversation_history[-6:]:
+#                 role = "Student" if msg.role == "user" else "Assistant"
+#                 history_parts.append(f"{role}: {msg.content[:300]}...")
+#             history_text = "\n".join(history_parts)
+#
+#         generation_start = time.time()
+#         hybrid_mode = retrieval_diagnostics.get("hybrid_fallback_triggered", False)
+#         hybrid_doc_filename = retrieval_diagnostics.get("hybrid_doc_filename")
+#         query_reference = retrieval_diagnostics.get("validation_expected_ref")
+#
+#         response_text = generate_response(
+#             query=query,
+#             context=context,
+#             system_prompt=ta.system_prompt,
+#             conversation_history=history_text,
+#             course_name=ta.course_name,
+#             hybrid_mode=hybrid_mode,
+#             hybrid_doc_filename=hybrid_doc_filename,
+#             query_reference=query_reference
+#         )
+#         generation_latency_ms = int((time.time() - generation_start) * 1000)
+#
+#         user_message = ChatMessage(session_id=session_id, role="user", content=query)
+#         sources = [c['file_name'] for c in chunks[:3]]
+#         assistant_message = ChatMessage(
+#             session_id=session_id,
+#             role="assistant",
+#             content=response_text,
+#             sources=sources
+#         )
+#         db.session.add(user_message)
+#         db.session.add(assistant_message)
+#         chat_session.last_activity = datetime.utcnow()
+#         db.session.commit()
+#
+#         total_latency_ms = int((time.time() - start_time) * 1000)
+#         token_count = len(response_text.split())
+#
+#         log_qa_entry(
+#             ta_id=str(ta.id),
+#             ta_slug=ta.slug,
+#             ta_name=ta.name,
+#             course_name=ta.course_name,
+#             session_id=session_id,
+#             query=query,
+#             answer=response_text,
+#             sources=sources,
+#             chunk_count=len(chunks),
+#             latency_ms=total_latency_ms,
+#             retrieval_latency_ms=retrieval_latency_ms,
+#             generation_latency_ms=generation_latency_ms,
+#             token_count=token_count,
+#             retrieval_diagnostics=retrieval_diagnostics
+#         )
+#
+#         return jsonify({
+#             "response": response_text,
+#             "session_id": session_id,
+#             "sources": sources
+#         })
+#
+#     except Exception as e:
+#         logger.error(f"Chat error for {slug}: {e}")
+#         return jsonify({"error": "An error occurred processing your question. Please try again."}), 500
 
-            # Sanitize LaTeX # characters before saving
-            full_response = escape_hash_in_latex(full_response)
-
-            chat_session_update = ChatSession.query.get(session_id)
-            assistant_message = ChatMessage(
-                session_id=session_id, 
-                role="assistant", 
-                content=full_response,
-                sources=sources
-            )
-            db.session.add(assistant_message)
-            if chat_session_update:
-                chat_session_update.last_activity = datetime.utcnow()
-            db.session.commit()
-            
-            total_latency_ms = int((time.time() - start_time) * 1000)
-            token_count = len(full_response.split())
-            
-            log_qa_entry(
-                ta_id=str(ta_id),
-                ta_slug=ta_slug,
-                ta_name=ta_name,
-                course_name=ta_course_name,
-                session_id=session_id,
-                query=query,
-                answer=full_response,
-                sources=sources,
-                chunk_count=chunk_count,
-                latency_ms=total_latency_ms,
-                retrieval_latency_ms=retrieval_latency_ms,
-                generation_latency_ms=generation_latency_ms,
-                token_count=token_count,
-                retrieval_diagnostics=retrieval_diagnostics
-            )
-            
-            yield f"data: {json.dumps({'type': 'done', 'session_id': session_id})}\n\n"
-            
-        except Exception as e:
-            logger.error(f"Streaming chat error for {slug}: {e}")
-            import traceback
-            logger.error(f"Traceback: {traceback.format_exc()}")
-            yield f"data: {json.dumps({'type': 'error', 'message': 'An error occurred processing your question.'})}\n\n"
-    
-    return Response(
-        stream_with_context(generate()),
-        mimetype='text/event-stream',
-        headers={
-            'Cache-Control': 'no-cache',
-            'X-Accel-Buffering': 'no'
-        }
-    )
+# @app.route('/<slug>/api/chat/stream', methods=['POST'])
+# def chat_stream_api(slug):
+#     import json
+#
+#     ta = TeachingAssistant.query.filter_by(slug=slug, is_active=True).first()
+#     if not ta:
+#         return jsonify({"error": "TA not found"}), 404
+#
+#     if not ta.is_indexed:
+#         return jsonify({"error": "This teaching assistant is not ready yet. Please check back later."}), 400
+#
+#     data = request.json
+#     query = data.get('query', '').strip()
+#     session_id = data.get('session_id', '')
+#
+#     if not query:
+#         return jsonify({"error": "Query required"}), 400
+#
+#     if not session_id:
+#         session_id = secrets.token_urlsafe(16)
+#         user_id = current_user.id if current_user.is_authenticated else None
+#         chat_session = ChatSession(id=session_id, ta_id=ta.id, user_id=user_id)
+#         db.session.add(chat_session)
+#         db.session.commit()
+#     else:
+#         chat_session = ChatSession.query.filter_by(id=session_id, ta_id=ta.id).first()
+#         if not chat_session:
+#             session_id = secrets.token_urlsafe(16)
+#             user_id = current_user.id if current_user.is_authenticated else None
+#             chat_session = ChatSession(id=session_id, ta_id=ta.id, user_id=user_id)
+#             db.session.add(chat_session)
+#             db.session.commit()
+#         elif current_user.is_authenticated and not chat_session.user_id:
+#             # Link anonymous session to user
+#             chat_session.user_id = current_user.id
+#             db.session.commit()
+#
+#     user_message = ChatMessage(session_id=session_id, role="user", content=query)
+#     db.session.add(user_message)
+#     db.session.commit()
+#
+#     ta_id = ta.id
+#     ta_slug = ta.slug
+#     ta_name = ta.name
+#     ta_system_prompt = ta.system_prompt
+# #     ta_course_name = ta.course_name
+#
+#     def generate():
+#         import time
+#         from src.qa_logger import log_qa_entry
+#
+#         start_time = time.time()
+#         retrieval_latency_ms = 0
+#         generation_latency_ms = 0
+#         chunk_count = 0
+#         sources = []
+#         full_response = ""
+#
+#         try:
+#             from src.retriever import retrieve_context
+#             from src.response_generator import generate_response_stream, escape_hash_in_latex
+#
+#             yield f"data: {json.dumps({'type': 'status', 'message': 'Searching course materials...'})}\n\n"
+#
+#             recent_messages = ChatMessage.query.filter_by(session_id=session_id).order_by(ChatMessage.created_at.desc()).limit(10).all()
+#             conversation_history = list(reversed(recent_messages))
+#
+#             history_text = ""
+#             if conversation_history:
+#                 history_parts = []
+#                 for msg in conversation_history[-6:]:
+#                     role = "Student" if msg.role == "user" else "Assistant"
+#                     history_parts.append(f"{role}: {msg.content[:300]}...")
+#                 history_text = "\n".join(history_parts)
+#
+#             retrieval_start = time.time()
+#             chunks, retrieval_diagnostics = retrieve_context(ta_id, query, top_k=8, conversation_history=conversation_history, session_id=session_id)
+#             retrieval_latency_ms = int((time.time() - retrieval_start) * 1000)
+#             chunk_count = len(chunks)
+#
+#             yield f"data: {json.dumps({'type': 'status', 'message': 'Analyzing relevant content...'})}\n\n"
+#
+#             context = "\n\n---\n\n".join([
+#                 f"[From: {c['file_name']}]\n{c['text']}"
+#                 for c in chunks
+#             ])
+#
+#             sources = [c['file_name'] for c in chunks[:3]]
+#             yield f"data: {json.dumps({'type': 'sources', 'sources': sources})}\n\n"
+#
+#             yield f"data: {json.dumps({'type': 'status', 'message': 'Generating response...'})}\n\n"
+#
+#             hybrid_mode = retrieval_diagnostics.get("hybrid_fallback_triggered", False)
+#             hybrid_doc_filename = retrieval_diagnostics.get("hybrid_doc_filename")
+#             query_reference = retrieval_diagnostics.get("validation_expected_ref")
+#             attempt_count = retrieval_diagnostics.get("attempt_count", 0)
+#
+#             generation_start = time.time()
+#             for token in generate_response_stream(
+#                 query=query,
+#                 context=context,
+#                 system_prompt=ta_system_prompt,
+#                 conversation_history=history_text,
+#                 course_name=ta_course_name,
+#                 hybrid_mode=hybrid_mode,
+#                 hybrid_doc_filename=hybrid_doc_filename,
+#                 query_reference=query_reference,
+#                 attempt_count=attempt_count
+#             ):
+#                 full_response += token
+#                 yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
+#             generation_latency_ms = int((time.time() - generation_start) * 1000)
+#
+#             # Sanitize LaTeX # characters before saving
+#             full_response = escape_hash_in_latex(full_response)
+#
+#             chat_session_update = ChatSession.query.get(session_id)
+#             assistant_message = ChatMessage(
+#                 session_id=session_id,
+#                 role="assistant",
+#                 content=full_response,
+#                 sources=sources
+#             )
+#             db.session.add(assistant_message)
+#             if chat_session_update:
+#                 chat_session_update.last_activity = datetime.utcnow()
+#             db.session.commit()
+#
+#             total_latency_ms = int((time.time() - start_time) * 1000)
+#             token_count = len(full_response.split())
+#
+#             log_qa_entry(
+#                 ta_id=str(ta_id),
+#                 ta_slug=ta_slug,
+#                 ta_name=ta_name,
+#                 course_name=ta_course_name,
+#                 session_id=session_id,
+#                 query=query,
+#                 answer=full_response,
+#                 sources=sources,
+#                 chunk_count=chunk_count,
+#                 latency_ms=total_latency_ms,
+#                 retrieval_latency_ms=retrieval_latency_ms,
+#                 generation_latency_ms=generation_latency_ms,
+#                 token_count=token_count,
+#                 retrieval_diagnostics=retrieval_diagnostics
+#             )
+#
+#             yield f"data: {json.dumps({'type': 'done', 'session_id': session_id})}\n\n"
+#
+#         except Exception as e:
+#             logger.error(f"Streaming chat error for {slug}: {e}")
+#             import traceback
+#             logger.error(f"Traceback: {traceback.format_exc()}")
+#             yield f"data: {json.dumps({'type': 'error', 'message': 'An error occurred processing your question.'})}\n\n"
+#
+#     return Response(
+#         stream_with_context(generate()),
+#         mimetype='text/event-stream',
+#         headers={
+#             'Cache-Control': 'no-cache',
+#             'X-Accel-Buffering': 'no'
+#         }
+#     )
 
 def check_stale_indexing_jobs():
     """Periodically check for stale indexing jobs and mark them as failed.
@@ -1250,9 +1389,10 @@ def check_stale_indexing_jobs():
             logger.error(f"Error in stale job check: {e}")
 
 with app.app_context():
-    db.create_all()
+    # Schema is managed via Flask-Migrate migrations (see migrations/versions/)
+    # Run `flask db upgrade` to apply pending migrations
     threading.Timer(2.0, resume_interrupted_indexing_jobs).start()
-    
+
     stale_checker = threading.Thread(target=check_stale_indexing_jobs, daemon=True)
     stale_checker.start()
 
