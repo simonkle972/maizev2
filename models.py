@@ -24,6 +24,8 @@ class User(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login_at = db.Column(db.DateTime, nullable=True)
+    auth0_sub = db.Column(db.String(128), unique=True, nullable=True, index=True)
+    email_verified = db.Column(db.Boolean, default=False, nullable=False)
 
     # Relationships
     institution = db.relationship('Institution', backref='users')
@@ -291,3 +293,21 @@ class PasswordResetToken(db.Model):
     def is_valid(self):
         """Check if token is still valid (not used and not expired)."""
         return not self.is_used and datetime.utcnow() < self.expires_at
+
+
+class Auth0State(db.Model):
+    """Store Auth0 OAuth state in PostgreSQL."""
+    __tablename__ = 'auth0_states'
+
+    state = db.Column(db.String(256), primary_key=True)
+    data = db.Column(db.JSON, nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+
+
+class Auth0Transaction(db.Model):
+    """Store Auth0 OAuth transactions in PostgreSQL."""
+    __tablename__ = 'auth0_transactions'
+
+    nonce = db.Column(db.String(256), primary_key=True)
+    data = db.Column(db.JSON, nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)

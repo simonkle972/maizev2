@@ -82,6 +82,10 @@ def create_ta():
         flash('Payment canceled. Your TA was not created.', 'info')
 
     if request.method == 'POST':
+        if not current_user.email_verified:
+            flash('Please verify your email before creating a TA. Check your inbox for a verification email.', 'warning')
+            return redirect(url_for('professor.dashboard'))
+
         ta_name = request.form.get('ta_name', '').strip()
         course_name = request.form.get('course_name', '').strip()
         tier = request.form.get('tier')

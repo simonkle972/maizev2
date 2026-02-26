@@ -13,11 +13,17 @@
             <div style="display: flex; gap: 15px; align-items: center;">
                 <span>{{ current_user.first_name }} {{ current_user.last_name }}</span>
                 <a href="{{ url_for('professor.settings') }}" class="btn btn-secondary">Settings</a>
-                <a href="{{ url_for('auth.logout') }}" class="btn btn-secondary">Logout</a>
+                <a href="{{ url_for('auth0.logout') }}" class="btn btn-secondary">Logout</a>
             </div>
         </header>
 
         <main class="admin-main">
+            {% if not current_user.email_verified %}
+            <div id="email-verify-banner" class="error-message" style="background:#fff3cd; border-color:#ffc107; color:#856404; transition: box-shadow 0.3s, outline 0.3s;">
+                ⚠️ Your email address is not verified. Please check your inbox for a verification email before creating TAs.
+            </div>
+            {% endif %}
+
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     {% for category, message in messages %}
@@ -41,7 +47,17 @@
 
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <h2>Your Teaching Assistants</h2>
+                {% if current_user.email_verified %}
                 <a href="{{ url_for('professor.create_ta') }}" class="btn btn-primary">Create New TA</a>
+                {% else %}
+                <button type="button" class="btn btn-primary" style="opacity:0.45; cursor:not-allowed;" onclick="
+                    var banner = document.getElementById('email-verify-banner');
+                    banner.scrollIntoView({behavior:'smooth', block:'center'});
+                    banner.style.boxShadow = '0 0 0 3px #ffc107';
+                    banner.style.outline = '2px solid #ffc107';
+                    setTimeout(function(){ banner.style.boxShadow = ''; banner.style.outline = ''; }, 2000);
+                ">Create New TA</button>
+                {% endif %}
             </div>
 
             {% if tas %}

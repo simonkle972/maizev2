@@ -104,6 +104,9 @@ def dashboard(ta_id=None):
 
     # Handle selected TA
     selected_ta = None
+    if ta_id and not current_student.email_verified:
+        flash('Please verify your email to access TAs.', 'warning')
+        return redirect(url_for('student.dashboard'))
     if ta_id:
         selected_ta = TeachingAssistant.query.get_or_404(ta_id)
         # Verify enrollment
@@ -175,6 +178,9 @@ def ta_sessions(ta_id):
 def chat_stream(ta_id):
     """Authenticated streaming chat API for students."""
     import json
+
+    if not current_student.email_verified:
+        return jsonify({"error": "Please verify your email address to use the AI TA. Check your inbox for a verification email."}), 403
 
     ta = TeachingAssistant.query.get_or_404(ta_id)
 

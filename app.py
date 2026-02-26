@@ -83,9 +83,13 @@ def migrate_student_sessions():
 from auth import auth_bp
 from professor import professor_bp
 from student import student_bp
+from auth_auth0 import auth0_bp
+from auth0_integration import init_oauth
 app.register_blueprint(auth_bp)
 app.register_blueprint(professor_bp)
 app.register_blueprint(student_bp)
+app.register_blueprint(auth0_bp)
+init_oauth(app)
 
 @app.route('/health')
 def health():

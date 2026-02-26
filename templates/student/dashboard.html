@@ -43,36 +43,76 @@
         }
 
         .sidebar-header h2 {
-            margin: 0 0 12px 0;
+            margin: 0;
             font-size: 20px;
             color: #111827;
         }
 
-        .user-info {
+        .sidebar-footer {
+            padding: 12px 16px;
+            border-top: 1px solid #e5e7eb;
+            background: white;
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            margin-top: 12px;
+            gap: 10px;
+            flex-shrink: 0;
         }
 
-        .user-name {
-            font-size: 14px;
-            color: #6b7280;
-        }
-
-        .logout-btn {
-            padding: 6px 12px;
+        .user-avatar-circle {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: #2563eb;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             font-size: 13px;
-            background: #f3f4f6;
-            border: 1px solid #d1d5db;
-            border-radius: 6px;
-            cursor: pointer;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .user-details {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .user-full-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: #111827;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .user-email-small {
+            font-size: 11px;
+            color: #6b7280;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .logout-icon-btn {
+            color: #9ca3af;
             text-decoration: none;
+            flex-shrink: 0;
+            padding: 4px;
+            display: flex;
+        }
+
+        .logout-icon-btn:hover {
             color: #374151;
         }
 
-        .logout-btn:hover {
-            background: #e5e7eb;
+        .ta-locked {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .ta-locked:hover {
+            background: white !important;
         }
 
         .ta-list {
@@ -367,17 +407,13 @@
         <aside class="sidebar">
             <div class="sidebar-header">
                 <h2>My Courses</h2>
-                <div class="user-info">
-                    <span class="user-name">{{ current_student.first_name }} {{ current_student.last_name }}</span>
-                    <a href="{{ url_for('auth.student_logout') }}" class="logout-btn">Logout</a>
-                </div>
             </div>
 
             {% if tas %}
                 <ul class="ta-list">
                     {% for item in tas %}
-                    <li class="ta-item {% if selected_ta and item.ta.id == selected_ta.id %}active{% endif %}"
-                        onclick="location.href='{{ url_for('student.dashboard', ta_id=item.ta.id) }}'">
+                    <li class="ta-item {% if selected_ta and item.ta.id == selected_ta.id %}active{% endif %} {% if not current_student.email_verified %}ta-locked{% endif %}"
+                        onclick="selectTA('{{ url_for('student.dashboard', ta_id=item.ta.id) }}')">
                         <div class="ta-name">{{ item.ta.name }}</div>
                         <div class="course-name">{{ item.ta.course_name }}</div>
                         <div class="last-message">
@@ -395,10 +431,38 @@
                     <p>No courses yet. Wait for your professor to enroll you!</p>
                 </div>
             {% endif %}
+            <div class="sidebar-footer">
+                <div class="user-avatar-circle">
+                    {{ current_student.first_name[0] | upper }}{% if current_student.last_name %}{{ current_student.last_name[0] | upper }}{% endif %}
+                </div>
+                <div class="user-details">
+                    <div class="user-full-name">{{ current_student.first_name }} {{ current_student.last_name }}</div>
+                    <div class="user-email-small">{{ current_student.email }}</div>
+                </div>
+                <a href="{{ url_for('auth0.logout') }}" class="logout-icon-btn" title="Log out">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                        <polyline points="16 17 21 12 16 7"/>
+                        <line x1="21" y1="12" x2="9" y2="12"/>
+                    </svg>
+                </a>
+            </div>
         </aside>
 
         <!-- Main Chat Area -->
         <div class="chat-main-wrapper">
+            {% if not current_student.email_verified %}
+            <div id="email-verify-banner" class="error-message"
+                 style="margin:16px; background:#fff3cd; border-color:#ffc107; color:#856404; transition: box-shadow 0.3s, outline 0.3s; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+                <span>⚠️ Your email address is not verified. Please check your inbox for a verification email before accessing your TAs.</span>
+                <a href="{{ url_for('auth0.refresh_verification') }}"
+                   style="color:#856404; font-weight:600; text-decoration:underline; white-space:nowrap; flex-shrink:0;">
+                    I've verified my email →
+                </a>
+            </div>
+            {% endif %}
+
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     <div style="padding: 16px;">
@@ -411,7 +475,7 @@
                 {% endif %}
             {% endwith %}
 
-            {% if selected_ta %}
+            {% if selected_ta and current_student.email_verified %}
                 <!-- Embedded Chat Interface -->
                 <div class="chat-container-embedded">
                     <div class="chat-header-embedded">
@@ -827,10 +891,29 @@
             {% else %}
                 <!-- Welcome Screen -->
                 <div class="welcome-container">
+                    {% if not current_student.email_verified %}
+                    <h1>Verify your email to continue</h1>
+                    <p>Check your inbox for a verification email. Once you've clicked the link, use the <strong>"I've verified my email →"</strong> button in the banner above.</p>
+                    {% else %}
                     <h1>Welcome to Maize TA</h1>
                     <p>Select a course from the sidebar to start chatting with your teaching assistant.</p>
+                    {% endif %}
                 </div>
             {% endif %}
+
+            <script>
+                function selectTA(url) {
+                    {% if not current_student.email_verified %}
+                    var banner = document.getElementById('email-verify-banner');
+                    banner.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    banner.style.boxShadow = '0 0 0 3px #ffc107';
+                    banner.style.outline = '2px solid #ffc107';
+                    setTimeout(function() { banner.style.boxShadow = ''; banner.style.outline = ''; }, 2000);
+                    {% else %}
+                    location.href = url;
+                    {% endif %}
+                }
+            </script>
         </div>
     </div>
 </body>
