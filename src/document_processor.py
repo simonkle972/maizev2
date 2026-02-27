@@ -208,19 +208,105 @@ def extract_pdf(file_path: str) -> tuple:
     """Extract PDF text and return (text, page_count)."""
     text, page_count = _extract_pdf_pypdf2(file_path)
     if text and len(text.strip()) > 100:
+        text = _supplement_pdf_with_figures(file_path, text)
         return text, page_count
-    
+
     logger.info("PyPDF2 extraction insufficient, trying pdfplumber...")
     text, page_count = _extract_pdf_pdfplumber(file_path)
     if text and len(text.strip()) > 100:
+        text = _supplement_pdf_with_figures(file_path, text)
         return text, page_count
-    
+
     logger.info("Text extraction insufficient - attempting vision-based extraction for image/handwritten PDF...")
     text, page_count = _extract_pdf_vision(file_path)
     if text and len(text.strip()) > 50:
-        return text, page_count
-    
+        return text, page_count  # vision already described figures — skip supplement
+
     return "", 0
+
+
+def _supplement_pdf_with_figures(file_path: str, text: str) -> str:
+    """
+    Run a figure-only vision pass over every PDF page and splice descriptions
+    into the already-extracted text under the matching '--- Page N ---' marker.
+    Pages with no figures return 'No figures' and are left untouched.
+    """
+    try:
+        import base64
+        import re as _re
+        from io import BytesIO
+        from pdf2image import convert_from_path
+        from openai import OpenAI
+
+        client = OpenAI(api_key=Config.OPENAI_API_KEY)
+        images = convert_from_path(file_path, dpi=200, fmt='jpeg')
+        logger.info(f"Figure supplement: rendering {len(images)} pages for {file_path}")
+
+        supplemented = text
+        for page_num, img in enumerate(images, 1):
+            try:
+                img_buffer = BytesIO()
+                img.save(img_buffer, format='JPEG', quality=85)
+                img_base64 = base64.b64encode(img_buffer.getvalue()).decode()
+
+                response = client.chat.completions.create(
+                    model=Config.VISION_MODEL,
+                    max_tokens=400,
+                    messages=[{
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": (
+                                    f"This is page {page_num} of a document. "
+                                    "Describe ONLY charts, figures, diagrams, and images visible on this page. "
+                                    "Include axis labels, trends, key data values, and notable features. "
+                                    "Do NOT transcribe text that is clearly readable as prose. "
+                                    "If there are no charts or figures on this page, reply exactly: No figures"
+                                )
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{img_base64}",
+                                    "detail": "high"
+                                }
+                            }
+                        ]
+                    }]
+                )
+
+                desc = response.choices[0].message.content or ""
+                desc = desc.strip()
+                if not desc or desc.lower().startswith("no figures"):
+                    continue
+
+                # Splice description after the matching "--- Page N ---" marker
+                marker = f"--- Page {page_num} ---"
+                if marker in supplemented:
+                    supplemented = supplemented.replace(
+                        marker,
+                        f"{marker}\n[FIGURE: {desc}]",
+                        1
+                    )
+                    logger.info(f"Figure supplement: added figure description for page {page_num}")
+                else:
+                    # Page marker missing (e.g. page had no text) — append at end
+                    supplemented += f"\n\n{marker}\n[FIGURE: {desc}]"
+                    logger.info(f"Figure supplement: appended figure description for page {page_num} (no marker found)")
+
+            except Exception as page_e:
+                logger.warning(f"Figure supplement failed on page {page_num}: {page_e}")
+                continue
+
+        return supplemented
+
+    except ImportError as e:
+        logger.warning(f"Figure supplement unavailable - missing dependency: {e}")
+        return text
+    except Exception as e:
+        logger.warning(f"Figure supplement failed: {e}")
+        return text
 
 
 def _extract_pdf_vision(file_path: str) -> tuple:
@@ -259,9 +345,8 @@ def _extract_pdf_vision(file_path: str) -> tuple:
                 logger.info(f"Vision extraction: processing page {page_num}/{len(images)} ({img_size_kb:.0f}KB)")
 
                 response = client.chat.completions.create(
-                    model=Config.LLM_MODEL,
-                    reasoning_effort=Config.LLM_REASONING_MEDIUM,
-                    max_completion_tokens=2000,
+                    model=Config.VISION_MODEL,
+                    max_tokens=1500,
                     messages=[{
                         "role": "user",
                         "content": [
@@ -548,16 +633,70 @@ def extract_excel(file_path: str) -> str:
 
 def extract_pptx(file_path: str) -> str:
     try:
+        import base64
+        from io import BytesIO
         from pptx import Presentation
+        from pptx.enum.shapes import MSO_SHAPE_TYPE
+        from openai import OpenAI
+
         prs = Presentation(file_path)
+        client = OpenAI(api_key=Config.OPENAI_API_KEY)
         text_parts = []
+        raster_types = {'image/jpeg', 'image/png', 'image/gif', 'image/bmp', 'image/webp'}
+
         for slide_num, slide in enumerate(prs.slides, 1):
             slide_text = []
+            figure_descriptions = []
+
             for shape in slide.shapes:
                 if hasattr(shape, "text") and shape.text.strip():
                     slide_text.append(shape.text)
+
+                if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
+                    try:
+                        img = shape.image
+                        if img.content_type not in raster_types:
+                            continue
+                        img_base64 = base64.b64encode(img.blob).decode()
+                        response = client.chat.completions.create(
+                            model=Config.VISION_MODEL,
+                            max_tokens=300,
+                            messages=[{
+                                "role": "user",
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": (
+                                            f"Describe this chart, figure, or image from slide {slide_num} of a lecture. "
+                                            "Be specific and concise — 2–4 sentences. "
+                                            "Include axis labels, trends, key values, and any notable features."
+                                        )
+                                    },
+                                    {
+                                        "type": "image_url",
+                                        "image_url": {
+                                            "url": f"data:{img.content_type};base64,{img_base64}",
+                                            "detail": "high"
+                                        }
+                                    }
+                                ]
+                            }]
+                        )
+                        desc = response.choices[0].message.content
+                        if desc and desc.strip():
+                            figure_descriptions.append(f"[FIGURE: {desc.strip()}]")
+                            logger.info(f"PPTX: described image on slide {slide_num}")
+                    except Exception as img_e:
+                        logger.warning(f"PPTX: failed to describe image on slide {slide_num}: {img_e}")
+
+            slide_parts = []
             if slide_text:
-                text_parts.append(f"Slide {slide_num}:\n" + "\n".join(slide_text))
+                slide_parts.append("\n".join(slide_text))
+            slide_parts.extend(figure_descriptions)
+
+            if slide_parts:
+                text_parts.append(f"Slide {slide_num}:\n" + "\n".join(slide_parts))
+
         return "\n\n".join(text_parts)
     except ImportError:
         logger.warning("python-pptx not installed, skipping PowerPoint file")

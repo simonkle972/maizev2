@@ -13,6 +13,7 @@ class Config:
     LLM_REASONING_HIGH = "high"
     LLM_REASONING_MEDIUM = "medium"
     LLM_MAX_COMPLETION_TOKENS = 16000
+    VISION_MODEL = "gpt-4o"  # Image description tasks — no reasoning needed, far cheaper than gpt-5.2
 
     # Stripe Configuration
     USE_STRIPE_TEST_MODE = os.getenv('USE_STRIPE_TEST_MODE', 'True') == 'True'
