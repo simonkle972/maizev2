@@ -1140,7 +1140,7 @@ def process_and_index_documents_resumable(ta_id: str, progress_callback=None, re
     from flask import current_app
     from src.qa_logger import log_index_batch
     
-    is_resume = resume_from_doc_id is not None
+    is_resume = bool(resume_from_doc_id)
     logger.info(f"[{ta_id}] Starting {'resumable' if is_resume else 'fresh'} indexing process...")
     
     ta = db.session.get(TeachingAssistant, ta_id)
