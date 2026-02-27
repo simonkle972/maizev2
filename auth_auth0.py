@@ -11,9 +11,13 @@ auth0_bp = Blueprint('auth0', __name__, url_prefix='/auth0')
 def login():
     """Initiate Auth0 login."""
     role = request.args.get('role', 'student')
+    screen_hint = request.args.get('screen_hint')
     session['auth0_role'] = role
     redirect_uri = url_for('auth0.callback', _external=True)
-    return oauth.auth0.authorize_redirect(redirect_uri=redirect_uri, prompt='login')
+    kwargs = {'redirect_uri': redirect_uri, 'prompt': 'login'}
+    if screen_hint:
+        kwargs['screen_hint'] = screen_hint
+    return oauth.auth0.authorize_redirect(**kwargs)
 
 
 @auth0_bp.route('/callback')
@@ -60,8 +64,11 @@ def callback():
     user.email_verified = userinfo.get('email_verified', False)
     db.session.commit()
 
+    # Capture pre-login session data before clearing
+    access_token = token.get('access_token')
+    pending_token = session.get('pending_enrollment_token')
+
     # Store in session — satisfy both Flask-Login (professors) and student session system
-    access_token = token.get('access_token')  # capture before session.clear()
     logout_user()
     logout_student()
     session.clear()
@@ -71,16 +78,75 @@ def callback():
     if user.role == 'student':
         login_student(user)
 
+    # Handle link-based enrollment (student followed /student/enroll/<token> before logging in)
+    if pending_token and user.role == 'student':
+        result = _do_enrollment(user, pending_token)
+        if result == 'enrolled':
+            flash('Successfully enrolled!', 'success')
+        elif result == 'already_enrolled':
+            flash('You are already enrolled in this course.', 'info')
+        elif result == 'full':
+            flash('Course capacity has been reached.', 'error')
+        else:
+            flash('Invalid or expired enrollment token.', 'error')
+        return redirect(url_for('student.dashboard'))
+
     # Redirect based on role
     if user.role == 'professor':
         return redirect(url_for('professor.dashboard'))
     elif user.role == 'student':
-        if user.enrollments:
-            return redirect(url_for('student.dashboard'))
-        else:
-            return redirect(url_for('auth0.enroll_prompt'))
+        return redirect(url_for('student.dashboard'))
     else:
         return redirect(url_for('admin_panel'))
+
+
+def _do_enrollment(user, token_str):
+    """Enroll a user with a token string. Returns: 'enrolled', 'already_enrolled', 'full', 'invalid'."""
+    link = EnrollmentLink.query.filter_by(token=token_str).first()
+    if not link or not link.is_valid:
+        return 'invalid'
+
+    existing = Enrollment.query.filter_by(student_id=user.id, ta_id=link.ta_id).first()
+    if existing:
+        return 'already_enrolled'
+
+    with db.session.begin_nested():
+        link = EnrollmentLink.query.with_for_update().get(link.id)
+        if link.is_full:
+            return 'full'
+        enrollment = Enrollment(
+            student_id=user.id,
+            ta_id=link.ta_id,
+            enrollment_token=token_str
+        )
+        db.session.add(enrollment)
+        link.current_enrollments += 1
+
+    db.session.commit()
+    return 'enrolled'
+
+
+@auth0_bp.route('/student/enroll/<token>')
+def enroll_via_link(token):
+    """Link-based enrollment: auto-enroll if logged in, else redirect through Auth0 login."""
+    user_id = session.get('auth0_user_id')
+    if user_id:
+        user = User.query.get(user_id)
+        if not user or user.role != 'student':
+            return redirect(url_for('auth0.login', role='student'))
+        result = _do_enrollment(user, token)
+        if result == 'enrolled':
+            flash('Successfully enrolled!', 'success')
+        elif result == 'already_enrolled':
+            flash('You are already enrolled in this course.', 'info')
+        elif result == 'full':
+            flash('Course capacity has been reached.', 'error')
+        else:
+            flash('Invalid or expired enrollment token.', 'error')
+        return redirect(url_for('student.dashboard'))
+    else:
+        session['pending_enrollment_token'] = token
+        return redirect(url_for('auth0.login', role='student', screen_hint='signup'))
 
 
 @auth0_bp.route('/enroll', methods=['GET'])
@@ -93,52 +159,31 @@ def enroll_prompt():
 
 @auth0_bp.route('/enroll', methods=['POST'])
 def enroll_submit():
-    """Complete enrollment with token."""
+    """Complete enrollment with token (manual entry form)."""
     user_id = session.get('auth0_user_id')
     if not user_id:
         return redirect(url_for('auth0.login', role='student'))
 
     user = User.query.get(user_id)
-    token = request.form.get('token', '').strip()
+    token_str = request.form.get('token', '').strip()
 
-    if not token:
+    if not token_str:
         flash('Please enter an enrollment token.', 'error')
         return redirect(url_for('auth0.enroll_prompt'))
 
-    link = EnrollmentLink.query.filter_by(token=token).first()
-
-    if not link or not link.is_valid:
-        flash('Invalid or expired enrollment token.', 'error')
-        return redirect(url_for('auth0.enroll_prompt'))
-
-    # Check if already enrolled
-    existing = Enrollment.query.filter_by(
-        student_id=user.id,
-        ta_id=link.ta_id
-    ).first()
-
-    if existing:
+    result = _do_enrollment(user, token_str)
+    if result == 'enrolled':
+        flash('Successfully enrolled!', 'success')
+        return redirect(url_for('student.dashboard'))
+    elif result == 'already_enrolled':
         flash('You are already enrolled in this course.', 'info')
         return redirect(url_for('student.dashboard'))
-
-    # Atomic enrollment with capacity check
-    with db.session.begin_nested():
-        link = EnrollmentLink.query.with_for_update().get(link.id)
-        if link.is_full:
-            flash('Course capacity has been reached.', 'error')
-            return redirect(url_for('auth0.enroll_prompt'))
-
-        enrollment = Enrollment(
-            student_id=user.id,
-            ta_id=link.ta_id,
-            enrollment_token=token
-        )
-        db.session.add(enrollment)
-        link.current_enrollments += 1
-
-    db.session.commit()
-    flash('Successfully enrolled!', 'success')
-    return redirect(url_for('student.dashboard'))
+    elif result == 'full':
+        flash('Course capacity has been reached.', 'error')
+        return redirect(url_for('auth0.enroll_prompt'))
+    else:
+        flash('Invalid or expired enrollment token.', 'error')
+        return redirect(url_for('auth0.enroll_prompt'))
 
 
 @auth0_bp.route('/refresh-verification')

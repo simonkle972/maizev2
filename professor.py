@@ -172,7 +172,7 @@ def manage_ta(ta_id):
 
     enrollment_url = None
     if link:
-        enrollment_url = url_for('auth.student_signup', token=link.token, _external=True)
+        enrollment_url = url_for('auth0.enroll_via_link', token=link.token, _external=True)
 
     tier_info = Config.BILLING_TIERS.get(ta.billing_tier, {})
 

@@ -190,10 +190,14 @@
 
             {% if ta.is_indexed and enrollment_url %}
                 <div style="background: #e8f5e9; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
-                    <h3>Enrollment Link</h3>
-                    <p>Share this link with students to enroll:</p>
-                    <input type="text" value="{{ enrollment_url }}" readonly style="width: 100%; padding: 10px; margin: 10px 0; font-family: monospace;">
+                    <h3>Student Enrollment</h3>
+                    <p><strong>Sign-up link</strong> — share this with new students (they'll create an account and be enrolled automatically):</p>
+                    <input id="enrollLinkInput" type="text" value="{{ enrollment_url }}" readonly style="width: 100%; padding: 10px; margin: 6px 0 10px; font-family: monospace; border: 1px solid #ccc; border-radius: 6px;">
                     <button onclick="copyEnrollmentLink()" class="btn btn-secondary">Copy Link</button>
+
+                    <p style="margin-top: 16px;"><strong>Enrollment token</strong> — share this with students who already have an account (they can use "+ Add a course" on their dashboard):</p>
+                    <input id="enrollTokenInput" type="text" value="{{ link.token }}" readonly style="width: 100%; padding: 10px; margin: 6px 0 10px; font-family: monospace; border: 1px solid #ccc; border-radius: 6px;">
+                    <button onclick="copyToken()" class="btn btn-secondary">Copy Token</button>
                 </div>
             {% elif not ta.is_indexed %}
                 <div class="enrollment-link-disabled">
@@ -328,10 +332,17 @@
         let indexingPollInterval = null;
 
         function copyEnrollmentLink() {
-            const input = document.querySelector('input[readonly]');
+            const input = document.getElementById('enrollLinkInput');
             input.select();
-            document.execCommand('copy');
+            navigator.clipboard.writeText(input.value).catch(() => document.execCommand('copy'));
             alert('Enrollment link copied to clipboard!');
+        }
+
+        function copyToken() {
+            const input = document.getElementById('enrollTokenInput');
+            input.select();
+            navigator.clipboard.writeText(input.value).catch(() => document.execCommand('copy'));
+            alert('Enrollment token copied to clipboard!');
         }
 
         // Setup drag-and-drop
