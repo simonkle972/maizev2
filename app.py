@@ -456,7 +456,8 @@ def create_ta():
         name=data.get("name", "New TA"),
         course_name=data.get("course_name", ""),
         system_prompt=data.get("system_prompt", TeachingAssistant.system_prompt.default.arg),
-        institution_id=institution_id if institution_id else None
+        institution_id=institution_id if institution_id else None,
+        allow_anonymous_chat=True
     )
     
     db.session.add(ta)
