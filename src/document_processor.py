@@ -689,6 +689,33 @@ def extract_pptx(file_path: str) -> str:
                     except Exception as img_e:
                         logger.warning(f"PPTX: failed to describe image on slide {slide_num}: {img_e}")
 
+                if shape.shape_type == MSO_SHAPE_TYPE.CHART:
+                    try:
+                        chart = shape.chart
+                        title = chart.chart_title.text_frame.text if chart.has_title else ""
+                        chart_type = str(chart.chart_type)
+                        series_data = []
+                        for plot in chart.plots:
+                            for series in plot.series:
+                                vals = [v for v in series.values if v is not None]
+                                series_data.append({"name": series.name or "Series", "values": vals[:20]})
+                        prompt = (
+                            f"Describe this chart from slide {slide_num} of a lecture in 2-4 sentences. "
+                            f"Chart type: {chart_type}. Title: '{title}'. Series data: {series_data}. "
+                            "Include the key trend, axis interpretation, and any notable data points."
+                        )
+                        response = client.chat.completions.create(
+                            model=Config.VISION_MODEL,
+                            max_tokens=300,
+                            messages=[{"role": "user", "content": prompt}]
+                        )
+                        desc = response.choices[0].message.content
+                        if desc and desc.strip():
+                            figure_descriptions.append(f"[CHART: {desc.strip()}]")
+                            logger.info(f"PPTX: described chart on slide {slide_num}")
+                    except Exception as chart_e:
+                        logger.warning(f"PPTX: failed to describe chart on slide {slide_num}: {chart_e}")
+
             slide_parts = []
             if slide_text:
                 slide_parts.append("\n".join(slide_text))
