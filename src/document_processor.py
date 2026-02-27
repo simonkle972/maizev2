@@ -724,15 +724,17 @@ def extract_pptx(file_path: str) -> str:
                             figure_descriptions.append(f"[CHART: {desc.strip()}]")
                             logger.info(f"PPTX: described chart on slide {slide_num}")
                     except Exception as chart_e:
-                        logger.warning(f"PPTX: failed to describe chart on slide {slide_num}: {chart_e}")
+                        import traceback
+                        logger.warning(f"PPTX: failed to describe chart on slide {slide_num}: {chart_e}\n{traceback.format_exc()}")
 
             slide_parts = []
             if slide_text:
                 slide_parts.append("\n".join(slide_text))
             slide_parts.extend(figure_descriptions)
+            if not slide_parts:
+                slide_parts.append("[Visual content only — chart or figure description unavailable]")
 
-            if slide_parts:
-                text_parts.append(f"Slide {slide_num}:\n" + "\n".join(slide_parts))
+            text_parts.append(f"Slide {slide_num}:\n" + "\n".join(slide_parts))
 
         return "\n\n".join(text_parts)
     except ImportError:
