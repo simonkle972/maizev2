@@ -644,11 +644,17 @@ def extract_pptx(file_path: str) -> str:
         text_parts = []
         raster_types = {'image/jpeg', 'image/png', 'image/gif', 'image/bmp', 'image/webp'}
 
+        def _iter_shapes(shapes):
+            for shape in shapes:
+                yield shape
+                if shape.shape_type == MSO_SHAPE_TYPE.GROUP:
+                    yield from _iter_shapes(shape.shapes)
+
         for slide_num, slide in enumerate(prs.slides, 1):
             slide_text = []
             figure_descriptions = []
 
-            for shape in slide.shapes:
+            for shape in _iter_shapes(slide.shapes):
                 if hasattr(shape, "text") and shape.text.strip():
                     slide_text.append(shape.text)
 
@@ -690,6 +696,7 @@ def extract_pptx(file_path: str) -> str:
                         logger.warning(f"PPTX: failed to describe image on slide {slide_num}: {img_e}")
 
                 if shape.shape_type == MSO_SHAPE_TYPE.CHART:
+                    logger.info(f"PPTX: found CHART shape on slide {slide_num}")
                     try:
                         chart = shape.chart
                         title = chart.chart_title.text_frame.text if chart.has_title else ""
@@ -697,8 +704,11 @@ def extract_pptx(file_path: str) -> str:
                         series_data = []
                         for plot in chart.plots:
                             for series in plot.series:
-                                vals = [v for v in series.values if v is not None]
-                                series_data.append({"name": series.name or "Series", "values": vals[:20]})
+                                try:
+                                    vals = [v for v in (series.values or []) if v is not None]
+                                    series_data.append({"name": series.name or "Series", "values": vals[:20]})
+                                except Exception:
+                                    pass
                         prompt = (
                             f"Describe this chart from slide {slide_num} of a lecture in 2-4 sentences. "
                             f"Chart type: {chart_type}. Title: '{title}'. Series data: {series_data}. "
