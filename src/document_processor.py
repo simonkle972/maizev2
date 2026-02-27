@@ -337,7 +337,7 @@ def _extract_pdf_pdfplumber(file_path: str) -> tuple:
                     
                     text = page.extract_text()
                     if text:
-                        text_parts.append(text)
+                        text_parts.append(f"--- Page {page_num + 1} ---\n{text}")
                     
                     page_time = time.time() - page_start
                     if page_time > 10:
@@ -360,10 +360,10 @@ def _extract_pdf_pypdf2(file_path: str) -> tuple:
         reader = PdfReader(file_path)
         text_parts = []
         page_count = len(reader.pages)
-        for page in reader.pages:
+        for page_num, page in enumerate(reader.pages, 1):
             text = page.extract_text()
             if text:
-                text_parts.append(text)
+                text_parts.append(f"--- Page {page_num} ---\n{text}")
         return "\n\n".join(text_parts), page_count
     except Exception as e:
         logger.warning(f"PyPDF2 extraction failed: {e}")
