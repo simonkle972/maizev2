@@ -32,6 +32,7 @@ def extract_section_headers(text: str) -> list:
         r'(?:^|\n)(Section\s+(?:\d+|[IVX]+)[:\s\-][^\n]{0,60})',
         r'(?:^|\n)(Part\s+[A-Z][:\s][^\n]{0,60})',
         r'(?:^|\n)(Exercise\s+\d+[:\s][^\n]{0,60})',
+        r'(?:^|\n)(Slide\s+\d+[:\s]?[^\n]{0,60})',
     ]
     
     for pattern in patterns:
