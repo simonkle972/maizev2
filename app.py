@@ -1320,7 +1320,9 @@ def chat_stream_api(slug):
                 retrieval_latency_ms=retrieval_latency_ms,
                 generation_latency_ms=generation_latency_ms,
                 token_count=token_count,
-                retrieval_diagnostics=retrieval_diagnostics
+                retrieval_diagnostics=retrieval_diagnostics,
+                llm_model=Config.LLM_MODEL,
+                is_anonymous=True
             )
 
             yield f"data: {json.dumps({'type': 'done', 'session_id': session_id})}\n\n"

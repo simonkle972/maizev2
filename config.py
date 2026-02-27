@@ -70,7 +70,10 @@ class Config:
     
     METADATA_SCHEMA_VERSION = "1.0"
     
-    QA_LOG_SHEET_ID = os.getenv("qa_log_googlesheet", "")
+    _raw_sheet = os.getenv("qa_log_googlesheet", "")
+    import re as _re
+    _sheet_match = _re.search(r'/spreadsheets/d/([a-zA-Z0-9_-]+)', _raw_sheet)
+    QA_LOG_SHEET_ID = _sheet_match.group(1) if _sheet_match else _raw_sheet
     QA_LOG_TAB_NAME = "qa_logs_v2"
     INDEX_LOG_TAB_NAME = "index_logs_v2"
     

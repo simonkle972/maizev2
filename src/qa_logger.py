@@ -3,15 +3,10 @@ import logging
 import threading
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any
-import requests
-from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from config import Config
 
 logger = logging.getLogger(__name__)
-
-_connection_settings = None
-_connection_lock = threading.Lock()
 
 QA_LOG_HEADERS = [
     "timestamp",
@@ -55,7 +50,9 @@ QA_LOG_HEADERS = [
     "validation_performed",
     "validation_passed",
     "validation_expected_ref",
-    "validation_matches_found"
+    "validation_matches_found",
+    "llm_model",
+    "is_anonymous"
 ]
 
 INDEX_LOG_HEADERS = [
@@ -80,66 +77,36 @@ INDEX_LOG_HEADERS = [
 
 INDEX_LOG_TAB_NAME = Config.INDEX_LOG_TAB_NAME
 
-def _get_access_token() -> Optional[str]:
-    global _connection_settings
-    
-    with _connection_lock:
-        if (_connection_settings and 
-            _connection_settings.get('settings', {}).get('expires_at') and
-            datetime.fromisoformat(_connection_settings['settings']['expires_at'].replace('Z', '+00:00')) > datetime.now(timezone.utc)):
-            return _connection_settings['settings'].get('access_token')
-    
-    hostname = os.environ.get('REPLIT_CONNECTORS_HOSTNAME')
-    repl_identity = os.environ.get('REPL_IDENTITY')
-    web_repl_renewal = os.environ.get('WEB_REPL_RENEWAL')
-    
-    if repl_identity:
-        x_replit_token = f'repl {repl_identity}'
-    elif web_repl_renewal:
-        x_replit_token = f'depl {web_repl_renewal}'
-    else:
-        logger.warning("No Replit token found for Google Sheets authentication")
-        return None
-    
-    if not hostname:
-        logger.warning("REPLIT_CONNECTORS_HOSTNAME not set")
-        return None
-    
-    try:
-        response = requests.get(
-            f'https://{hostname}/api/v2/connection?include_secrets=true&connector_names=google-sheet',
-            headers={
-                'Accept': 'application/json',
-                'X_REPLIT_TOKEN': x_replit_token
-            },
-            timeout=10
-        )
-        response.raise_for_status()
-        data = response.json()
-        
-        with _connection_lock:
-            _connection_settings = data.get('items', [{}])[0] if data.get('items') else {}
-        
-        settings = _connection_settings.get('settings', {})
-        access_token = settings.get('access_token') or settings.get('oauth', {}).get('credentials', {}).get('access_token')
-        
-        if not access_token:
-            logger.warning("No access token found in Google Sheets connection")
-            return None
-        
-        return access_token
-        
-    except Exception as e:
-        logger.error(f"Failed to get Google Sheets access token: {e}")
-        return None
-
 def _get_sheets_service():
-    access_token = _get_access_token()
-    if not access_token:
-        return None
-    
-    credentials = Credentials(token=access_token)
-    return build('sheets', 'v4', credentials=credentials, cache_discovery=False)
+    """Build Sheets service using a Google Service Account credential."""
+    import json
+    from google.oauth2.service_account import Credentials as SACredentials
+
+    SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
+
+    # Option A: full JSON blob in env var (recommended — no file needed on VPS)
+    sa_json = os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON')
+    if sa_json:
+        try:
+            sa_info = json.loads(sa_json)
+            creds = SACredentials.from_service_account_info(sa_info, scopes=SCOPES)
+            return build('sheets', 'v4', credentials=creds, cache_discovery=False)
+        except Exception as e:
+            logger.error(f"Failed to build Sheets service from JSON env var: {e}")
+            return None
+
+    # Option B: path to a JSON key file
+    sa_file = os.environ.get('GOOGLE_SERVICE_ACCOUNT_FILE')
+    if sa_file and os.path.exists(sa_file):
+        try:
+            creds = SACredentials.from_service_account_file(sa_file, scopes=SCOPES)
+            return build('sheets', 'v4', credentials=creds, cache_discovery=False)
+        except Exception as e:
+            logger.error(f"Failed to build Sheets service from file {sa_file}: {e}")
+            return None
+
+    logger.warning("No Google service account credentials configured (set GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_SERVICE_ACCOUNT_FILE)")
+    return None
 
 def _ensure_headers_exist(service, spreadsheet_id: str, tab_name: str) -> bool:
     num_cols = len(QA_LOG_HEADERS)
@@ -210,7 +177,9 @@ def log_qa_entry(
     retrieval_latency_ms: int,
     generation_latency_ms: int,
     token_count: int,
-    retrieval_diagnostics: Optional[Dict[str, Any]] = None
+    retrieval_diagnostics: Optional[Dict[str, Any]] = None,
+    llm_model: str = "",
+    is_anonymous: bool = False
 ) -> bool:
     if not Config.QA_LOG_SHEET_ID:
         logger.debug("QA logging disabled - no sheet ID configured")
@@ -277,7 +246,9 @@ def log_qa_entry(
                 str(diag.get("validation_performed", False)),
                 str(diag.get("validation_passed", "")),
                 diag.get("validation_expected_ref") or "",
-                str(diag.get("validation_matches_found", 0))
+                str(diag.get("validation_matches_found", 0)),
+                llm_model,
+                str(is_anonymous)
             ]
             
             service.spreadsheets().values().append(

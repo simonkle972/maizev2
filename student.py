@@ -11,6 +11,7 @@ import logging
 
 from models import db, Enrollment, TeachingAssistant, ChatSession, ChatMessage
 from auth_student import current_student
+from config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -328,7 +329,9 @@ def chat_stream(ta_id):
                 retrieval_latency_ms=retrieval_latency_ms,
                 generation_latency_ms=generation_latency_ms,
                 token_count=token_count,
-                retrieval_diagnostics=retrieval_diagnostics
+                retrieval_diagnostics=retrieval_diagnostics,
+                llm_model=Config.LLM_MODEL,
+                is_anonymous=False
             )
 
             yield f"data: {json.dumps({'type': 'done', 'session_id': session_id})}\n\n"
