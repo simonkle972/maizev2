@@ -239,7 +239,7 @@ def _supplement_pdf_with_figures(file_path: str, text: str) -> str:
         from openai import OpenAI
 
         client = OpenAI(api_key=Config.OPENAI_API_KEY)
-        images = convert_from_path(file_path, dpi=200, fmt='jpeg')
+        images = convert_from_path(file_path, dpi=200, fmt='jpeg', poppler_path="/usr/bin")
         logger.info(f"Figure supplement: rendering {len(images)} pages for {file_path}")
 
         supplemented = text
@@ -326,7 +326,7 @@ def _extract_pdf_vision(file_path: str) -> tuple:
 
         client = OpenAI(api_key=Config.OPENAI_API_KEY)
 
-        images = convert_from_path(file_path, dpi=200, fmt='jpeg')
+        images = convert_from_path(file_path, dpi=200, fmt='jpeg', poppler_path="/usr/bin")
         page_count = len(images)
         logger.info(f"Vision extraction: converted {page_count} pages to images")
 
