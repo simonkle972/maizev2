@@ -251,18 +251,21 @@ def _supplement_pdf_with_figures(file_path: str, text: str) -> str:
 
                 response = client.chat.completions.create(
                     model=Config.VISION_MODEL,
-                    max_tokens=400,
+                    max_tokens=1000,
                     messages=[{
                         "role": "user",
                         "content": [
                             {
                                 "type": "text",
                                 "text": (
-                                    f"This is page {page_num} of a document. "
-                                    "Describe ONLY charts, figures, diagrams, and images visible on this page. "
-                                    "Include axis labels, trends, key data values, and notable features. "
-                                    "Do NOT transcribe text that is clearly readable as prose. "
-                                    "If there are no charts or figures on this page, reply exactly: No figures"
+                                    f"This is slide/page {page_num} of an academic lecture. "
+                                    "Describe ALL visual elements: charts, graphs, figures, diagrams, maps, photos, and tables shown as images. "
+                                    "For maps: list every labeled city, region, country, or location name visible. "
+                                    "For tables: describe the structure and transcribe all cell contents. "
+                                    "For charts/graphs: include axis labels, legend entries, data values, and trends. "
+                                    "Include all text that appears inside or as part of a visual element. "
+                                    "Do NOT describe regular slide titles or bullet-point body text. "
+                                    "If there are no visual elements on this page, reply exactly: No figures"
                                 )
                             },
                             {
@@ -666,16 +669,19 @@ def extract_pptx(file_path: str) -> str:
                         img_base64 = base64.b64encode(img.blob).decode()
                         response = client.chat.completions.create(
                             model=Config.VISION_MODEL,
-                            max_tokens=300,
+                            max_tokens=800,
                             messages=[{
                                 "role": "user",
                                 "content": [
                                     {
                                         "type": "text",
                                         "text": (
-                                            f"Describe this chart, figure, or image from slide {slide_num} of a lecture. "
-                                            "Be specific and concise — 2–4 sentences. "
-                                            "Include axis labels, trends, key values, and any notable features."
+                                            f"Describe this visual from slide {slide_num} of an academic lecture. "
+                                            "For maps: list every labeled city, region, country, or location name visible. "
+                                            "For tables: describe the structure and transcribe all cell contents. "
+                                            "For charts/graphs: include axis labels, legend entries, data values, and trends. "
+                                            "Include all text visible inside the image (labels, annotations, callouts). "
+                                            "Be thorough — do not summarize away specific names or values."
                                         )
                                     },
                                     {
@@ -716,7 +722,7 @@ def extract_pptx(file_path: str) -> str:
                         )
                         response = client.chat.completions.create(
                             model=Config.VISION_MODEL,
-                            max_tokens=300,
+                            max_tokens=500,
                             messages=[{"role": "user", "content": prompt}]
                         )
                         desc = response.choices[0].message.content
