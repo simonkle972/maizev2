@@ -38,13 +38,13 @@ class Config:
         'tier2': {
             'name': 'Medium Course',
             'max_students': 100,
-            'price_monthly': 14.99,
+            'price_monthly': 19.99,
             'stripe_price_id': os.getenv('STRIPE_PRICE_TIER2')
         },
         'tier3': {
             'name': 'Large Course',
             'max_students': 250,
-            'price_monthly': 19.99,
+            'price_monthly': 29.99,
             'stripe_price_id': os.getenv('STRIPE_PRICE_TIER3')
         },
     }

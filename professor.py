@@ -99,7 +99,7 @@ def create_ta():
         is_custom_tier = False
         if tier == 'custom':
             is_custom_tier = True
-            tier = 'tier3'  # Use tier3 (Large Course, 250 students, $19.99/mo)
+            tier = 'tier3'  # Use tier3 (Large Course, 250 students, $29.99/mo)
         elif tier not in Config.BILLING_TIERS:
             flash('Invalid billing tier', 'error')
             return render_template('professor/create_ta.html', billing_tiers=Config.BILLING_TIERS)

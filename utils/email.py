@@ -228,7 +228,7 @@ def send_custom_tier_notification(professor_name, professor_email, institution_n
             <div style="background-color: #fef3c7; padding: 15px; border-left: 4px solid #f59e0b; margin: 20px 0;">
                 <p style="margin: 0;"><strong>Action Required:</strong></p>
                 <p style="margin: 5px 0 0 0;">
-                    The TA has been created with the Large tier ($19.99/month, 250-student cap) as a temporary measure.
+                    The TA has been created with the Large tier ($29.99/month, 250-student cap) as a temporary measure.
                     Please contact the professor within 24 hours to discuss custom pricing for their larger class.
                 </p>
             </div>
@@ -250,7 +250,7 @@ Institution: {institution_name}
 TA Name: {ta_name}
 Course: {course_name}
 
-The TA has been created with the Large tier ($19.99/month, 250-student cap) as a temporary measure.
+The TA has been created with the Large tier ($29.99/month, 250-student cap) as a temporary measure.
 Please contact the professor within 24 hours to discuss custom pricing for their larger class.
 
 ---
