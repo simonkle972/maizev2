@@ -20,7 +20,7 @@ from utils.stripe_helpers import (
     resume_ta_subscription,
     create_customer_portal_session
 )
-from utils.email import send_contact_sales_email
+from utils.email import send_contact_sales_email, send_support_request_email
 
 professor_bp = Blueprint('professor', __name__, url_prefix='/professor')
 
@@ -315,6 +315,110 @@ def contact_sales():
         flash('Request sent! We will contact you shortly.', 'success')
 
     return redirect(url_for('professor.create_ta'))
+
+
+@professor_bp.route('/onboarding', methods=['GET', 'POST'])
+@professor_required
+def onboarding():
+    """Post-signup onboarding: collect name and institution for new Auth0 professors."""
+    if current_user.onboarding_complete:
+        return redirect(url_for('professor.dashboard'))
+
+    if request.method == 'POST':
+        first_name = request.form.get('first_name', '').strip()
+        last_name = request.form.get('last_name', '').strip()
+        institution_id = request.form.get('institution_id', '').strip()
+        new_institution_name = request.form.get('new_institution_name', '').strip()
+
+        if not first_name or not last_name:
+            flash('First and last name are required.', 'error')
+        elif not institution_id and not new_institution_name:
+            flash('Please select or create an institution.', 'error')
+        else:
+            if institution_id == 'new' and new_institution_name:
+                domain = current_user.email.split('@')[-1].lower()
+                institution = Institution(name=new_institution_name, email_domain=domain)
+                db.session.add(institution)
+                db.session.flush()
+            elif institution_id and institution_id != 'new':
+                institution = Institution.query.get(int(institution_id))
+            else:
+                flash('Invalid institution selection.', 'error')
+                institutions = Institution.query.order_by(Institution.name).all()
+                return render_template('professor/onboarding.html', institutions=institutions)
+
+            current_user.first_name = first_name
+            current_user.last_name = last_name
+            current_user.institution_id = institution.id
+            current_user.onboarding_complete = True
+            db.session.commit()
+            return redirect(url_for('professor.dashboard'))
+
+    institutions = Institution.query.order_by(Institution.name).all()
+    return render_template('professor/onboarding.html', institutions=institutions)
+
+
+@professor_bp.route('/profile', methods=['GET', 'POST'])
+@professor_required
+def profile():
+    """Professor profile page — view and edit name and institution."""
+    if request.method == 'POST':
+        first_name = request.form.get('first_name', '').strip()
+        last_name = request.form.get('last_name', '').strip()
+        institution_id = request.form.get('institution_id', '').strip()
+        new_institution_name = request.form.get('new_institution_name', '').strip()
+
+        if not first_name or not last_name:
+            flash('First and last name are required.', 'error')
+        elif not institution_id and not new_institution_name:
+            flash('Please select or create an institution.', 'error')
+        else:
+            if institution_id == 'new' and new_institution_name:
+                domain = current_user.email.split('@')[-1].lower()
+                institution = Institution(name=new_institution_name, email_domain=domain)
+                db.session.add(institution)
+                db.session.flush()
+            elif institution_id and institution_id != 'new':
+                institution = Institution.query.get(int(institution_id))
+            else:
+                flash('Invalid institution selection.', 'error')
+                institutions = Institution.query.order_by(Institution.name).all()
+                return render_template('professor/profile.html', institutions=institutions)
+
+            current_user.first_name = first_name
+            current_user.last_name = last_name
+            current_user.institution_id = institution.id
+            db.session.commit()
+            flash('Profile updated successfully.', 'success')
+            return redirect(url_for('professor.profile'))
+
+    institutions = Institution.query.order_by(Institution.name).all()
+    return render_template('professor/profile.html', institutions=institutions)
+
+
+@professor_bp.route('/support', methods=['GET', 'POST'])
+@professor_required
+def support():
+    """Support request form — sends email to simon@getmaize.ai."""
+    if request.method == 'POST':
+        subject_line = request.form.get('subject', '').strip()
+        message = request.form.get('message', '').strip()
+
+        if not subject_line or not message:
+            flash('Please fill in both fields.', 'error')
+        else:
+            institution_name = current_user.institution.name if current_user.institution else 'Unknown'
+            send_support_request_email(
+                f"{current_user.first_name} {current_user.last_name}",
+                current_user.email,
+                institution_name,
+                subject_line,
+                message
+            )
+            flash("Message sent — we'll get back to you shortly.", 'success')
+            return redirect(url_for('professor.support'))
+
+    return render_template('professor/support.html')
 
 
 # Document Management Routes

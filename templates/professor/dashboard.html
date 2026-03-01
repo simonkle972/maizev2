@@ -9,12 +9,19 @@
 <body>
     <div class="admin-container">
         <header class="admin-header">
-            <h1>Professor Dashboard</h1>
-            <div style="display: flex; gap: 15px; align-items: center;">
-                <span>{{ current_user.first_name }} {{ current_user.last_name }}</span>
-                <a href="{{ url_for('professor.settings') }}" class="btn btn-secondary">Settings</a>
-                <a href="{{ url_for('auth0.logout') }}" class="btn btn-secondary">Logout</a>
-            </div>
+            <a href="{{ url_for('professor.dashboard') }}" class="header-brand">
+                <img src="/static/images/maize-logo.png" alt="Maize TA">
+                <span class="header-brand-name">Maize TA</span>
+            </a>
+            <nav class="header-nav">
+                <span class="header-nav-user">{{ current_user.first_name }}</span>
+                <div class="nav-divider"></div>
+                <a href="{{ url_for('professor.profile') }}">Profile</a>
+                <a href="{{ url_for('professor.settings') }}">Billing</a>
+                <a href="{{ url_for('professor.support') }}">Support</a>
+                <div class="nav-divider"></div>
+                <a href="{{ url_for('auth0.logout') }}">Logout</a>
+            </nav>
         </header>
 
         <main class="admin-main">

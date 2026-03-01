@@ -93,6 +93,8 @@ def callback():
 
     # Redirect based on role
     if user.role == 'professor':
+        if not user.onboarding_complete:
+            return redirect(url_for('professor.onboarding'))
         return redirect(url_for('professor.dashboard'))
     elif user.role == 'student':
         return redirect(url_for('student.dashboard'))

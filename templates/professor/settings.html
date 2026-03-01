@@ -3,24 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Settings - Maize TA</title>
+    <title>Billing - Maize TA</title>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
     <div class="admin-container">
         <header class="admin-header">
-            <h1>Settings</h1>
-            <a href="{{ url_for('professor.dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
+            <a href="{{ url_for('professor.dashboard') }}" class="header-brand">
+                <img src="/static/images/maize-logo.png" alt="Maize TA">
+                <span class="header-brand-name">Maize TA</span>
+            </a>
+            <nav class="header-nav">
+                <span class="header-nav-user">{{ current_user.first_name }}</span>
+                <div class="nav-divider"></div>
+                <a href="{{ url_for('professor.profile') }}">Profile</a>
+                <a href="{{ url_for('professor.settings') }}" class="active">Billing</a>
+                <a href="{{ url_for('professor.support') }}">Support</a>
+                <div class="nav-divider"></div>
+                <a href="{{ url_for('auth0.logout') }}">Logout</a>
+            </nav>
         </header>
 
         <main class="admin-main">
-            <h2>Account Information</h2>
-            <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
-                <p><strong>Name:</strong> {{ current_user.first_name }} {{ current_user.last_name }}</p>
-                <p><strong>Email:</strong> {{ current_user.email }}</p>
-                <p><strong>Institution:</strong> {{ current_user.institution.name if current_user.institution else 'N/A' }}</p>
-            </div>
-
             <h2>Billing Summary</h2>
             <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
                 <p><strong>Active TAs:</strong> {{ active_tas|length }}</p>

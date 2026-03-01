@@ -321,3 +321,65 @@ def send_welcome_email(user_email, user_name, user_role):
     """
 
     return send_email(user_email, subject, html_body)
+
+
+def send_support_request_email(professor_name, professor_email, institution_name, subject_line, message):
+    """
+    Send a professor support request to simon@getmaize.ai.
+
+    Args:
+        professor_name: Professor's full name
+        professor_email: Professor's email address
+        institution_name: Professor's institution name
+        subject_line: Subject entered by professor
+        message: Message body entered by professor
+
+    Returns:
+        Tuple of (success: bool, error_message: str or None)
+    """
+    subject = f"[Maize Support] {subject_line}"
+
+    html_body = f"""
+    <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <h2 style="color: #2563eb;">Support Request</h2>
+            <table style="border-collapse: collapse; width: 100%; margin-bottom: 20px;">
+                <tr>
+                    <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; background-color: #f9f9f9; width: 140px;">From</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">{professor_name}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; background-color: #f9f9f9;">Email</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;"><a href="mailto:{professor_email}">{professor_email}</a></td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; background-color: #f9f9f9;">Institution</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">{institution_name}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; background-color: #f9f9f9;">Subject</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">{subject_line}</td>
+                </tr>
+            </table>
+            <h3 style="color: #333; margin-bottom: 8px;">Message</h3>
+            <div style="background-color: #f8fafc; padding: 16px; border-radius: 6px; border: 1px solid #e2e8f0; white-space: pre-wrap;">{message}</div>
+            <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+            <p style="font-size: 12px; color: #999;">Maize TA — Automated Support Notification</p>
+        </body>
+    </html>
+    """
+
+    text_body = f"""Support Request — {subject_line}
+
+From: {professor_name}
+Email: {professor_email}
+Institution: {institution_name}
+
+Message:
+{message}
+
+---
+Maize TA - Automated Support Notification
+    """
+
+    return send_email("simon@getmaize.ai", subject, html_body, text_body)

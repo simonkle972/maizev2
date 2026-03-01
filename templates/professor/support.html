@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Support - Maize TA</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="admin-container">
+        <header class="admin-header">
+            <a href="{{ url_for('professor.dashboard') }}" class="header-brand">
+                <img src="/static/images/maize-logo.png" alt="Maize TA">
+                <span class="header-brand-name">Maize TA</span>
+            </a>
+            <nav class="header-nav">
+                <span class="header-nav-user">{{ current_user.first_name }}</span>
+                <div class="nav-divider"></div>
+                <a href="{{ url_for('professor.profile') }}">Profile</a>
+                <a href="{{ url_for('professor.settings') }}">Billing</a>
+                <a href="{{ url_for('professor.support') }}" class="active">Support</a>
+                <div class="nav-divider"></div>
+                <a href="{{ url_for('auth0.logout') }}">Logout</a>
+            </nav>
+        </header>
+
+        <main class="admin-main" style="max-width: 600px; margin: 0 auto; padding: 2rem 1rem;">
+            <h2 style="margin-bottom: 0.25rem;">Contact Support</h2>
+            <p style="color: #64748b; font-size: 0.9rem; margin-bottom: 2rem;">
+                Send us a message and we'll get back to you shortly.
+            </p>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="{% if category == 'error' %}error-message{% else %}success-message{% endif %}" style="margin-bottom: 1rem;">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div style="background: white; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); padding: 2rem;">
+                <div style="background: #f8fafc; border-radius: 6px; padding: 0.875rem 1rem; margin-bottom: 1.5rem; font-size: 0.875rem; color: #64748b;">
+                    Sending as <strong style="color: #1e293b;">{{ current_user.first_name }} {{ current_user.last_name }}</strong>
+                    ({{ current_user.email }})
+                </div>
+
+                <form method="POST">
+                    <div class="form-group">
+                        <label for="subject">Subject</label>
+                        <input type="text" id="subject" name="subject" required
+                               placeholder="e.g. Question about indexing, billing issue...">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="message">Message</label>
+                        <textarea id="message" name="message" required rows="6"
+                                  placeholder="Describe your question or issue in detail..."
+                                  style="width:100%; padding:0.625rem 0.875rem; border:1.5px solid #e2e8f0; border-radius:6px; font-size:0.9rem; color:#1e293b; font-family:inherit; resize:vertical; outline:none; transition:border-color 0.15s;"
+                                  onfocus="this.style.borderColor='#2563eb'" onblur="this.style.borderColor='#e2e8f0'"></textarea>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">Send Message</button>
+                </form>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

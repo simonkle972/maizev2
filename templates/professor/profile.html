@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile - Maize TA</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="admin-container">
+        <header class="admin-header">
+            <a href="{{ url_for('professor.dashboard') }}" class="header-brand">
+                <img src="/static/images/maize-logo.png" alt="Maize TA">
+                <span class="header-brand-name">Maize TA</span>
+            </a>
+            <nav class="header-nav">
+                <span class="header-nav-user">{{ current_user.first_name }}</span>
+                <div class="nav-divider"></div>
+                <a href="{{ url_for('professor.profile') }}" class="active">Profile</a>
+                <a href="{{ url_for('professor.settings') }}">Billing</a>
+                <a href="{{ url_for('professor.support') }}">Support</a>
+                <div class="nav-divider"></div>
+                <a href="{{ url_for('auth0.logout') }}">Logout</a>
+            </nav>
+        </header>
+
+        <main class="admin-main" style="max-width: 600px; margin: 0 auto; padding: 2rem 1rem;">
+            <h2 style="margin-bottom: 0.25rem;">Profile</h2>
+            <p style="color: #64748b; font-size: 0.9rem; margin-bottom: 2rem;">Update your name and institution.</p>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="{% if category == 'error' %}error-message{% else %}success-message{% endif %}" style="margin-bottom: 1rem;">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div style="background: white; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); padding: 2rem;">
+                <form method="POST" id="profile-form">
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label for="first_name">First Name</label>
+                            <input type="text" id="first_name" name="first_name" required
+                                   value="{{ current_user.first_name or '' }}"
+                                   autocomplete="given-name">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label for="last_name">Last Name</label>
+                            <input type="text" id="last_name" name="last_name" required
+                                   value="{{ current_user.last_name or '' }}"
+                                   autocomplete="family-name">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" value="{{ current_user.email }}" disabled
+                               style="background: #f8fafc; color: #64748b; cursor: not-allowed;">
+                        <small style="color: #94a3b8; font-size: 0.8rem;">Managed by Auth0 — contact support to change.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="inst-search">Institution</label>
+                        <div style="position: relative;">
+                            <input type="text" id="inst-search" autocomplete="off"
+                                   placeholder="Search your university..."
+                                   value="{{ current_user.institution.name if current_user.institution else '' }}">
+                            <div id="inst-dropdown" style="position:absolute;top:calc(100% + 4px);left:0;right:0;background:white;border:1.5px solid #e2e8f0;border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,0.1);max-height:200px;overflow-y:auto;z-index:100;display:none;"></div>
+                        </div>
+                        <input type="hidden" id="institution_id" name="institution_id"
+                               value="{{ current_user.institution_id or '' }}">
+                        <div id="new-inst-group" style="display:none; margin-top: 0.75rem;">
+                            <input type="text" id="new_institution_name" name="new_institution_name"
+                                   placeholder="Enter full institution name">
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">Save Changes</button>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <script>
+    const institutions = {{ institutions | tojson }};
+    const searchInput = document.getElementById('inst-search');
+    const dropdown = document.getElementById('inst-dropdown');
+    const hiddenInput = document.getElementById('institution_id');
+    const newInstGroup = document.getElementById('new-inst-group');
+    const newInstInput = document.getElementById('new_institution_name');
+
+    function renderDropdown(query) {
+        const q = query.toLowerCase();
+        const matches = institutions.filter(i => i.name.toLowerCase().includes(q));
+        dropdown.innerHTML = '';
+        matches.slice(0, 8).forEach(inst => {
+            const opt = document.createElement('div');
+            opt.style.cssText = 'padding:0.625rem 0.875rem;font-size:0.875rem;cursor:pointer;';
+            opt.textContent = inst.name;
+            opt.dataset.id = inst.id;
+            opt.addEventListener('mouseover', () => opt.style.background = '#f0f6ff');
+            opt.addEventListener('mouseout', () => opt.style.background = '');
+            opt.addEventListener('mousedown', e => { e.preventDefault(); selectInstitution(inst.id, inst.name); });
+            dropdown.appendChild(opt);
+        });
+        const addOpt = document.createElement('div');
+        addOpt.style.cssText = 'padding:0.625rem 0.875rem;font-size:0.875rem;cursor:pointer;color:#2563eb;font-weight:600;border-top:1px solid #e2e8f0;';
+        addOpt.textContent = '+ Add new institution';
+        addOpt.addEventListener('mousedown', e => { e.preventDefault(); selectNew(); });
+        dropdown.appendChild(addOpt);
+        dropdown.style.display = 'block';
+    }
+
+    function selectInstitution(id, name) {
+        hiddenInput.value = id;
+        searchInput.value = name;
+        newInstGroup.style.display = 'none';
+        newInstInput.value = '';
+        newInstInput.required = false;
+        dropdown.style.display = 'none';
+    }
+
+    function selectNew() {
+        hiddenInput.value = 'new';
+        newInstGroup.style.display = 'block';
+        newInstInput.required = true;
+        newInstInput.focus();
+        dropdown.style.display = 'none';
+    }
+
+    searchInput.addEventListener('input', () => {
+        hiddenInput.value = '';
+        newInstGroup.style.display = 'none';
+        newInstInput.required = false;
+        if (searchInput.value.trim()) renderDropdown(searchInput.value);
+        else dropdown.style.display = 'none';
+    });
+    searchInput.addEventListener('focus', () => { if (searchInput.value.trim()) renderDropdown(searchInput.value); });
+    document.addEventListener('click', e => { if (!e.target.closest('[style*="position: relative"]')) dropdown.style.display = 'none'; });
+    </script>
+</body>
+</html>

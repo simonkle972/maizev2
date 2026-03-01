@@ -26,6 +26,7 @@ class User(db.Model):
     last_login_at = db.Column(db.DateTime, nullable=True)
     auth0_sub = db.Column(db.String(128), unique=True, nullable=True, index=True)
     email_verified = db.Column(db.Boolean, default=False, nullable=False)
+    onboarding_complete = db.Column(db.Boolean, default=False, nullable=False)
 
     # Relationships
     institution = db.relationship('Institution', backref='users')
