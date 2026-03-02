@@ -37,6 +37,10 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 db.init_app(app)
 migrate = Migrate(app, db)
 
+# Flask-Limiter setup (rate limiting for professor test chat)
+from extensions import limiter
+limiter.init_app(app)
+
 # Flask-Login setup
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -90,6 +94,11 @@ app.register_blueprint(professor_bp)
 app.register_blueprint(student_bp)
 app.register_blueprint(auth0_bp)
 init_oauth(app)
+
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    return jsonify(error="Rate limit exceeded", message=str(e.description)), 429
+
 
 @app.route('/health')
 def health():
@@ -199,24 +208,32 @@ def stripe_webhook():
         logger.info(f"Checkout completed: {session.get('id')}")
 
     elif event_type == 'invoice.payment_succeeded':
-        # Payment succeeded - update subscription status
+        # Payment succeeded - restore TA if it was paused due to prior failure
         invoice = event['data']['object']
         subscription_id = invoice.get('subscription')
         if subscription_id:
             ta = TeachingAssistant.query.filter_by(stripe_subscription_id=subscription_id).first()
             if ta:
                 ta.subscription_status = 'active'
+                if ta.status == 'paused':
+                    ta.status = 'active'
+                    ta.is_paused = False
+                    ta.paused_at = None
                 db.session.commit()
                 logger.info(f"Payment succeeded for TA {ta.id}")
 
     elif event_type == 'invoice.payment_failed':
-        # Payment failed - notify professor
+        # Payment failed - pause TA and notify professor
         invoice = event['data']['object']
         subscription_id = invoice.get('subscription')
         if subscription_id:
             ta = TeachingAssistant.query.filter_by(stripe_subscription_id=subscription_id).first()
             if ta:
-                logger.warning(f"Payment failed for TA {ta.id}")
+                ta.status = 'paused'
+                ta.is_paused = True
+                ta.subscription_status = 'paused'
+                db.session.commit()
+                logger.warning(f"Payment failed for TA {ta.id} — TA paused")
                 # TODO: Send email notification to professor
 
     elif event_type == 'customer.subscription.updated':
@@ -230,14 +247,16 @@ def stripe_webhook():
             logger.info(f"Subscription updated for TA {ta.id}: {subscription.get('status')}")
 
     elif event_type == 'customer.subscription.deleted':
-        # Subscription canceled
+        # Subscription canceled — pause TA
         subscription = event['data']['object']
         subscription_id = subscription.get('id')
         ta = TeachingAssistant.query.filter_by(stripe_subscription_id=subscription_id).first()
         if ta:
             ta.subscription_status = 'canceled'
+            ta.status = 'paused'
+            ta.is_paused = True
             db.session.commit()
-            logger.info(f"Subscription canceled for TA {ta.id}")
+            logger.info(f"Subscription canceled for TA {ta.id} — TA paused")
 
     return jsonify({'status': 'success'}), 200
 

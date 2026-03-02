@@ -16,6 +16,7 @@
             <nav class="header-nav">
                 <span class="header-nav-user">{{ current_user.first_name }}</span>
                 <div class="nav-divider"></div>
+                <a href="{{ url_for('professor.dashboard') }}">Dashboard</a>
                 <a href="{{ url_for('professor.profile') }}">Profile</a>
                 <a href="{{ url_for('professor.settings') }}" class="active">Billing</a>
                 <a href="{{ url_for('professor.support') }}">Support</a>
@@ -47,14 +48,14 @@
                                 <td style="padding: 12px;">{{ ta.name }}</td>
                                 <td style="padding: 12px; text-align: center;">{{ billing_tiers[ta.billing_tier]['name'] }}</td>
                                 <td style="padding: 12px; text-align: center;">
-                                    {% if ta.is_paused %}
-                                        <span style="color: #ff9800;">Paused ($0)</span>
+                                    {% if ta.status == 'paused' %}
+                                        <span style="color: #c2410c;">Paused ($0)</span>
                                     {% else %}
-                                        <span style="color: #4caf50;">Active</span>
+                                        <span style="color: #15803d;">Active</span>
                                     {% endif %}
                                 </td>
                                 <td style="padding: 12px; text-align: right;">
-                                    ${{ "%.2f"|format(billing_tiers[ta.billing_tier]['price_monthly'] if not ta.is_paused else 0) }}
+                                    ${{ "%.2f"|format(billing_tiers[ta.billing_tier]['price_monthly'] if ta.status == 'active' else 0) }}
                                 </td>
                             </tr>
                         {% endfor %}

@@ -208,6 +208,48 @@
             margin-top: 0.75rem;
         }
 
+        /* Institution suggestion banner */
+        .inst-suggestion {
+            background: #eff6ff;
+            border: 1.5px solid #bfdbfe;
+            border-radius: 8px;
+            padding: 0.875rem 1rem;
+            margin-bottom: 1rem;
+            font-size: 0.875rem;
+            color: #1e40af;
+        }
+
+        .inst-suggestion p { margin-bottom: 0.625rem; line-height: 1.4; }
+
+        .inst-suggestion-btns {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .inst-suggestion-btns button {
+            padding: 0.375rem 0.75rem;
+            border-radius: 5px;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+        }
+
+        .btn-confirm-suggestion {
+            background: #2563eb;
+            color: white;
+        }
+
+        .btn-confirm-suggestion:hover { background: #1d4ed8; }
+
+        .btn-dismiss-suggestion {
+            background: transparent;
+            color: #64748b;
+            border: 1.5px solid #e2e8f0 !important;
+        }
+
+        .btn-dismiss-suggestion:hover { background: #f1f5f9; }
+
         .submit-btn {
             width: 100%;
             padding: 0.75rem;
@@ -287,12 +329,32 @@
 
             <div class="form-group">
                 <label for="inst-search">Institution</label>
-                <div class="inst-wrapper">
+
+                {% if suggested_institution %}
+                <div class="inst-suggestion" id="inst-suggestion">
+                    <p>Based on your email, are you affiliated with <strong>{{ suggested_institution.name }}</strong>?</p>
+                    <div class="inst-suggestion-btns">
+                        <button type="button" class="btn-confirm-suggestion"
+                                onclick="confirmSuggested({{ suggested_institution.id }}, {{ suggested_institution.name | tojson }})">
+                            Yes, that's right
+                        </button>
+                        <button type="button" class="btn-dismiss-suggestion"
+                                onclick="dismissSuggested()">
+                            Choose a different one
+                        </button>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="inst-wrapper" id="inst-search-wrapper" {% if suggested_institution %}style="display:none"{% endif %}>
                     <input type="text" id="inst-search" placeholder="Search your university..."
                            autocomplete="off">
                     <div class="inst-dropdown" id="inst-dropdown"></div>
                 </div>
-                <input type="hidden" id="institution_id" name="institution_id">
+                <input type="hidden" id="institution_id" name="institution_id"
+                       {% if suggested_institution %}value="{{ suggested_institution.id }}"{% endif %}>
+                <input type="hidden" id="auto_verified" name="auto_verified"
+                       value="{{ 'true' if suggested_institution else 'false' }}">
                 <div class="new-inst-group" id="new-inst-group">
                     <input type="text" id="new_institution_name" name="new_institution_name"
                            placeholder="Enter full institution name">
@@ -305,23 +367,24 @@
 </div>
 
 <script>
-const institutions = {{ institutions | tojson }};
 const searchInput = document.getElementById('inst-search');
 const dropdown = document.getElementById('inst-dropdown');
 const hiddenInput = document.getElementById('institution_id');
+const autoVerifiedInput = document.getElementById('auto_verified');
 const newInstGroup = document.getElementById('new-inst-group');
 const newInstInput = document.getElementById('new_institution_name');
+const searchWrapper = document.getElementById('inst-search-wrapper');
+const suggestionBanner = document.getElementById('inst-suggestion');
 
-function renderDropdown(query) {
-    const q = query.toLowerCase();
-    const matches = institutions.filter(i => i.name.toLowerCase().includes(q));
+let debounceTimer = null;
+
+function renderDropdown(results) {
     dropdown.innerHTML = '';
 
-    matches.slice(0, 8).forEach(inst => {
+    results.forEach(inst => {
         const opt = document.createElement('div');
         opt.className = 'inst-option';
-        opt.textContent = inst.name;
-        opt.dataset.id = inst.id;
+        opt.textContent = inst.country ? `${inst.name} — ${inst.country}` : inst.name;
         opt.addEventListener('mousedown', e => {
             e.preventDefault();
             selectInstitution(inst.id, inst.name);
@@ -340,8 +403,17 @@ function renderDropdown(query) {
     dropdown.style.display = 'block';
 }
 
+function fetchAndRender(query) {
+    if (query.length < 2) { dropdown.style.display = 'none'; return; }
+    fetch(`/professor/api/institutions?q=${encodeURIComponent(query)}`)
+        .then(r => r.json())
+        .then(renderDropdown)
+        .catch(() => { dropdown.style.display = 'none'; });
+}
+
 function selectInstitution(id, name) {
     hiddenInput.value = id;
+    autoVerifiedInput.value = 'false';
     searchInput.value = name;
     newInstGroup.style.display = 'none';
     newInstInput.value = '';
@@ -351,26 +423,43 @@ function selectInstitution(id, name) {
 
 function selectNew() {
     hiddenInput.value = 'new';
+    autoVerifiedInput.value = 'false';
     newInstGroup.style.display = 'block';
     newInstInput.required = true;
     newInstInput.focus();
     dropdown.style.display = 'none';
 }
 
-searchInput.addEventListener('input', () => {
-    hiddenInput.value = '';
-    newInstGroup.style.display = 'none';
-    newInstInput.required = false;
-    if (searchInput.value.trim()) {
-        renderDropdown(searchInput.value);
-    } else {
-        dropdown.style.display = 'none';
-    }
-});
+function confirmSuggested(id, name) {
+    hiddenInput.value = id;
+    autoVerifiedInput.value = 'true';
+    searchInput.value = name;
+    if (suggestionBanner) suggestionBanner.style.display = 'none';
+    // No need to show search wrapper — form is ready
+}
 
-searchInput.addEventListener('focus', () => {
-    if (searchInput.value.trim()) renderDropdown(searchInput.value);
-});
+function dismissSuggested() {
+    hiddenInput.value = '';
+    autoVerifiedInput.value = 'false';
+    if (suggestionBanner) suggestionBanner.style.display = 'none';
+    if (searchWrapper) searchWrapper.style.display = '';
+    if (searchInput) searchInput.focus();
+}
+
+if (searchInput) {
+    searchInput.addEventListener('input', () => {
+        hiddenInput.value = '';
+        autoVerifiedInput.value = 'false';
+        newInstGroup.style.display = 'none';
+        newInstInput.required = false;
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => fetchAndRender(searchInput.value.trim()), 300);
+    });
+
+    searchInput.addEventListener('focus', () => {
+        if (searchInput.value.trim().length >= 2) fetchAndRender(searchInput.value.trim());
+    });
+}
 
 document.addEventListener('click', e => {
     if (!e.target.closest('.inst-wrapper')) dropdown.style.display = 'none';
@@ -379,8 +468,9 @@ document.addEventListener('click', e => {
 document.getElementById('onboarding-form').addEventListener('submit', e => {
     if (!hiddenInput.value) {
         e.preventDefault();
-        searchInput.focus();
-        renderDropdown(searchInput.value || '');
+        if (suggestionBanner) suggestionBanner.style.display = 'none';
+        if (searchWrapper) searchWrapper.style.display = '';
+        if (searchInput) searchInput.focus();
     }
 });
 </script>

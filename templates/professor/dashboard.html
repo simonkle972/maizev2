@@ -16,6 +16,7 @@
             <nav class="header-nav">
                 <span class="header-nav-user">{{ current_user.first_name }}</span>
                 <div class="nav-divider"></div>
+                <a href="{{ url_for('professor.dashboard') }}" class="active">Dashboard</a>
                 <a href="{{ url_for('professor.profile') }}">Profile</a>
                 <a href="{{ url_for('professor.settings') }}">Billing</a>
                 <a href="{{ url_for('professor.support') }}">Support</a>
@@ -85,22 +86,27 @@
                                 <td style="padding: 12px;">{{ ta.name }}</td>
                                 <td style="padding: 12px;">{{ ta.course_name }}</td>
                                 <td style="padding: 12px; text-align: center;">
-                                    {{ billing_tiers[ta.billing_tier]['name'] if ta.requires_billing else 'Admin' }}
+                                    {% if not ta.requires_billing %}Admin{% elif ta.status == 'draft' %}—{% else %}{{ billing_tiers[ta.billing_tier]['name'] }}{% endif %}
                                 </td>
                                 <td style="padding: 12px; text-align: center;">
                                     {{ ta.current_enrollment_count }} / {{ ta.max_students }}
                                 </td>
                                 <td style="padding: 12px; text-align: center;">
-                                    {% if ta.is_paused %}
-                                        <span style="color: #ff9800;">Paused</span>
-                                    {% elif ta.is_active %}
-                                        <span style="color: #4caf50;">Active</span>
+                                    {% if ta.status == 'draft' %}
+                                        <span style="display:inline-block;background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;border-radius:12px;padding:2px 10px;font-size:0.8rem;font-weight:600;">Draft</span>
+                                    {% elif ta.status == 'paused' %}
+                                        <span style="display:inline-block;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;border-radius:12px;padding:2px 10px;font-size:0.8rem;font-weight:600;">Paused</span>
                                     {% else %}
-                                        <span style="color: #999;">Inactive</span>
+                                        <span style="display:inline-block;background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;border-radius:12px;padding:2px 10px;font-size:0.8rem;font-weight:600;">Active</span>
                                     {% endif %}
                                 </td>
                                 <td style="padding: 12px; text-align: center;">
-                                    <a href="{{ url_for('professor.manage_ta', ta_id=ta.id) }}" class="btn btn-secondary" style="font-size: 12px; padding: 5px 10px;">Manage</a>
+                                    {% if ta.status == 'draft' %}
+                                        <a href="{{ url_for('professor.publish_ta', ta_id=ta.id) }}" class="btn btn-primary" style="font-size: 12px; padding: 5px 12px;">Publish</a>
+                                        <a href="{{ url_for('professor.manage_ta', ta_id=ta.id) }}" class="btn btn-secondary" style="font-size: 12px; padding: 5px 10px; margin-left: 4px;">Manage</a>
+                                    {% else %}
+                                        <a href="{{ url_for('professor.manage_ta', ta_id=ta.id) }}" class="btn btn-secondary" style="font-size: 12px; padding: 5px 10px;">Manage</a>
+                                    {% endif %}
                                 </td>
                             </tr>
                         {% endfor %}

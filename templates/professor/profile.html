@@ -16,6 +16,7 @@
             <nav class="header-nav">
                 <span class="header-nav-user">{{ current_user.first_name }}</span>
                 <div class="nav-divider"></div>
+                <a href="{{ url_for('professor.dashboard') }}">Dashboard</a>
                 <a href="{{ url_for('professor.profile') }}" class="active">Profile</a>
                 <a href="{{ url_for('professor.settings') }}">Billing</a>
                 <a href="{{ url_for('professor.support') }}">Support</a>
@@ -65,7 +66,7 @@
 
                     <div class="form-group">
                         <label for="inst-search">Institution</label>
-                        <div style="position: relative;">
+                        <div class="prof-inst-wrapper" style="position: relative;">
                             <input type="text" id="inst-search" autocomplete="off"
                                    placeholder="Search your university..."
                                    value="{{ current_user.institution.name if current_user.institution else '' }}">
@@ -77,6 +78,35 @@
                             <input type="text" id="new_institution_name" name="new_institution_name"
                                    placeholder="Enter full institution name">
                         </div>
+
+                        {# Verification status shown below institution field #}
+                        {% if current_user.institution_verified %}
+                        <div style="margin-top: 0.625rem; display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="display:inline-flex;align-items:center;gap:0.375rem;background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;border-radius:20px;padding:0.25rem 0.75rem;font-size:0.8125rem;font-weight:600;">
+                                ✓ Verified via {{ current_user.verification_domain }}
+                            </span>
+                        </div>
+                        {% elif current_user.institution %}
+                        <details style="margin-top: 0.75rem;">
+                            <summary style="font-size:0.8125rem;color:#64748b;cursor:pointer;user-select:none;">
+                                Verify your institutional affiliation
+                            </summary>
+                            <div style="margin-top: 0.75rem; padding: 1rem; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0;">
+                                <p style="font-size:0.8125rem;color:#64748b;margin-bottom:0.625rem;">
+                                    Enter your institutional email to verify affiliation with {{ current_user.institution.name }}.
+                                </p>
+                                <form method="POST" style="display:flex;gap:0.5rem;align-items:flex-start;">
+                                    <input type="hidden" name="action" value="verify">
+                                    <input type="email" name="verification_email"
+                                           placeholder="you@youruniversity.edu"
+                                           style="flex:1;padding:0.5rem 0.75rem;border:1.5px solid #e2e8f0;border-radius:6px;font-size:0.875rem;">
+                                    <button type="submit" class="btn btn-primary" style="white-space:nowrap;padding:0.5rem 1rem;font-size:0.875rem;">
+                                        Verify
+                                    </button>
+                                </form>
+                            </div>
+                        </details>
+                        {% endif %}
                     </div>
 
                     <button type="submit" class="btn btn-primary" style="width: 100%;">Save Changes</button>
@@ -86,22 +116,19 @@
     </div>
 
     <script>
-    const institutions = {{ institutions | tojson }};
     const searchInput = document.getElementById('inst-search');
     const dropdown = document.getElementById('inst-dropdown');
     const hiddenInput = document.getElementById('institution_id');
     const newInstGroup = document.getElementById('new-inst-group');
     const newInstInput = document.getElementById('new_institution_name');
+    let debounceTimer = null;
 
-    function renderDropdown(query) {
-        const q = query.toLowerCase();
-        const matches = institutions.filter(i => i.name.toLowerCase().includes(q));
+    function renderDropdown(results) {
         dropdown.innerHTML = '';
-        matches.slice(0, 8).forEach(inst => {
+        results.forEach(inst => {
             const opt = document.createElement('div');
             opt.style.cssText = 'padding:0.625rem 0.875rem;font-size:0.875rem;cursor:pointer;';
-            opt.textContent = inst.name;
-            opt.dataset.id = inst.id;
+            opt.textContent = inst.country ? `${inst.name} — ${inst.country}` : inst.name;
             opt.addEventListener('mouseover', () => opt.style.background = '#f0f6ff');
             opt.addEventListener('mouseout', () => opt.style.background = '');
             opt.addEventListener('mousedown', e => { e.preventDefault(); selectInstitution(inst.id, inst.name); });
@@ -113,6 +140,14 @@
         addOpt.addEventListener('mousedown', e => { e.preventDefault(); selectNew(); });
         dropdown.appendChild(addOpt);
         dropdown.style.display = 'block';
+    }
+
+    function fetchAndRender(query) {
+        if (query.length < 2) { dropdown.style.display = 'none'; return; }
+        fetch(`/professor/api/institutions?q=${encodeURIComponent(query)}`)
+            .then(r => r.json())
+            .then(renderDropdown)
+            .catch(() => { dropdown.style.display = 'none'; });
     }
 
     function selectInstitution(id, name) {
@@ -136,11 +171,15 @@
         hiddenInput.value = '';
         newInstGroup.style.display = 'none';
         newInstInput.required = false;
-        if (searchInput.value.trim()) renderDropdown(searchInput.value);
-        else dropdown.style.display = 'none';
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => fetchAndRender(searchInput.value.trim()), 300);
     });
-    searchInput.addEventListener('focus', () => { if (searchInput.value.trim()) renderDropdown(searchInput.value); });
-    document.addEventListener('click', e => { if (!e.target.closest('[style*="position: relative"]')) dropdown.style.display = 'none'; });
+    searchInput.addEventListener('focus', () => {
+        if (searchInput.value.trim().length >= 2) fetchAndRender(searchInput.value.trim());
+    });
+    document.addEventListener('click', e => {
+        if (!e.target.closest('.prof-inst-wrapper')) dropdown.style.display = 'none';
+    });
     </script>
 </body>
 </html>

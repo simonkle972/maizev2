@@ -27,6 +27,8 @@ class User(db.Model):
     auth0_sub = db.Column(db.String(128), unique=True, nullable=True, index=True)
     email_verified = db.Column(db.Boolean, default=False, nullable=False)
     onboarding_complete = db.Column(db.Boolean, default=False, nullable=False)
+    institution_verified = db.Column(db.Boolean, default=False, nullable=False, server_default='false')
+    verification_domain = db.Column(db.String(256), nullable=True)
 
     # Relationships
     institution = db.relationship('Institution', backref='users')
@@ -83,12 +85,29 @@ class Institution(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(256), nullable=False)
     customer_id = db.Column(db.String(64), nullable=True, unique=True)
-    email_domain = db.Column(db.String(256), nullable=True)  # Default domain for institution (e.g., "harvard.edu")
+    email_domain = db.Column(db.String(256), nullable=True)  # Legacy single-domain field; use InstitutionDomain for new records
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    is_from_dataset = db.Column(db.Boolean, default=False, nullable=False, server_default='false')
+    country = db.Column(db.String(128), nullable=True)
+    alpha_two_code = db.Column(db.String(2), nullable=True)
+    state_province = db.Column(db.String(128), nullable=True)
+    web_pages = db.Column(db.JSON, nullable=True)
 
     teaching_assistants = db.relationship('TeachingAssistant', backref='institution', lazy='dynamic')
+
+
+class InstitutionDomain(db.Model):
+    """One-to-many domains per institution for email-based verification."""
+    __tablename__ = 'institution_domains'
+
+    id = db.Column(db.Integer, primary_key=True)
+    institution_id = db.Column(db.Integer, db.ForeignKey('institutions.id'), nullable=False, index=True)
+    domain = db.Column(db.String(256), nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    institution = db.relationship('Institution', backref='domains')
 
 
 class TeachingAssistant(db.Model):
@@ -123,6 +142,8 @@ class TeachingAssistant(db.Model):
     paused_at = db.Column(db.DateTime, nullable=True)
     last_pause_action_at = db.Column(db.DateTime, nullable=True)  # Track last pause/resume for cooldown
     requires_billing = db.Column(db.Boolean, default=True)  # False for admin-created TAs
+    status = db.Column(db.String(16), nullable=False, default='draft', server_default='draft')  # 'draft' | 'active' | 'paused'
+    published_at = db.Column(db.DateTime, nullable=True)
 
     # Relationships
     professor = db.relationship('User', backref='taught_tas', foreign_keys=[professor_id])
@@ -137,8 +158,8 @@ class TeachingAssistant(db.Model):
 
     @property
     def is_available(self):
-        """Check if TA is available (active and not paused)."""
-        return self.is_active and not self.is_paused
+        """Check if TA is available (published and not paused)."""
+        return self.status == 'active'
 
 class Document(db.Model):
     __tablename__ = 'documents'

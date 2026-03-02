@@ -2,7 +2,7 @@
 Email validation utilities for .edu domain and institution domain matching.
 """
 
-from models import Institution
+from models import Institution, InstitutionDomain
 
 
 def validate_edu_email(email, user_role=None):
@@ -80,12 +80,15 @@ def validate_student_email(email, ta):
     return True, None
 
 
-def suggest_institution(email):
+def match_institution_by_email(email):
     """
-    Suggest existing institution based on email domain.
+    Find the best-matching Institution for an email address using domain matching.
+
+    Handles subdomain stripping: som.yale.edu → tries som.yale.edu then yale.edu.
+    Checks InstitutionDomain table first, then falls back to Institution.email_domain.
 
     Args:
-        email: Email address
+        email: Email address (e.g. "john@som.yale.edu")
 
     Returns:
         Institution object or None
@@ -93,8 +96,33 @@ def suggest_institution(email):
     if not email or '@' not in email:
         return None
 
-    domain = email.split('@')[-1].lower()
-    return Institution.query.filter_by(email_domain=domain).first()
+    full_domain = email.split('@')[-1].lower()
+    parts = full_domain.split('.')
+    # Generate candidates from most-specific to least-specific, excluding bare TLD
+    candidates = ['.'.join(parts[i:]) for i in range(len(parts) - 1)]
+
+    if not candidates:
+        return None
+
+    # Check InstitutionDomain table (seeded from Hipo dataset)
+    match = (
+        InstitutionDomain.query
+        .filter(InstitutionDomain.domain.in_(candidates))
+        .join(Institution)
+        .first()
+    )
+    if match:
+        return match.institution
+
+    # Fallback: check legacy Institution.email_domain field
+    return Institution.query.filter(
+        Institution.email_domain.in_(candidates)
+    ).first()
+
+
+def suggest_institution(email):
+    """Backward-compatible alias for match_institution_by_email."""
+    return match_institution_by_email(email)
 
 
 def validate_password_strength(password):

@@ -16,6 +16,7 @@
             <nav class="header-nav">
                 <span class="header-nav-user">{{ current_user.first_name }}</span>
                 <div class="nav-divider"></div>
+                <a href="{{ url_for('professor.dashboard') }}">Dashboard</a>
                 <a href="{{ url_for('professor.profile') }}">Profile</a>
                 <a href="{{ url_for('professor.settings') }}" class="active">Billing</a>
                 <a href="{{ url_for('professor.support') }}">Support</a>

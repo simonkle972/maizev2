@@ -176,11 +176,128 @@ def sanitize_text(text: str) -> str:
     text = ''.join(char for char in text if ord(char) >= 32 or char in '\n\r\t')
     return text
 
+def extract_image(file_path: str) -> str:
+    """Extract content from an image file using GPT-4o vision."""
+    try:
+        import base64
+        from openai import OpenAI
+
+        ext = file_path.rsplit('.', 1)[-1].lower()
+        mime_map = {
+            'jpg': 'image/jpeg', 'jpeg': 'image/jpeg',
+            'png': 'image/png', 'gif': 'image/gif', 'webp': 'image/webp',
+        }
+        mime_type = mime_map.get(ext, 'image/jpeg')
+
+        with open(file_path, 'rb') as f:
+            img_base64 = base64.b64encode(f.read()).decode()
+
+        client = OpenAI(api_key=Config.OPENAI_API_KEY)
+        response = client.chat.completions.create(
+            model=Config.VISION_MODEL,
+            max_tokens=1500,
+            messages=[{
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": (
+                            "This is an image from an academic course. "
+                            "Transcribe ALL visible content including:\n"
+                            "- All text (printed or handwritten)\n"
+                            "- Mathematical equations (use LaTeX notation like $x^2$)\n"
+                            "- Diagrams and figures (describe in [DIAGRAM: ...] tags)\n"
+                            "- Tables (preserve structure)\n"
+                            "- Labels, annotations, and any other visual information\n\n"
+                            "Be thorough — students will use this content to get help."
+                        )
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:{mime_type};base64,{img_base64}",
+                            "detail": "high"
+                        }
+                    }
+                ]
+            }]
+        )
+        return response.choices[0].message.content or ""
+    except Exception as e:
+        logger.warning(f"Image extraction failed for {file_path}: {e}")
+        return ""
+
+
+def extract_json(file_path: str) -> str:
+    """Extract content from a JSON file as pretty-printed text."""
+    try:
+        import json
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            data = json.load(f)
+        return json.dumps(data, indent=2, ensure_ascii=False)
+    except Exception:
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                return f.read()
+        except Exception as e:
+            logger.warning(f"JSON extraction failed for {file_path}: {e}")
+            return ""
+
+
+def extract_csv(file_path: str) -> str:
+    """Extract content from a CSV file as a readable table."""
+    try:
+        import pandas as pd
+        for encoding in ('utf-8', 'latin-1', 'cp1252'):
+            try:
+                df = pd.read_csv(file_path, encoding=encoding)
+                return df.to_string(index=False)
+            except UnicodeDecodeError:
+                continue
+        return ""
+    except Exception as e:
+        logger.warning(f"CSV extraction failed for {file_path}: {e}")
+        return ""
+
+
+def extract_jupyter_notebook(file_path: str) -> str:
+    """Extract content from a Jupyter notebook (.ipynb) file."""
+    try:
+        import json
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            nb = json.load(f)
+
+        parts = []
+        for cell in nb.get('cells', []):
+            cell_type = cell.get('cell_type', '')
+            source = ''.join(cell.get('source', []))
+            if not source.strip():
+                continue
+
+            if cell_type == 'markdown':
+                parts.append(source)
+            elif cell_type == 'code':
+                parts.append(f"```python\n{source}\n```")
+                for output in cell.get('outputs', []):
+                    if output.get('output_type') in ('stream', 'execute_result', 'display_data'):
+                        out_text = ''.join(
+                            output.get('text', []) or
+                            output.get('data', {}).get('text/plain', [])
+                        )
+                        if out_text.strip():
+                            parts.append(f"Output:\n{out_text.strip()}")
+
+        return '\n\n'.join(parts)
+    except Exception as e:
+        logger.warning(f"Jupyter notebook extraction failed for {file_path}: {e}")
+        return ""
+
+
 def extract_text_from_file(file_path: str) -> tuple:
     """Extract text from file. Returns (text, page_count) - page_count is 0 for non-PDFs."""
     ext = file_path.rsplit('.', 1)[-1].lower() if '.' in file_path else ''
     page_count = 0
-    
+
     try:
         if ext == 'pdf':
             text, page_count = extract_pdf(file_path)
@@ -195,10 +312,21 @@ def extract_text_from_file(file_path: str) -> tuple:
                 text = f.read()
         elif ext in ('pptx', 'ppt'):
             text = extract_pptx(file_path)
+        elif ext in ('png', 'jpg', 'jpeg', 'gif', 'webp'):
+            text = extract_image(file_path)
+        elif ext in ('md', 'py'):
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                text = f.read()
+        elif ext == 'json':
+            text = extract_json(file_path)
+        elif ext == 'csv':
+            text = extract_csv(file_path)
+        elif ext == 'ipynb':
+            text = extract_jupyter_notebook(file_path)
         else:
             logger.warning(f"Unsupported file type: {ext}")
             return "", 0
-        
+
         return sanitize_text(text), page_count
     except Exception as e:
         logger.error(f"Error extracting text from {file_path}: {e}")

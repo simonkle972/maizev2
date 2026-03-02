@@ -19,6 +19,9 @@
             <div class="header-info">
                 <h1>{{ ta.name }}</h1>
                 <p class="course-name">{{ ta.course_name }}</p>
+                {% if ta.professor and ta.professor.institution_verified and ta.professor.institution %}
+                <span class="inst-verified-badge">&#10003; Verified {{ ta.professor.institution.name }} instructor</span>
+                {% endif %}
             </div>
             <a href="/" class="logo-link">
                 <img src="/static/images/maize-logo.png" alt="Maize" class="logo-img">

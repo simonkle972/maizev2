@@ -3,7 +3,7 @@ Professor blueprint for Maize TA.
 Handles TA creation, management, document uploads, and billing.
 """
 
-from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify
+from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, session
 from flask_login import login_required, current_user
 from functools import wraps
 from datetime import datetime
@@ -11,16 +11,19 @@ import secrets
 import os
 import threading
 
-from models import db, TeachingAssistant, EnrollmentLink, Enrollment, Document, Institution, DocumentChunk, IndexingJob
+from models import db, TeachingAssistant, EnrollmentLink, Enrollment, Document, Institution, InstitutionDomain, DocumentChunk, IndexingJob
+from utils.validators import match_institution_by_email
 from config import Config
 from utils.stripe_helpers import (
-    create_checkout_session,
-    create_ta_from_checkout,
+    create_publish_checkout_session,
+    activate_ta_from_checkout,
     pause_ta_subscription,
     resume_ta_subscription,
-    create_customer_portal_session
+    create_customer_portal_session,
+    generate_slug
 )
 from utils.email import send_contact_sales_email, send_support_request_email
+from extensions import limiter
 
 professor_bp = Blueprint('professor', __name__, url_prefix='/professor')
 
@@ -77,10 +80,7 @@ def dashboard():
 @professor_bp.route('/ta/create', methods=['GET', 'POST'])
 @professor_required
 def create_ta():
-    """Create new TA with Stripe Checkout."""
-    if request.args.get('canceled') == 'true':
-        flash('Payment canceled. Your TA was not created.', 'info')
-
+    """Create new TA as a draft (no payment required)."""
     if request.method == 'POST':
         if not current_user.email_verified:
             flash('Please verify your email before creating a TA. Check your inbox for a verification email.', 'warning')
@@ -88,70 +88,35 @@ def create_ta():
 
         ta_name = request.form.get('ta_name', '').strip()
         course_name = request.form.get('course_name', '').strip()
-        tier = request.form.get('tier')
 
-        # Validation
-        if not all([ta_name, course_name, tier]):
-            flash('TA name, course name, and tier are required', 'error')
-            return render_template('professor/create_ta.html', billing_tiers=Config.BILLING_TIERS)
+        if not ta_name or not course_name:
+            flash('TA name and course name are required', 'error')
+            return render_template('professor/create_ta.html')
 
-        # Handle custom tier - map to tier3 and send notification
-        is_custom_tier = False
-        if tier == 'custom':
-            is_custom_tier = True
-            tier = 'tier3'  # Use tier3 (Large Course, 250 students, $29.99/mo)
-        elif tier not in Config.BILLING_TIERS:
-            flash('Invalid billing tier', 'error')
-            return render_template('professor/create_ta.html', billing_tiers=Config.BILLING_TIERS)
-
-        # Use default system prompt
+        from utils.stripe_helpers import generate_slug
+        ta_id = secrets.token_urlsafe(12)
+        slug = generate_slug(ta_name)
         system_prompt = "You are a helpful teaching assistant for this course. Help students understand course concepts by explaining clearly and guiding them through problems without giving direct answers."
 
-        # Create Stripe Checkout session
-        base_url = request.url_root.rstrip('/')
-        checkout_url, error = create_checkout_session(
-            current_user, tier, ta_name, course_name, system_prompt, base_url
+        ta = TeachingAssistant(
+            id=ta_id,
+            slug=slug,
+            name=ta_name,
+            course_name=course_name,
+            system_prompt=system_prompt,
+            professor_id=current_user.id,
+            institution_id=current_user.institution_id,
+            status='draft',
+            requires_billing=True,
+            allow_anonymous_chat=False,
         )
+        db.session.add(ta)
+        db.session.commit()
 
-        if error:
-            flash(f'Error creating checkout session: {error}', 'error')
-            return render_template('professor/create_ta.html', billing_tiers=Config.BILLING_TIERS)
+        flash(f'TA "{ta.name}" created! Upload your course materials, then publish when ready.', 'success')
+        return redirect(url_for('professor.manage_ta', ta_id=ta.id))
 
-        # Send custom tier notification email if requested
-        if is_custom_tier:
-            from utils.email import send_custom_tier_notification
-            institution_name = current_user.institution.name if current_user.institution else 'Unknown'
-            send_custom_tier_notification(
-                f"{current_user.first_name} {current_user.last_name}",
-                current_user.email,
-                institution_name,
-                ta_name,
-                course_name
-            )
-
-        return redirect(checkout_url)
-
-    return render_template('professor/create_ta.html', billing_tiers=Config.BILLING_TIERS)
-
-
-@professor_bp.route('/ta/create/success')
-@professor_required
-def create_ta_success():
-    """Handle successful TA creation after Stripe Checkout."""
-    session_id = request.args.get('session_id')
-    if not session_id:
-        flash('Invalid session', 'error')
-        return redirect(url_for('professor.dashboard'))
-
-    # Create TA from checkout session
-    ta, link, error = create_ta_from_checkout(session_id)
-
-    if error:
-        flash(f'Error creating TA: {error}', 'error')
-        return redirect(url_for('professor.dashboard'))
-
-    flash(f'TA "{ta.name}" created successfully!', 'success')
-    return redirect(url_for('professor.manage_ta', ta_id=ta.id))
+    return render_template('professor/create_ta.html')
 
 
 @professor_bp.route('/ta/<ta_id>')
@@ -176,13 +141,84 @@ def manage_ta(ta_id):
 
     tier_info = Config.BILLING_TIERS.get(ta.billing_tier, {})
 
+    today = datetime.utcnow().strftime('%Y-%m-%d')
+    test_chat_used = session.get(f'tc_{ta_id}_{today}', 0)
+
     return render_template('professor/manage_ta.html',
                          ta=ta,
                          enrollment_url=enrollment_url,
                          link=link,
                          enrollments=enrollments,
                          documents=documents,
-                         tier_info=tier_info)
+                         tier_info=tier_info,
+                         billing_tiers=Config.BILLING_TIERS,
+                         test_chat_used=test_chat_used)
+
+
+@professor_bp.route('/ta/<ta_id>/publish', methods=['GET', 'POST'])
+@professor_required
+@professor_owns_ta
+def publish_ta(ta_id):
+    """Tier selection and Stripe checkout to publish a draft TA."""
+    ta = TeachingAssistant.query.get_or_404(ta_id)
+
+    if ta.status != 'draft':
+        flash('This TA is already published.', 'info')
+        return redirect(url_for('professor.manage_ta', ta_id=ta_id))
+
+    if request.args.get('canceled') == 'true':
+        flash('Payment canceled. Your TA is still in draft.', 'info')
+
+    if request.method == 'POST':
+        tier = request.form.get('tier')
+        is_custom_tier = (tier == 'custom')
+        if is_custom_tier:
+            tier = 'tier3'
+        elif tier not in Config.BILLING_TIERS:
+            flash('Invalid billing tier', 'error')
+            return render_template('professor/publish.html', ta=ta, billing_tiers=Config.BILLING_TIERS)
+
+        base_url = request.url_root.rstrip('/')
+        checkout_url, error = create_publish_checkout_session(ta, tier, base_url)
+
+        if error:
+            flash(f'Error starting checkout: {error}', 'error')
+            return render_template('professor/publish.html', ta=ta, billing_tiers=Config.BILLING_TIERS)
+
+        if is_custom_tier:
+            from utils.email import send_custom_tier_notification
+            institution_name = current_user.institution.name if current_user.institution else 'Unknown'
+            send_custom_tier_notification(
+                f"{current_user.first_name} {current_user.last_name}",
+                current_user.email,
+                institution_name,
+                ta.name,
+                ta.course_name
+            )
+
+        return redirect(checkout_url)
+
+    return render_template('professor/publish.html', ta=ta, billing_tiers=Config.BILLING_TIERS)
+
+
+@professor_bp.route('/ta/<ta_id>/publish/success')
+@professor_required
+@professor_owns_ta
+def publish_ta_success(ta_id):
+    """Handle successful publish after Stripe Checkout."""
+    session_id = request.args.get('session_id')
+    if not session_id:
+        flash('Invalid session', 'error')
+        return redirect(url_for('professor.manage_ta', ta_id=ta_id))
+
+    ta, link, error = activate_ta_from_checkout(session_id)
+
+    if error:
+        flash(f'Error publishing TA: {error}', 'error')
+        return redirect(url_for('professor.manage_ta', ta_id=ta_id))
+
+    flash(f'"{ta.name}" is now live! Share the enrollment link with your students.', 'success')
+    return redirect(url_for('professor.manage_ta', ta_id=ta.id))
 
 
 @professor_bp.route('/ta/<ta_id>/pause', methods=['POST'])
@@ -199,6 +235,7 @@ def pause_ta(ta_id):
     if not ta.requires_billing:
         # Admin TAs don't have billing to pause
         ta.is_paused = True
+        ta.status = 'paused'
         ta.paused_at = datetime.utcnow()
         db.session.commit()
         flash('TA paused successfully', 'success')
@@ -228,6 +265,7 @@ def resume_ta(ta_id):
     if not ta.requires_billing:
         # Admin TAs don't have billing to resume
         ta.is_paused = False
+        ta.status = 'active'
         ta.paused_at = None
         db.session.commit()
         flash('TA resumed successfully', 'success')
@@ -243,14 +281,196 @@ def resume_ta(ta_id):
     return redirect(url_for('professor.manage_ta', ta_id=ta_id))
 
 
+@professor_bp.route('/ta/<ta_id>/change-tier', methods=['GET', 'POST'])
+@professor_required
+@professor_owns_ta
+def change_ta_tier(ta_id):
+    """Show tier selection page; handle tier change (upgrade or downgrade) on POST."""
+    ta = TeachingAssistant.query.get_or_404(ta_id)
+
+    if not ta.requires_billing or ta.status == 'draft':
+        flash('Tier changes are not available for this TA.', 'error')
+        return redirect(url_for('professor.manage_ta', ta_id=ta_id))
+
+    if request.method == 'POST':
+        new_tier = request.form.get('tier')
+
+        if new_tier == 'custom':
+            from utils.email import send_custom_tier_notification
+            institution_name = current_user.institution.name if current_user.institution else 'Unknown'
+            send_custom_tier_notification(
+                f"{current_user.first_name} {current_user.last_name}",
+                current_user.email,
+                institution_name,
+                ta.name,
+                ta.course_name,
+            )
+            flash('Thanks! Our team will reach out within 24 hours to discuss custom pricing.', 'success')
+            return redirect(url_for('professor.manage_ta', ta_id=ta_id))
+
+        if new_tier not in Config.BILLING_TIERS:
+            flash('Invalid billing tier.', 'error')
+            return redirect(url_for('professor.change_ta_tier', ta_id=ta_id))
+
+        if new_tier == ta.billing_tier:
+            flash('That is already your current plan.', 'info')
+            return redirect(url_for('professor.manage_ta', ta_id=ta_id))
+
+        # Downgrade guard: cannot drop below current enrollment count
+        new_cap = Config.BILLING_TIERS[new_tier]['max_students']
+        current_count = ta.current_enrollment_count
+        if new_cap < current_count:
+            flash(
+                f'Cannot downgrade: {current_count} students are enrolled but the '
+                f'{Config.BILLING_TIERS[new_tier]["name"]} tier only supports {new_cap}.',
+                'error'
+            )
+            return redirect(url_for('professor.change_ta_tier', ta_id=ta_id))
+
+        from utils.stripe_helpers import change_ta_subscription
+        success, error = change_ta_subscription(ta, new_tier)
+
+        if success:
+            flash(f'Plan changed to {Config.BILLING_TIERS[new_tier]["name"]}.', 'success')
+        else:
+            flash(f'Plan change failed: {error}', 'error')
+
+        return redirect(url_for('professor.manage_ta', ta_id=ta_id))
+
+    # GET — render tier selection page
+    enrollment_count = ta.current_enrollment_count
+    return render_template('professor/change_tier.html',
+                         ta=ta,
+                         billing_tiers=Config.BILLING_TIERS,
+                         enrollment_count=enrollment_count)
+
+
+@professor_bp.route('/ta/<ta_id>/test-chat/stream', methods=['POST'])
+@limiter.limit("20 per day")
+@professor_required
+@professor_owns_ta
+def test_chat_stream(ta_id):
+    """
+    Professor test chat — streams TA response for the professor's own testing.
+    Logs to QA analytics with is_preview=True so it can be filtered later.
+    Does not require TA to be active/published.
+    Guards: must be indexed and not currently indexing.
+    """
+    from flask import stream_with_context, Response
+    from src.qa_logger import log_qa_entry
+    import json
+    import time
+
+    ta = TeachingAssistant.query.get_or_404(ta_id)
+
+    if not ta.is_indexed:
+        return jsonify(error="Documents must be indexed before testing."), 400
+    if ta.indexing_status == 'running':
+        return jsonify(error="Indexing is in progress. Please wait until it completes."), 400
+
+    data = request.get_json(silent=True) or {}
+    query = (data.get('query') or '').strip()
+    conversation_history = (data.get('conversation_history') or '')
+
+    if not query:
+        return jsonify(error="Query is required."), 400
+
+    session_id = f"prof_test_{secrets.token_hex(8)}"
+
+    def generate():
+        from src.retriever import retrieve_context
+        from src.response_generator import generate_response_stream
+        total_start = time.time()
+        try:
+            yield f"data: {json.dumps({'type': 'status', 'content': 'Searching course materials...'})}\n\n"
+
+            retrieval_start = time.time()
+            chunks, retrieval_diagnostics = retrieve_context(
+                ta.id, query, top_k=8, conversation_history=conversation_history
+            )
+            retrieval_latency_ms = int((time.time() - retrieval_start) * 1000)
+            chunk_count = len(chunks)
+
+            context = "\n\n---\n\n".join([
+                f"[From: {c['file_name']}]\n{c['text']}" for c in chunks
+            ])
+            sources = [c['file_name'] for c in chunks[:3]]
+
+            hybrid_mode = retrieval_diagnostics.get("hybrid_fallback_triggered", False)
+            hybrid_doc_filename = retrieval_diagnostics.get("hybrid_doc_filename")
+            query_reference = retrieval_diagnostics.get("validation_expected_ref")
+            attempt_count = retrieval_diagnostics.get("attempt_count", 0)
+
+            yield f"data: {json.dumps({'type': 'status', 'content': 'Generating response...'})}\n\n"
+
+            if sources:
+                yield f"data: {json.dumps({'type': 'sources', 'sources': sources})}\n\n"
+
+            full_response = ''
+            token_count = 0
+            gen_start = time.time()
+            for token in generate_response_stream(
+                query=query,
+                context=context,
+                system_prompt=ta.system_prompt or '',
+                conversation_history=conversation_history,
+                course_name=ta.course_name or '',
+                hybrid_mode=hybrid_mode,
+                hybrid_doc_filename=hybrid_doc_filename,
+                query_reference=query_reference,
+                attempt_count=attempt_count,
+            ):
+                full_response += token
+                token_count += 1
+                yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
+
+            generation_latency_ms = int((time.time() - gen_start) * 1000)
+            total_latency_ms = int((time.time() - total_start) * 1000)
+
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+
+            log_qa_entry(
+                ta_id=str(ta.id),
+                ta_slug=ta.slug or '',
+                ta_name=ta.name,
+                course_name=ta.course_name or '',
+                session_id=session_id,
+                query=query,
+                answer=full_response,
+                sources=sources,
+                chunk_count=chunk_count,
+                latency_ms=total_latency_ms,
+                retrieval_latency_ms=retrieval_latency_ms,
+                generation_latency_ms=generation_latency_ms,
+                token_count=token_count,
+                retrieval_diagnostics=retrieval_diagnostics,
+                llm_model=Config.LLM_MODEL,
+                is_anonymous=False,
+                is_preview=True,
+            )
+
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
+
+    # Increment session-based day counter so page reload shows correct count
+    today = datetime.utcnow().strftime('%Y-%m-%d')
+    session[f'tc_{ta_id}_{today}'] = session.get(f'tc_{ta_id}_{today}', 0) + 1
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype='text/event-stream',
+        headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'}
+    )
+
+
 @professor_bp.route('/settings')
 @professor_required
 def settings():
     """Professor account settings."""
     tas = TeachingAssistant.query.filter_by(professor_id=current_user.id).all()
 
-    active_tas = [ta for ta in tas if ta.is_available and ta.requires_billing]
-    paused_tas = [ta for ta in tas if ta.is_paused and ta.requires_billing]
+    active_tas = [ta for ta in tas if ta.status == 'active' and ta.requires_billing]
+    paused_tas = [ta for ta in tas if ta.status == 'paused' and ta.requires_billing]
 
     return render_template('professor/settings.html',
                          active_tas=active_tas,
@@ -263,9 +483,10 @@ def settings():
 @professor_required
 def billing():
     """Detailed billing page."""
-    tas = TeachingAssistant.query.filter_by(
-        professor_id=current_user.id,
-        requires_billing=True
+    tas = TeachingAssistant.query.filter(
+        TeachingAssistant.professor_id == current_user.id,
+        TeachingAssistant.requires_billing == True,
+        TeachingAssistant.status != 'draft'
     ).order_by(TeachingAssistant.created_at.desc()).all()
 
     return render_template('professor/billing.html',
@@ -317,6 +538,19 @@ def contact_sales():
     return redirect(url_for('professor.create_ta'))
 
 
+@professor_bp.route('/api/institutions')
+@professor_required
+def institutions_search():
+    """JSON endpoint for institution autocomplete. Returns up to 10 matches."""
+    q = request.args.get('q', '').strip()
+    if len(q) < 2:
+        return jsonify([])
+    results = Institution.query.filter(
+        Institution.name.ilike(f'%{q}%')
+    ).order_by(Institution.name).limit(10).all()
+    return jsonify([{'id': i.id, 'name': i.name, 'country': i.country or ''} for i in results])
+
+
 @professor_bp.route('/onboarding', methods=['GET', 'POST'])
 @professor_required
 def onboarding():
@@ -329,6 +563,7 @@ def onboarding():
         last_name = request.form.get('last_name', '').strip()
         institution_id = request.form.get('institution_id', '').strip()
         new_institution_name = request.form.get('new_institution_name', '').strip()
+        auto_verified = request.form.get('auto_verified', 'false') == 'true'
 
         if not first_name or not last_name:
             flash('First and last name are required.', 'error')
@@ -340,29 +575,66 @@ def onboarding():
                 institution = Institution(name=new_institution_name, email_domain=domain)
                 db.session.add(institution)
                 db.session.flush()
+                auto_verified = False  # User-created institution cannot be auto-verified
             elif institution_id and institution_id != 'new':
                 institution = Institution.query.get(int(institution_id))
             else:
                 flash('Invalid institution selection.', 'error')
-                institutions = Institution.query.order_by(Institution.name).all()
-                return render_template('professor/onboarding.html', institutions=institutions)
+                suggested = match_institution_by_email(current_user.email)
+                return render_template('professor/onboarding.html', suggested_institution=suggested)
 
             current_user.first_name = first_name
             current_user.last_name = last_name
             current_user.institution_id = institution.id
             current_user.onboarding_complete = True
+            # Always verify server-side — catches both confirmed suggestions and
+            # manual re-selection of the matched institution
+            email_match = match_institution_by_email(current_user.email)
+            if email_match and email_match.id == institution.id:
+                current_user.institution_verified = True
+                current_user.verification_domain = current_user.email.split('@')[-1].lower()
+            else:
+                current_user.institution_verified = False
+                current_user.verification_domain = None
             db.session.commit()
             return redirect(url_for('professor.dashboard'))
 
-    institutions = Institution.query.order_by(Institution.name).all()
-    return render_template('professor/onboarding.html', institutions=institutions)
+    suggested = match_institution_by_email(current_user.email)
+    return render_template('professor/onboarding.html', suggested_institution=suggested)
 
 
 @professor_bp.route('/profile', methods=['GET', 'POST'])
 @professor_required
 def profile():
-    """Professor profile page — view and edit name and institution."""
+    """Professor profile page — view and edit name, institution, and verification status."""
     if request.method == 'POST':
+        action = request.form.get('action', 'save')
+
+        if action == 'verify':
+            # Verify affiliation via a secondary institutional email
+            verification_email = request.form.get('verification_email', '').strip().lower()
+            if not verification_email or '@' not in verification_email:
+                flash('Please enter a valid email address.', 'error')
+            elif not current_user.institution:
+                flash('Please set your institution first.', 'error')
+            else:
+                matched = match_institution_by_email(verification_email)
+                if matched and matched.id == current_user.institution_id:
+                    current_user.institution_verified = True
+                    current_user.verification_domain = verification_email.split('@')[-1].lower()
+                    db.session.commit()
+                    flash('Affiliation verified!', 'success')
+                elif matched:
+                    flash(
+                        f'That email is associated with {matched.name}, not your current institution. '
+                        'Change your institution first if you want to switch.',
+                        'error'
+                    )
+                else:
+                    flash('Email domain not recognized — verification unsuccessful.', 'error')
+            return redirect(url_for('professor.profile'))
+
+        # Default: save profile
         first_name = request.form.get('first_name', '').strip()
         last_name = request.form.get('last_name', '').strip()
         institution_id = request.form.get('institution_id', '').strip()
@@ -382,18 +654,29 @@ def profile():
                 institution = Institution.query.get(int(institution_id))
             else:
                 flash('Invalid institution selection.', 'error')
-                institutions = Institution.query.order_by(Institution.name).all()
-                return render_template('professor/profile.html', institutions=institutions)
+                return render_template('professor/profile.html')
 
             current_user.first_name = first_name
             current_user.last_name = last_name
-            current_user.institution_id = institution.id
+
+            # If institution changed, reset verification and re-check via primary email
+            if institution.id != current_user.institution_id:
+                current_user.institution_id = institution.id
+                current_user.institution_verified = False
+                current_user.verification_domain = None
+                # Auto-verify if primary email matches the new institution
+                matched = match_institution_by_email(current_user.email)
+                if matched and matched.id == institution.id:
+                    current_user.institution_verified = True
+                    current_user.verification_domain = current_user.email.split('@')[-1].lower()
+            else:
+                current_user.institution_id = institution.id
+
             db.session.commit()
             flash('Profile updated successfully.', 'success')
             return redirect(url_for('professor.profile'))
 
-    institutions = Institution.query.order_by(Institution.name).all()
-    return render_template('professor/profile.html', institutions=institutions)
+    return render_template('professor/profile.html')
 
 
 @professor_bp.route('/support', methods=['GET', 'POST'])
@@ -444,7 +727,11 @@ def upload_document(ta_id):
     original_filename = file.filename
     file_ext = original_filename.rsplit('.', 1)[-1].lower() if '.' in original_filename else ''
 
-    allowed_extensions = {'pdf', 'docx', 'doc', 'xlsx', 'xls', 'txt', 'pptx', 'ppt'}
+    allowed_extensions = {
+        'pdf', 'docx', 'doc', 'xlsx', 'xls', 'txt', 'pptx', 'ppt',
+        'png', 'jpg', 'jpeg', 'gif', 'webp',
+        'md', 'py', 'json', 'csv', 'ipynb',
+    }
     if file_ext not in allowed_extensions:
         return jsonify({"error": f"File type .{file_ext} not supported"}), 400
 

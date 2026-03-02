@@ -74,8 +74,8 @@ def dashboard(ta_id=None):
     for enrollment in enrollments:
         ta = enrollment.ta
 
-        # Skip inactive or paused TAs
-        if not ta.is_active or ta.is_paused:
+        # Skip unavailable TAs (draft or paused)
+        if not ta.is_available:
             continue
 
         # Get last session for this TA

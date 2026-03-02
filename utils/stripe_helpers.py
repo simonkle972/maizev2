@@ -205,6 +205,7 @@ def pause_ta_subscription(ta):
             )
 
         ta.is_paused = True
+        ta.status = 'paused'
         ta.paused_at = datetime.utcnow()
         ta.last_pause_action_at = datetime.utcnow()  # Track action time for cooldown
         ta.subscription_status = 'paused'
@@ -299,6 +300,7 @@ def resume_ta_subscription(ta):
         )
 
         ta.is_paused = False
+        ta.status = 'active'
         ta.paused_at = None
         ta.last_pause_action_at = datetime.utcnow()  # Track action time for cooldown
         ta.subscription_status = 'active'
@@ -311,6 +313,172 @@ def resume_ta_subscription(ta):
         return False, str(e)
     except Exception as e:
         db.session.rollback()  # Explicit rollback on any error
+        return False, str(e)
+
+
+def create_publish_checkout_session(ta, tier, base_url):
+    """
+    Create a Stripe Checkout session to publish an existing draft TA.
+
+    Args:
+        ta: TeachingAssistant object (must be in 'draft' status)
+        tier: Billing tier ('tier1', 'tier2', 'tier3')
+        base_url: Base URL for success/cancel redirects
+
+    Returns:
+        Tuple of (checkout_url: str, error: str or None)
+    """
+    try:
+        from models import db, User
+        tier_config = Config.BILLING_TIERS.get(tier)
+        if not tier_config:
+            return None, "Invalid billing tier"
+
+        professor = User.query.get(ta.professor_id)
+
+        # Ensure professor has a Stripe customer ID
+        if not professor.stripe_customer_id:
+            customer_id, error = create_stripe_customer(professor)
+            if error:
+                return None, error
+            professor.stripe_customer_id = customer_id
+            db.session.commit()
+
+        session = stripe.checkout.Session.create(
+            customer=professor.stripe_customer_id,
+            payment_method_types=['card'],
+            line_items=[{
+                'price': tier_config['stripe_price_id'],
+                'quantity': 1,
+            }],
+            mode='subscription',
+            success_url=f"{base_url}/professor/ta/{ta.id}/publish/success?session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{base_url}/professor/ta/{ta.id}/publish?canceled=true",
+            metadata={
+                'ta_id': ta.id,
+                'billing_tier': tier,
+                'professor_id': ta.professor_id,
+            }
+        )
+
+        return session.url, None
+
+    except stripe.error.StripeError as e:
+        return None, str(e)
+
+
+def activate_ta_from_checkout(checkout_session_id):
+    """
+    Activate a draft TA after successful Stripe Checkout during publish flow.
+
+    Args:
+        checkout_session_id: Stripe Checkout Session ID
+
+    Returns:
+        Tuple of (ta: TeachingAssistant, enrollment_link: EnrollmentLink, error: str or None)
+    """
+    try:
+        from models import db, TeachingAssistant, EnrollmentLink
+        from datetime import datetime
+        import secrets as _secrets
+
+        session = stripe.checkout.Session.retrieve(checkout_session_id)
+
+        if session.payment_status != 'paid':
+            return None, None, "Payment not completed"
+
+        subscription_id = session.subscription
+        metadata = session.metadata
+        ta_id = metadata['ta_id']
+        tier = metadata['billing_tier']
+
+        tier_config = Config.BILLING_TIERS[tier]
+        ta = TeachingAssistant.query.get(ta_id)
+        if not ta:
+            return None, None, "TA not found"
+
+        ta.billing_tier = tier
+        ta.max_students = tier_config['max_students']
+        ta.stripe_subscription_id = subscription_id
+        ta.subscription_status = 'active'
+        ta.status = 'active'
+        ta.is_paused = False
+        ta.published_at = datetime.utcnow()
+
+        # Create enrollment link
+        token = _secrets.token_urlsafe(32)
+        link = EnrollmentLink(
+            ta_id=ta.id,
+            token=token,
+            max_capacity=ta.max_students,
+            created_by=ta.professor_id,
+            is_active=True
+        )
+        db.session.add(link)
+        db.session.commit()
+
+        return ta, link, None
+
+    except stripe.error.StripeError as e:
+        return None, None, str(e)
+    except Exception as e:
+        return None, None, str(e)
+
+
+def change_ta_subscription(ta, new_tier):
+    """
+    Change a TA's subscription tier (upgrade or downgrade) via Stripe.
+
+    Uses Subscription.modify() + create_prorations for both directions:
+    - Upgrade: Stripe charges prorated difference immediately.
+    - Downgrade: Stripe creates a credit applied to the next invoice.
+
+    Also updates ta.billing_tier, ta.max_students, and EnrollmentLink.max_capacity.
+
+    Args:
+        ta: TeachingAssistant object
+        new_tier: Target billing tier key ('tier1', 'tier2', 'tier3')
+
+    Returns:
+        Tuple of (success: bool, error: str or None)
+    """
+    try:
+        from models import db, EnrollmentLink
+
+        tier_config = Config.BILLING_TIERS.get(new_tier)
+        if not tier_config:
+            return False, "Invalid billing tier"
+        if not ta.stripe_subscription_id:
+            return False, "No Stripe subscription found for this TA"
+
+        # Retrieve subscription and find the current item id
+        subscription = stripe.Subscription.retrieve(ta.stripe_subscription_id)
+        item_id = subscription['items']['data'][0]['id']
+
+        # Swap price; Stripe prorates both upgrades and downgrades
+        stripe.Subscription.modify(
+            ta.stripe_subscription_id,
+            items=[{'id': item_id, 'price': tier_config['stripe_price_id']}],
+            proration_behavior='create_prorations',
+        )
+
+        # Update TA record
+        ta.billing_tier = new_tier
+        ta.max_students = tier_config['max_students']
+
+        # Update enrollment link capacity
+        link = EnrollmentLink.query.filter_by(ta_id=ta.id, is_active=True).first()
+        if link:
+            link.max_capacity = ta.max_students
+
+        db.session.commit()
+        return True, None
+
+    except stripe.error.StripeError as e:
+        db.session.rollback()
+        return False, str(e)
+    except Exception as e:
+        db.session.rollback()
         return False, str(e)
 
 

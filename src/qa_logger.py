@@ -52,7 +52,8 @@ QA_LOG_HEADERS = [
     "validation_expected_ref",
     "validation_matches_found",
     "llm_model",
-    "is_anonymous"
+    "is_anonymous",
+    "is_preview"
 ]
 
 INDEX_LOG_HEADERS = [
@@ -179,7 +180,8 @@ def log_qa_entry(
     token_count: int,
     retrieval_diagnostics: Optional[Dict[str, Any]] = None,
     llm_model: str = "",
-    is_anonymous: bool = False
+    is_anonymous: bool = False,
+    is_preview: bool = False
 ) -> bool:
     if not Config.QA_LOG_SHEET_ID:
         logger.debug("QA logging disabled - no sheet ID configured")
@@ -248,7 +250,8 @@ def log_qa_entry(
                 diag.get("validation_expected_ref") or "",
                 str(diag.get("validation_matches_found", 0)),
                 llm_model,
-                str(is_anonymous)
+                str(is_anonymous),
+                str(is_preview)
             ]
             
             service.spreadsheets().values().append(
