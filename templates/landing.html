@@ -20,7 +20,7 @@
             <nav class="header-nav">
                 <a href="#features" class="nav-link">Features</a>
                 <a href="#comparison" class="nav-link">Why Maize</a>
-                <a href="#demo" class="nav-link">Demo</a>
+                <a href="/auth0/login?role=professor&screen_hint=signup" class="btn btn-primary">Try for free</a>
             </nav>
         </div>
     </header>
@@ -202,8 +202,9 @@
                             <label for="message">Anything else we should know?</label>
                             <textarea id="message" name="message" rows="3" placeholder="Tell us about your course or specific needs..."></textarea>
                         </div>
-                        <button type="submit" class="btn btn-primary btn-large btn-full" id="demo-submit-btn">Request Demo</button>
+                        <button type="submit" class="btn btn-primary btn-large btn-full" id="demo-submit-btn">Send message</button>
                         <p id="demo-status" class="form-status"></p>
+                        <a href="/auth0/login?role=professor&screen_hint=signup" class="btn btn-secondary-outline btn-large btn-full" style="display:block; text-align:center; margin-top:0.75rem;">Get started for free now</a>
                     </form>
                 </div>
             </div>
@@ -269,7 +270,7 @@
             }
             
             btn.disabled = false;
-            btn.textContent = 'Request Demo';
+            btn.textContent = 'Send message';
         }
         
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
