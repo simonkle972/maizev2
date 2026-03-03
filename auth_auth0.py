@@ -17,13 +17,16 @@ def login():
     kwargs = {'redirect_uri': redirect_uri, 'prompt': 'login'}
     if screen_hint:
         kwargs['screen_hint'] = screen_hint
-    return oauth.auth0.authorize_redirect(**kwargs)
+    client = oauth.auth0_professor if role == 'professor' else oauth.auth0_student
+    return client.authorize_redirect(**kwargs)
 
 
 @auth0_bp.route('/callback')
 def callback():
     """Handle Auth0 callback."""
-    token = oauth.auth0.authorize_access_token()
+    role = session.get('auth0_role', 'student')
+    client = oauth.auth0_professor if role == 'professor' else oauth.auth0_student
+    token = client.authorize_access_token()
     userinfo = token.get('userinfo', {})
 
     auth0_sub = userinfo.get('sub')
