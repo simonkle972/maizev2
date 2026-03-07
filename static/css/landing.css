@@ -598,3 +598,11 @@
     background: var(--maize-orange);
     color: var(--maize-white);
 }
+
+/* Legal pages */
+.legal-content {
+    max-width: 900px;
+    margin: 6rem auto 3rem;
+    padding: 2rem;
+    line-height: 1.6;
+}
