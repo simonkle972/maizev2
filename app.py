@@ -108,6 +108,10 @@ def health():
 def favicon():
     return '', 204
 
+@app.route('/.well-known/gpc.json')
+def gpc():
+    return jsonify({"gpc": True, "lastUpdate": "2026-03-07"})
+
 @app.route('/api/demo-request', methods=['POST'])
 def demo_request():
     """Handle demo request form submissions and send email notification."""
@@ -263,6 +267,11 @@ def stripe_webhook():
 @app.route('/')
 def landing():
     return render_template('landing.html')
+
+
+@app.route('/landing-preview')
+def landing_preview():
+    return render_template('landing_v2.html')
 
 def admin_required(f):
     from functools import wraps
