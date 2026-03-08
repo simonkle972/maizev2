@@ -246,11 +246,12 @@ def resend_verification():
         return redirect(url_for('auth0.login'))
 
     try:
-        # Get Management API token
-        token_resp = req.post(f'https://{Config.AUTH0_DOMAIN}/oauth/token', json={
+        # Get Management API token (must use canonical domain, not custom domain)
+        canonical = Config.AUTH0_CANONICAL_DOMAIN
+        token_resp = req.post(f'https://{canonical}/oauth/token', json={
             'client_id': Config.AUTH0_M2M_CLIENT_ID,
             'client_secret': Config.AUTH0_M2M_CLIENT_SECRET,
-            'audience': f'https://{Config.AUTH0_DOMAIN}/api/v2/',
+            'audience': f'https://{canonical}/api/v2/',
             'grant_type': 'client_credentials'
         }, timeout=10)
 
@@ -263,7 +264,7 @@ def resend_verification():
 
         # Send verification email
         verify_resp = req.post(
-            f'https://{Config.AUTH0_DOMAIN}/api/v2/jobs/verification-email',
+            f'https://{canonical}/api/v2/jobs/verification-email',
             headers={'Authorization': f'Bearer {mgmt_token}', 'Content-Type': 'application/json'},
             json={'user_id': auth0_user_id},
             timeout=10

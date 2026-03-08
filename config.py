@@ -93,3 +93,5 @@ class Config:
     # Auth0 M2M app (for Management API calls like resending verification emails)
     AUTH0_M2M_CLIENT_ID = os.getenv('AUTH0_M2M_CLIENT_ID')
     AUTH0_M2M_CLIENT_SECRET = os.getenv('AUTH0_M2M_CLIENT_SECRET')
+    # Canonical Auth0 domain for Management API (custom domains don't support client_credentials)
+    AUTH0_CANONICAL_DOMAIN = os.getenv('AUTH0_CANONICAL_DOMAIN', 'dev-f6vdicbjf42atxau.us.auth0.com')
