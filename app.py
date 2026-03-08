@@ -8,6 +8,7 @@ from flask import Flask, request, jsonify, render_template, session, redirect, u
 from flask_migrate import Migrate
 from flask_login import LoginManager, login_required, current_user
 from config import Config
+from sqlalchemy import func
 from models import db, User, TeachingAssistant, Document, ChatSession, ChatMessage, DocumentChunk, Institution, IndexingJob, Enrollment, EnrollmentLink
 
 logging.basicConfig(
@@ -314,15 +315,24 @@ def admin_api_required(f):
 @app.route('/admin/api/institutions', methods=['GET'])
 @admin_api_required
 def list_institutions():
-    institutions = Institution.query.order_by(Institution.name).all()
+    results = (
+        db.session.query(
+            Institution,
+            func.count(TeachingAssistant.id).label('ta_count')
+        )
+        .outerjoin(TeachingAssistant, TeachingAssistant.institution_id == Institution.id)
+        .group_by(Institution.id)
+        .order_by(Institution.name)
+        .all()
+    )
     return jsonify([{
         "id": inst.id,
         "name": inst.name,
         "customer_id": inst.customer_id,
         "notes": inst.notes,
-        "ta_count": inst.teaching_assistants.count(),
+        "ta_count": ta_count,
         "created_at": inst.created_at.isoformat() if inst.created_at else None
-    } for inst in institutions])
+    } for inst, ta_count in results])
 
 @app.route('/admin/api/institutions', methods=['POST'])
 @admin_api_required
