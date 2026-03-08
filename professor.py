@@ -563,39 +563,38 @@ def onboarding():
         last_name = request.form.get('last_name', '').strip()
         institution_id = request.form.get('institution_id', '').strip()
         new_institution_name = request.form.get('new_institution_name', '').strip()
-        auto_verified = request.form.get('auto_verified', 'false') == 'true'
 
         if not first_name or not last_name:
             flash('First and last name are required.', 'error')
-        elif not institution_id and not new_institution_name:
-            flash('Please select or create an institution.', 'error')
         else:
+            institution = None
+
             if institution_id == 'new' and new_institution_name:
-                domain = current_user.email.split('@')[-1].lower()
-                institution = Institution(name=new_institution_name, email_domain=domain)
+                institution = Institution(name=new_institution_name)
                 db.session.add(institution)
                 db.session.flush()
-                auto_verified = False  # User-created institution cannot be auto-verified
             elif institution_id and institution_id != 'new':
                 institution = Institution.query.get(int(institution_id))
-            else:
-                flash('Invalid institution selection.', 'error')
-                suggested = match_institution_by_email(current_user.email)
-                return render_template('professor/onboarding.html', suggested_institution=suggested)
 
             current_user.first_name = first_name
             current_user.last_name = last_name
-            current_user.institution_id = institution.id
             current_user.onboarding_complete = True
-            # Always verify server-side — catches both confirmed suggestions and
-            # manual re-selection of the matched institution
-            email_match = match_institution_by_email(current_user.email)
-            if email_match and email_match.id == institution.id:
-                current_user.institution_verified = True
-                current_user.verification_domain = current_user.email.split('@')[-1].lower()
+
+            if institution:
+                current_user.institution_id = institution.id
+                # Only auto-verify against dataset institutions
+                email_match = match_institution_by_email(current_user.email)
+                if email_match and email_match.id == institution.id:
+                    current_user.institution_verified = True
+                    current_user.verification_domain = current_user.email.split('@')[-1].lower()
+                else:
+                    current_user.institution_verified = False
+                    current_user.verification_domain = None
             else:
+                current_user.institution_id = None
                 current_user.institution_verified = False
                 current_user.verification_domain = None
+
             db.session.commit()
             return redirect(url_for('professor.dashboard'))
 
@@ -642,35 +641,29 @@ def profile():
 
         if not first_name or not last_name:
             flash('First and last name are required.', 'error')
-        elif not institution_id and not new_institution_name:
-            flash('Please select or create an institution.', 'error')
         else:
+            institution = None
+
             if institution_id == 'new' and new_institution_name:
-                domain = current_user.email.split('@')[-1].lower()
-                institution = Institution(name=new_institution_name, email_domain=domain)
+                institution = Institution(name=new_institution_name)
                 db.session.add(institution)
                 db.session.flush()
             elif institution_id and institution_id != 'new':
                 institution = Institution.query.get(int(institution_id))
-            else:
-                flash('Invalid institution selection.', 'error')
-                return render_template('professor/profile.html')
 
             current_user.first_name = first_name
             current_user.last_name = last_name
 
-            # If institution changed, reset verification and re-check via primary email
-            if institution.id != current_user.institution_id:
-                current_user.institution_id = institution.id
+            new_inst_id = institution.id if institution else None
+            if new_inst_id != current_user.institution_id:
+                current_user.institution_id = new_inst_id
                 current_user.institution_verified = False
                 current_user.verification_domain = None
-                # Auto-verify if primary email matches the new institution
-                matched = match_institution_by_email(current_user.email)
-                if matched and matched.id == institution.id:
-                    current_user.institution_verified = True
-                    current_user.verification_domain = current_user.email.split('@')[-1].lower()
-            else:
-                current_user.institution_id = institution.id
+                if institution:
+                    matched = match_institution_by_email(current_user.email)
+                    if matched and matched.id == institution.id:
+                        current_user.institution_verified = True
+                        current_user.verification_domain = current_user.email.split('@')[-1].lower()
 
             db.session.commit()
             flash('Profile updated successfully.', 'success')

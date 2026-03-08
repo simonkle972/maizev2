@@ -114,9 +114,10 @@ def match_institution_by_email(email):
     if match:
         return match.institution
 
-    # Fallback: check legacy Institution.email_domain field
+    # Fallback: check legacy Institution.email_domain field (dataset institutions only)
     return Institution.query.filter(
-        Institution.email_domain.in_(candidates)
+        Institution.email_domain.in_(candidates),
+        Institution.is_from_dataset == True
     ).first()
 
 
