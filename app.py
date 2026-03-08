@@ -8,7 +8,7 @@ from flask import Flask, request, jsonify, render_template, session, redirect, u
 from flask_migrate import Migrate
 from flask_login import LoginManager, login_required, current_user
 from config import Config
-from models import db, User, TeachingAssistant, Document, ChatSession, ChatMessage, DocumentChunk, Institution, IndexingJob, Enrollment
+from models import db, User, TeachingAssistant, Document, ChatSession, ChatMessage, DocumentChunk, Institution, IndexingJob, Enrollment, EnrollmentLink
 
 logging.basicConfig(
     level=logging.INFO,
@@ -605,18 +605,34 @@ def delete_ta(ta_id):
     ta = TeachingAssistant.query.get(ta_id)
     if not ta:
         return jsonify({"error": "TA not found"}), 404
-    
+
     try:
+        import shutil
+
+        # Delete ChromaDB directory
         chroma_path = os.path.join(Config.CHROMA_DB_PATH, ta_id)
         if os.path.exists(chroma_path):
-            import shutil
             shutil.rmtree(chroma_path)
+
+        # Delete document files from disk
+        docs_path = f"data/courses/{ta_id}/docs"
+        if os.path.exists(docs_path):
+            shutil.rmtree(docs_path)
+
+        # Clean up non-cascading relationships
+        DocumentChunk.query.filter_by(ta_id=ta_id).delete()
+        Enrollment.query.filter_by(ta_id=ta_id).delete()
+        EnrollmentLink.query.filter_by(ta_id=ta_id).delete()
+        IndexingJob.query.filter_by(ta_id=ta_id).delete()
+
+        # Delete the TA (cascades Documents, ChatSessions, ChatMessages)
+        db.session.delete(ta)
+        db.session.commit()
+        return jsonify({"success": True})
     except Exception as e:
-        logger.warning(f"Could not delete ChromaDB for {ta_id}: {e}")
-    
-    db.session.delete(ta)
-    db.session.commit()
-    return jsonify({"success": True})
+        db.session.rollback()
+        logger.error(f"Error deleting TA {ta_id}: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/admin/api/cleanup-slug', methods=['POST'])
 @admin_api_required

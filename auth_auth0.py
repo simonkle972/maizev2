@@ -231,6 +231,57 @@ def refresh_verification():
     return redirect(dashboard)
 
 
+@auth0_bp.route('/resend-verification', methods=['POST'])
+def resend_verification():
+    """Trigger Auth0 to resend a verification email via the Management API."""
+    import requests as req
+    import logging
+    from config import Config
+
+    logger = logging.getLogger(__name__)
+    auth0_user_id = session.get('auth0_user_id')
+
+    if not auth0_user_id:
+        flash('Please log in first.', 'warning')
+        return redirect(url_for('auth0.login'))
+
+    try:
+        # Get Management API token
+        token_resp = req.post(f'https://{Config.AUTH0_DOMAIN}/oauth/token', json={
+            'client_id': Config.AUTH0_M2M_CLIENT_ID,
+            'client_secret': Config.AUTH0_M2M_CLIENT_SECRET,
+            'audience': f'https://{Config.AUTH0_DOMAIN}/api/v2/',
+            'grant_type': 'client_credentials'
+        }, timeout=10)
+
+        if not token_resp.ok:
+            logger.error(f"Failed to get M2M token: {token_resp.status_code} {token_resp.text}")
+            flash('Could not send verification email. Please try again later.', 'error')
+            return redirect(request.referrer or url_for('professor.dashboard'))
+
+        mgmt_token = token_resp.json()['access_token']
+
+        # Send verification email
+        verify_resp = req.post(
+            f'https://{Config.AUTH0_DOMAIN}/api/v2/jobs/verification-email',
+            headers={'Authorization': f'Bearer {mgmt_token}', 'Content-Type': 'application/json'},
+            json={'user_id': auth0_user_id},
+            timeout=10
+        )
+
+        if verify_resp.ok:
+            flash('Verification email sent! Please check your inbox (and spam folder).', 'success')
+        else:
+            logger.error(f"Failed to send verification email: {verify_resp.status_code} {verify_resp.text}")
+            flash('Could not send verification email. Please try again later.', 'error')
+
+    except Exception as e:
+        logger.error(f"Error resending verification email: {e}")
+        flash('Could not send verification email. Please try again later.', 'error')
+
+    return redirect(request.referrer or url_for('professor.dashboard'))
+
+
 @auth0_bp.route('/logout')
 def logout():
     """Log out from Auth0 and clear session."""

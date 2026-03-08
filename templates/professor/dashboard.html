@@ -27,8 +27,14 @@
 
         <main class="admin-main">
             {% if not current_user.email_verified %}
-            <div id="email-verify-banner" class="error-message" style="background:#fff3cd; border-color:#ffc107; color:#856404; transition: box-shadow 0.3s, outline 0.3s;">
-                ⚠️ Your email address is not verified. Please check your inbox for a verification email before creating TAs.
+            <div id="email-verify-banner" class="error-message" style="background:#fff3cd; border-color:#ffc107; color:#856404; transition: box-shadow 0.3s, outline 0.3s; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem;">
+                <span>⚠️ Your email address is not verified. Please check your inbox for a verification email before creating TAs.</span>
+                <span style="display:flex; gap:0.5rem; flex-shrink:0;">
+                    <form method="POST" action="{{ url_for('auth0.resend_verification') }}" style="margin:0;">
+                        <button type="submit" style="background:none; border:1px solid #856404; color:#856404; padding:0.25rem 0.75rem; border-radius:4px; cursor:pointer; font-size:0.85rem;">Resend email</button>
+                    </form>
+                    <a href="{{ url_for('auth0.refresh_verification') }}" style="background:#856404; color:#fff; padding:0.25rem 0.75rem; border-radius:4px; text-decoration:none; font-size:0.85rem;">I've verified my email →</a>
+                </span>
             </div>
             {% endif %}
 

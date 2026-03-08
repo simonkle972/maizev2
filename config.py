@@ -89,3 +89,7 @@ class Config:
     # Auth0 student app (separate to allow role-specific login pages)
     AUTH0_STUDENT_CLIENT_ID = os.getenv('AUTH0_STUDENT_CLIENT_ID')
     AUTH0_STUDENT_CLIENT_SECRET = os.getenv('AUTH0_STUDENT_CLIENT_SECRET')
+
+    # Auth0 M2M app (for Management API calls like resending verification emails)
+    AUTH0_M2M_CLIENT_ID = os.getenv('AUTH0_M2M_CLIENT_ID')
+    AUTH0_M2M_CLIENT_SECRET = os.getenv('AUTH0_M2M_CLIENT_SECRET')
