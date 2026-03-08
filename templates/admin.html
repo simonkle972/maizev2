@@ -191,6 +191,26 @@
             color: var(--text-light);
         }
         
+        .inst-autocomplete-dropdown {
+            display: none;
+            position: absolute;
+            left: 0; right: 0;
+            z-index: 1000;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            max-height: 220px;
+            overflow-y: auto;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        }
+        .inst-ac-option {
+            padding: 0.5rem 0.75rem;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        .inst-ac-option:hover {
+            background: #f0f4ff;
+        }
         .modal-backdrop {
             position: fixed;
             top: 0;
@@ -627,11 +647,12 @@
                         <label for="new-ta-course">Course Name:</label>
                         <input type="text" id="new-ta-course" required placeholder="e.g., Introduction to Finance">
                     </div>
-                    <div class="form-group">
-                        <label for="new-ta-institution">Institution (optional):</label>
-                        <select id="new-ta-institution">
-                            <option value="">None</option>
-                        </select>
+                    <div class="form-group" style="position:relative;">
+                        <label for="new-ta-institution-search">Institution (optional):</label>
+                        <input type="text" id="new-ta-institution-search" placeholder="Type to search institutions..." autocomplete="off">
+                        <input type="hidden" id="new-ta-institution" value="">
+                        <div id="new-ta-institution-dropdown" class="inst-autocomplete-dropdown"></div>
+                        <small id="new-ta-institution-selected" style="color:#15803d;display:none;"></small>
                     </div>
                     <div class="form-group">
                         <label for="new-ta-prompt">System Prompt (optional):</label>
@@ -996,22 +1017,71 @@
         
         function showCreateTAModal() {
             document.getElementById('create-ta-form').reset();
-            populateInstitutionDropdown('new-ta-institution');
+            setupInstAutocomplete('new-ta-institution');
             document.getElementById('create-ta-modal').classList.remove('hidden');
         }
         function hideCreateTAModal() {
             document.getElementById('create-ta-modal').classList.add('hidden');
         }
         
-        async function populateInstitutionDropdown(selectId, selectedId = null) {
-            const select = document.getElementById(selectId);
-            try {
-                const insts = await apiCall('/admin/api/institutions');
-                select.innerHTML = '<option value="">None</option>' + 
-                    insts.map(i => `<option value="${i.id}" ${i.id == selectedId ? 'selected' : ''}>${escapeHtml(i.name)}</option>`).join('');
-            } catch (err) {
-                select.innerHTML = '<option value="">None</option>';
+        let cachedInstitutions = null;
+        async function getInstitutions() {
+            if (!cachedInstitutions) {
+                try { cachedInstitutions = await apiCall('/admin/api/institutions'); }
+                catch (e) { cachedInstitutions = []; }
             }
+            return cachedInstitutions;
+        }
+
+        function setupInstAutocomplete(prefix, selectedId = null, selectedName = null) {
+            const searchInput = document.getElementById(prefix + '-search');
+            const hiddenInput = document.getElementById(prefix);
+            const dropdown = document.getElementById(prefix + '-dropdown');
+            const selectedLabel = document.getElementById(prefix + '-selected');
+
+            if (selectedId && selectedName) {
+                hiddenInput.value = selectedId;
+                searchInput.value = '';
+                selectedLabel.textContent = selectedName;
+                selectedLabel.style.display = 'block';
+            } else {
+                hiddenInput.value = '';
+                searchInput.value = '';
+                selectedLabel.style.display = 'none';
+            }
+
+            searchInput.oninput = async function() {
+                const q = this.value.trim().toLowerCase();
+                hiddenInput.value = '';
+                selectedLabel.style.display = 'none';
+                if (q.length < 2) { dropdown.style.display = 'none'; return; }
+                const insts = await getInstitutions();
+                const matches = insts.filter(i => i.name.toLowerCase().includes(q)).slice(0, 12);
+                if (!matches.length) { dropdown.style.display = 'none'; return; }
+                dropdown.innerHTML = matches.map(i =>
+                    `<div class="inst-ac-option" data-id="${i.id}">${escapeHtml(i.name)}</div>`
+                ).join('');
+                dropdown.style.display = 'block';
+                dropdown.querySelectorAll('.inst-ac-option').forEach(opt => {
+                    opt.onmousedown = function(e) {
+                        e.preventDefault();
+                        hiddenInput.value = this.dataset.id;
+                        searchInput.value = '';
+                        selectedLabel.textContent = this.textContent;
+                        selectedLabel.style.display = 'block';
+                        dropdown.style.display = 'none';
+                    };
+                });
+            };
+            searchInput.onblur = function() { setTimeout(() => dropdown.style.display = 'none', 150); };
+            searchInput.onfocus = function() { if (this.value.trim().length >= 2) this.oninput(); };
+        }
+
+        // Keep backward compat name for edit flow
+        async function populateInstitutionDropdown(prefix, selectedId = null) {
+            const insts = await getInstitutions();
+            const match = selectedId ? insts.find(i => i.id == selectedId) : null;
+            setupInstAutocomplete(prefix, selectedId, match ? match.name : null);
         }
         
         async function createTA(e) {
@@ -1112,9 +1182,12 @@
                         <input type="text" id="edit-ta-slug" value="${escapeHtml(ta.slug)}" pattern="[a-z0-9-]+" title="Lowercase letters, numbers, and hyphens only">
                         <small>Current URL: <a href="/${ta.slug}" target="_blank">/${ta.slug}</a></small>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" style="position:relative;">
                         <label>Institution:</label>
-                        <select id="edit-ta-institution"></select>
+                        <input type="text" id="edit-ta-institution-search" placeholder="Type to search institutions..." autocomplete="off">
+                        <input type="hidden" id="edit-ta-institution" value="">
+                        <div id="edit-ta-institution-dropdown" class="inst-autocomplete-dropdown"></div>
+                        <small id="edit-ta-institution-selected" style="color:#15803d;display:none;"></small>
                     </div>
                     <div class="form-group">
                         <label>System Prompt:</label>

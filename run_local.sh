@@ -13,7 +13,7 @@ fi
 
 # Start PostgreSQL container if not running
 echo "🐳 Starting PostgreSQL container..."
-docker-compose up -d postgres
+docker-compose --env-file /dev/null up -d postgres
 
 # Wait for database to be ready
 echo "⏳ Waiting for database to be ready..."
