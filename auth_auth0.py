@@ -273,6 +273,7 @@ def resend_verification():
         )
 
         if verify_resp.ok:
+            logger.info(f"Verification email job created: {verify_resp.json()}")
             flash('Verification email sent! Please check your inbox (and spam folder).', 'success')
         else:
             logger.error(f"Failed to send verification email: {verify_resp.status_code} {verify_resp.text}")
