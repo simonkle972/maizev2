@@ -239,11 +239,13 @@ def resend_verification():
     from config import Config
 
     logger = logging.getLogger(__name__)
-    auth0_user_id = session.get('auth0_user_id')
+    from flask_login import current_user
 
-    if not auth0_user_id:
+    if not current_user.is_authenticated or not current_user.auth0_sub:
         flash('Please log in first.', 'warning')
         return redirect(url_for('auth0.login'))
+
+    auth0_sub = current_user.auth0_sub
 
     try:
         # Get Management API token (must use canonical domain, not custom domain)
@@ -266,7 +268,7 @@ def resend_verification():
         verify_resp = req.post(
             f'https://{canonical}/api/v2/jobs/verification-email',
             headers={'Authorization': f'Bearer {mgmt_token}', 'Content-Type': 'application/json'},
-            json={'user_id': auth0_user_id},
+            json={'user_id': auth0_sub},
             timeout=10
         )
 
