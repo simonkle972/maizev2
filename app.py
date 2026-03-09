@@ -677,38 +677,35 @@ def cleanup_orphaned_slug():
 @app.route('/admin/api/tas/<ta_id>/upload', methods=['POST'])
 @admin_api_required
 def upload_document(ta_id):
-    from src.document_processor import extract_metadata_from_file_content
-    
     ta = TeachingAssistant.query.get(ta_id)
     if not ta:
         return jsonify({"error": "TA not found"}), 404
-    
+
     if 'file' not in request.files:
         return jsonify({"error": "No file provided"}), 400
-    
+
     file = request.files['file']
     if file.filename == '':
         return jsonify({"error": "No file selected"}), 400
-    
+
     original_filename = file.filename
     file_ext = original_filename.rsplit('.', 1)[-1].lower() if '.' in original_filename else ''
-    
+
     allowed_extensions = {'pdf', 'docx', 'doc', 'xlsx', 'xls', 'txt', 'pptx', 'ppt'}
     if file_ext not in allowed_extensions:
         return jsonify({"error": f"File type .{file_ext} not supported"}), 400
-    
+
     safe_filename = f"{secrets.token_urlsafe(8)}_{original_filename}"
     storage_path = f"data/courses/{ta_id}/docs/{safe_filename}"
-    
+
     file_content = file.read()
     file_size = len(file_content)
-    
-    metadata = extract_metadata_from_file_content(file_content, file_ext, original_filename)
-    
+
     display_name = original_filename
     if file_ext:
         display_name = original_filename.rsplit('.', 1)[0]
-    
+
+    # Save document immediately so the response returns fast
     doc = Document(
         ta_id=ta_id,
         filename=safe_filename,
@@ -718,33 +715,52 @@ def upload_document(ta_id):
         file_size=file_size,
         storage_path=storage_path,
         file_content=file_content,
-        doc_type=metadata.get("doc_type"),
-        assignment_number=metadata.get("assignment_number"),
-        instructional_unit_number=metadata.get("instructional_unit_number"),
-        instructional_unit_label=metadata.get("instructional_unit_label"),
-        content_title=metadata.get("content_title"),
-        metadata_extracted=metadata.get("extraction_success", False),
-        extraction_metadata=metadata
+        metadata_extracted=False
     )
-    
+
     db.session.add(doc)
     db.session.flush()
-    
+
     ta.document_count = Document.query.filter_by(ta_id=ta_id).count()
     ta.is_indexed = False
     ta.indexing_status = None
     ta.indexing_error = None
     db.session.commit()
-    
+
+    doc_id = doc.id
+
+    # Extract metadata in background thread (text extraction + LLM can take 10-30s)
+    def extract_metadata_bg(app_obj, doc_id, file_content, file_ext, original_filename):
+        with app_obj.app_context():
+            from src.document_processor import extract_metadata_from_file_content
+            try:
+                metadata = extract_metadata_from_file_content(file_content, file_ext, original_filename)
+                doc = Document.query.get(doc_id)
+                if doc:
+                    doc.doc_type = metadata.get("doc_type")
+                    doc.assignment_number = metadata.get("assignment_number")
+                    doc.instructional_unit_number = metadata.get("instructional_unit_number")
+                    doc.instructional_unit_label = metadata.get("instructional_unit_label")
+                    doc.content_title = metadata.get("content_title")
+                    doc.metadata_extracted = metadata.get("extraction_success", False)
+                    doc.extraction_metadata = metadata
+                    db.session.commit()
+            except Exception as e:
+                logger.error(f"Background metadata extraction failed for {original_filename}: {e}")
+
+    import threading
+    thread = threading.Thread(
+        target=extract_metadata_bg,
+        args=(app._get_current_object(), doc_id, file_content, file_ext, original_filename)
+    )
+    thread.daemon = True
+    thread.start()
+
     return jsonify({
         "success": True,
-        "document_id": doc.id,
+        "document_id": doc_id,
         "filename": original_filename,
-        "display_name": doc.display_name,
-        "doc_type": doc.doc_type,
-        "unit_number": doc.instructional_unit_number,
-        "content_title": doc.content_title,
-        "metadata_extracted": doc.metadata_extracted
+        "display_name": display_name
     })
 
 @app.route('/admin/api/tas/<ta_id>/documents/<int:doc_id>', methods=['DELETE'])

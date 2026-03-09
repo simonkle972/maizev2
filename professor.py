@@ -704,8 +704,6 @@ def support():
 @professor_owns_ta
 def upload_document(ta_id):
     """Upload document to TA."""
-    from src.document_processor import extract_metadata_from_file_content
-
     ta = TeachingAssistant.query.get(ta_id)
     if not ta:
         return jsonify({"error": "TA not found"}), 404
@@ -734,12 +732,11 @@ def upload_document(ta_id):
     file_content = file.read()
     file_size = len(file_content)
 
-    metadata = extract_metadata_from_file_content(file_content, file_ext, original_filename)
-
     display_name = original_filename
     if file_ext:
         display_name = original_filename.rsplit('.', 1)[0]
 
+    # Save document immediately so the response returns fast
     doc = Document(
         ta_id=ta_id,
         filename=safe_filename,
@@ -749,13 +746,7 @@ def upload_document(ta_id):
         file_size=file_size,
         storage_path=storage_path,
         file_content=file_content,
-        doc_type=metadata.get("doc_type"),
-        assignment_number=metadata.get("assignment_number"),
-        instructional_unit_number=metadata.get("instructional_unit_number"),
-        instructional_unit_label=metadata.get("instructional_unit_label"),
-        content_title=metadata.get("content_title"),
-        metadata_extracted=metadata.get("extraction_success", False),
-        extraction_metadata=metadata
+        metadata_extracted=False
     )
 
     db.session.add(doc)
@@ -765,16 +756,47 @@ def upload_document(ta_id):
     ta.is_indexed = False
     db.session.commit()
 
+    doc_id = doc.id
+
+    # Extract metadata in background thread (text extraction + LLM can take 10-30s)
+    def extract_metadata_bg(app_obj, doc_id, file_content, file_ext, original_filename):
+        with app_obj.app_context():
+            from src.document_processor import extract_metadata_from_file_content
+            try:
+                metadata = extract_metadata_from_file_content(file_content, file_ext, original_filename)
+                doc = Document.query.get(doc_id)
+                if doc:
+                    doc.doc_type = metadata.get("doc_type")
+                    doc.assignment_number = metadata.get("assignment_number")
+                    doc.instructional_unit_number = metadata.get("instructional_unit_number")
+                    doc.instructional_unit_label = metadata.get("instructional_unit_label")
+                    doc.content_title = metadata.get("content_title")
+                    doc.metadata_extracted = metadata.get("extraction_success", False)
+                    doc.extraction_metadata = metadata
+                    db.session.commit()
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error(f"Background metadata extraction failed for {original_filename}: {e}")
+
+    import threading
+    from flask import current_app
+    thread = threading.Thread(
+        target=extract_metadata_bg,
+        args=(current_app._get_current_object(), doc_id, file_content, file_ext, original_filename)
+    )
+    thread.daemon = True
+    thread.start()
+
     return jsonify({
         "success": True,
         "document": {
-            "id": doc.id,
-            "filename": doc.original_filename,
-            "display_name": doc.display_name,
-            "file_type": doc.file_type,
-            "file_size": doc.file_size,
-            "doc_type": doc.doc_type,
-            "instructional_unit_number": doc.instructional_unit_number
+            "id": doc_id,
+            "filename": original_filename,
+            "display_name": display_name,
+            "file_type": file_ext,
+            "file_size": file_size,
+            "doc_type": None,
+            "instructional_unit_number": None
         }
     })
 
