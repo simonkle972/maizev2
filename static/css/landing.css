@@ -707,6 +707,89 @@
 }
 
 /* =============================================
+   COMPARISON TABLE
+   ============================================= */
+.comparison-section {
+    padding: 6rem 2rem;
+    background: var(--maize-white);
+}
+
+.comparison-table-wrapper {
+    overflow-x: auto;
+    max-width: 880px;
+    margin: 0 auto;
+}
+
+.comparison-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--maize-white);
+    border-radius: 1rem;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(43, 31, 26, 0.08);
+}
+
+.comparison-table th,
+.comparison-table td {
+    padding: 1.25rem 1.5rem;
+    text-align: center;
+}
+
+.comparison-table thead {
+    background: var(--maize-charcoal);
+    color: var(--maize-white);
+}
+
+.comparison-table th {
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.comparison-table th:first-child {
+    text-align: left;
+}
+
+.table-logo {
+    width: 32px;
+    height: 32px;
+    vertical-align: middle;
+    margin-right: 0.5rem;
+}
+
+.highlight-col {
+    background: rgba(242, 169, 59, 0.1);
+}
+
+.comparison-table thead .highlight-col {
+    background: var(--maize-amber);
+    color: var(--maize-charcoal);
+}
+
+.comparison-table tbody tr {
+    border-bottom: 1px solid rgba(74, 51, 40, 0.1);
+}
+
+.comparison-table tbody tr:last-child {
+    border-bottom: none;
+}
+
+.feature-name {
+    text-align: left;
+    font-weight: 500;
+    color: var(--maize-charcoal);
+}
+
+.check {
+    color: #16a34a;
+    font-weight: 600;
+}
+
+.cross {
+    color: var(--maize-cocoa);
+    opacity: 0.7;
+}
+
+/* =============================================
    PRICING
    ============================================= */
 .pricing-section {
@@ -1121,6 +1204,7 @@
 
     .features-section,
     .steps-section,
+    .comparison-section,
     .pricing-section,
     .demo-section {
         padding: 4rem 1.25rem;
