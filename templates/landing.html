@@ -8,9 +8,9 @@
     <title>Maize - AI Teaching Assistant</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=13">
-    <link rel="stylesheet" href="/static/css/landing.css?v=2">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css?v=14">
+    <link rel="stylesheet" href="/static/css/landing.css?v=3">
 </head>
 <body class="landing-page">
     <header class="site-header">
@@ -21,67 +21,180 @@
             </a>
             <nav class="header-nav">
                 <a href="#features" class="nav-link">Features</a>
-                <a href="#comparison" class="nav-link">Why Maize</a>
+                <a href="#how-it-works" class="nav-link">How It Works</a>
                 <a href="#pricing" class="nav-link">Pricing</a>
-                <a href="/auth0/login?role=professor&screen_hint=signup" class="btn btn-primary">Try for free</a>
+                <a href="/auth0/login?role=professor&screen_hint=signup" class="btn btn-primary nav-cta">Try for free</a>
+                <a href="/auth0/login?role=professor" class="btn btn-nav-login">Professor Login</a>
             </nav>
         </div>
     </header>
 
     <main>
+        <!-- HERO -->
         <section class="hero-section">
+            <!-- Floating academic motifs -->
+            <!-- Graph / axes with curve -->
+            <svg class="hero-deco hero-deco-graph" viewBox="0 0 120 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <line x1="10" y1="90" x2="10" y2="10" stroke="white" stroke-width="1.5"/>
+                <line x1="10" y1="90" x2="110" y2="90" stroke="white" stroke-width="1.5"/>
+                <path d="M15 80 Q40 75 55 50 T100 20" stroke="white" stroke-width="1.5" fill="none"/>
+                <circle cx="55" cy="50" r="3" fill="white"/>
+            </svg>
+            <!-- Molecule hexagon -->
+            <svg class="hero-deco hero-deco-molecule" viewBox="0 0 100 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <polygon points="50,5 85,25 85,65 50,85 15,65 15,25" stroke="white" stroke-width="1.5" fill="none"/>
+                <line x1="50" y1="5" x2="50" y2="85" stroke="white" stroke-width="1"/>
+                <line x1="85" y1="25" x2="15" y2="65" stroke="white" stroke-width="1"/>
+                <circle cx="50" cy="5" r="4" fill="white"/>
+                <circle cx="85" cy="25" r="4" fill="white"/>
+                <circle cx="85" cy="65" r="4" fill="white"/>
+                <circle cx="50" cy="85" r="4" fill="white"/>
+                <circle cx="15" cy="65" r="4" fill="white"/>
+                <circle cx="15" cy="25" r="4" fill="white"/>
+            </svg>
+            <!-- Equation -->
+            <div class="hero-deco hero-deco-equation">∫ f(x) dx</div>
+            <!-- Pencil -->
+            <svg class="hero-deco hero-deco-pencil" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="25" y="5" width="8" height="55" rx="1" stroke="white" stroke-width="1.5" fill="none"/>
+                <polygon points="25,60 33,60 29,75" stroke="white" stroke-width="1.5" fill="none"/>
+                <line x1="25" y1="12" x2="33" y2="12" stroke="white" stroke-width="1"/>
+            </svg>
+            <!-- Sigma symbol -->
+            <div class="hero-deco hero-deco-sigma">&Sigma;</div>
+            <!-- Open book -->
+            <svg class="hero-deco hero-deco-book" viewBox="0 0 110 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M55 15 L10 25 L10 80 L55 70 L100 80 L100 25 Z" stroke="white" stroke-width="1.5" fill="none"/>
+                <line x1="55" y1="15" x2="55" y2="70" stroke="white" stroke-width="1.5"/>
+                <line x1="20" y1="35" x2="48" y2="30" stroke="white" stroke-width="0.8" opacity="0.6"/>
+                <line x1="20" y1="43" x2="48" y2="38" stroke="white" stroke-width="0.8" opacity="0.6"/>
+                <line x1="20" y1="51" x2="48" y2="46" stroke="white" stroke-width="0.8" opacity="0.6"/>
+                <line x1="62" y1="30" x2="90" y2="35" stroke="white" stroke-width="0.8" opacity="0.6"/>
+                <line x1="62" y1="38" x2="90" y2="43" stroke="white" stroke-width="0.8" opacity="0.6"/>
+                <line x1="62" y1="46" x2="90" y2="51" stroke="white" stroke-width="0.8" opacity="0.6"/>
+            </svg>
+            <!-- Grid paper -->
+            <svg class="hero-deco hero-deco-grid" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="5" y="5" width="90" height="90" rx="3" stroke="white" stroke-width="1.2" fill="none"/>
+                <line x1="5" y1="23" x2="95" y2="23" stroke="white" stroke-width="0.5" opacity="0.5"/>
+                <line x1="5" y1="41" x2="95" y2="41" stroke="white" stroke-width="0.5" opacity="0.5"/>
+                <line x1="5" y1="59" x2="95" y2="59" stroke="white" stroke-width="0.5" opacity="0.5"/>
+                <line x1="5" y1="77" x2="95" y2="77" stroke="white" stroke-width="0.5" opacity="0.5"/>
+                <line x1="23" y1="5" x2="23" y2="95" stroke="white" stroke-width="0.5" opacity="0.5"/>
+                <line x1="41" y1="5" x2="41" y2="95" stroke="white" stroke-width="0.5" opacity="0.5"/>
+                <line x1="59" y1="5" x2="59" y2="95" stroke="white" stroke-width="0.5" opacity="0.5"/>
+                <line x1="77" y1="5" x2="77" y2="95" stroke="white" stroke-width="0.5" opacity="0.5"/>
+            </svg>
+            <!-- E = mc² -->
+            <div class="hero-deco hero-deco-emc2">E = mc&sup2;</div>
+            <!-- Pi symbol -->
+            <div class="hero-deco hero-deco-pi">&pi;</div>
+            <!-- Atom with orbits -->
+            <svg class="hero-deco hero-deco-atom" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="60" cy="60" r="6" fill="white"/>
+                <ellipse cx="60" cy="60" rx="50" ry="18" stroke="white" stroke-width="1.2" fill="none"/>
+                <ellipse cx="60" cy="60" rx="50" ry="18" stroke="white" stroke-width="1.2" fill="none" transform="rotate(60 60 60)"/>
+                <ellipse cx="60" cy="60" rx="50" ry="18" stroke="white" stroke-width="1.2" fill="none" transform="rotate(120 60 60)"/>
+                <circle cx="110" cy="60" r="3.5" fill="white"/>
+                <circle cx="35" cy="17" r="3.5" fill="white"/>
+                <circle cx="35" cy="103" r="3.5" fill="white"/>
+            </svg>
+            <!-- Ruler -->
+            <svg class="hero-deco hero-deco-ruler" viewBox="0 0 140 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="2" y="2" width="136" height="26" rx="2" stroke="white" stroke-width="1.2" fill="none"/>
+                <line x1="20" y1="2" x2="20" y2="12" stroke="white" stroke-width="0.8"/>
+                <line x1="40" y1="2" x2="40" y2="16" stroke="white" stroke-width="1"/>
+                <line x1="60" y1="2" x2="60" y2="12" stroke="white" stroke-width="0.8"/>
+                <line x1="80" y1="2" x2="80" y2="16" stroke="white" stroke-width="1"/>
+                <line x1="100" y1="2" x2="100" y2="12" stroke="white" stroke-width="0.8"/>
+                <line x1="120" y1="2" x2="120" y2="16" stroke="white" stroke-width="1"/>
+            </svg>
+
             <div class="hero-container">
                 <div class="hero-content">
-                    <h1 class="hero-title">Teach students to think, not just answer.</h1>
+                    <h1 class="hero-title">Students already use AI.<br>Now they can use yours.</h1>
                     <p class="hero-subtitle">Maize is an AI teaching assistant that helps students understand course concepts using your actual materials. 24/7 support that guides learning without giving away answers.</p>
                     <div class="hero-cta">
-                        <a href="#features" class="btn btn-secondary-outline btn-large">Learn More</a>
+                        <a href="/auth0/login?role=professor&screen_hint=signup" class="btn btn-primary btn-large">Try for free</a>
+                        <a href="#demo" class="btn btn-ghost btn-large">Request a demo</a>
                     </div>
                 </div>
-                <div class="hero-image">
-                    <div class="floating-questions">
-                        <div class="question-bubble bubble-1">"How do I solve problem 3?"</div>
-                        <div class="question-bubble bubble-2">"What's the formula for..."</div>
-                        <div class="question-bubble bubble-3">"Can you explain this?"</div>
-                        <div class="question-bubble bubble-4">"I'm stuck on part (b)"</div>
-                        <div class="question-bubble bubble-5">"Is my answer right?"</div>
+
+                <div class="hero-mockup-area">
+                    <div class="mockup-glow"></div>
+                    <!-- Main chat mockup -->
+                    <div class="mockup-browser mockup-main">
+                        <div class="browser-chrome">
+                            <div class="chrome-dots">
+                                <span></span><span></span><span></span>
+                            </div>
+                            <div class="chrome-url">getmaize.ai/chat</div>
+                        </div>
+                        <div class="browser-body">
+                            <div class="mock-chat">
+                                <div class="mock-header">
+                                    <img src="/static/images/maize-logo.png" alt="" class="mock-avatar">
+                                    <div>
+                                        <div class="mock-header-title" id="mock-course-title">Intro to Microeconomics TA</div>
+                                        <div class="mock-header-sub">Powered by Maize</div>
+                                    </div>
+                                </div>
+                                <div class="mock-messages" id="mock-messages"></div>
+                            </div>
+                        </div>
                     </div>
-                    <img src="/static/images/maize-logo.png" alt="Maize AI Teaching Assistant" class="hero-mascot">
+                    <!-- Floating dashboard card -->
+                    <div class="mockup-browser mockup-float">
+                        <div class="browser-chrome">
+                            <div class="chrome-dots">
+                                <span></span><span></span><span></span>
+                            </div>
+                            <div class="chrome-url">getmaize.ai/professor</div>
+                        </div>
+                        <div class="browser-body">
+                            <div class="mock-dashboard">
+                                <div class="mock-dash-title">Your Teaching Assistants</div>
+                                <div class="mock-dash-card">
+                                    <div class="mock-dash-row">
+                                        <span class="mock-dash-name" id="mock-dash-course">Intro to Microeconomics</span>
+                                        <span class="mock-dash-badge active">Active</span>
+                                    </div>
+                                    <div class="mock-dash-meta">3 documents &middot; 47 students</div>
+                                </div>
+                                <div class="mock-dash-card">
+                                    <div class="mock-dash-row">
+                                        <span class="mock-dash-name" id="mock-dash-course2">Macroeconomics 201</span>
+                                        <span class="mock-dash-badge draft">Draft</span>
+                                    </div>
+                                    <div class="mock-dash-meta">1 document &middot; 0 students</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>
 
-        <section id="features" class="features-section">
+        <!-- FEATURES -->
+        <section id="features" class="features-section animate-on-scroll">
             <div class="section-container">
-                <h2 class="section-title">Why instructors choose Maize</h2>
+                <h2 class="section-title">Built for your classroom</h2>
                 <p class="section-subtitle">An AI TA that actually understands your course</p>
-                
+
                 <div class="features-grid">
                     <div class="feature-card">
                         <div class="feature-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>
                             </svg>
                         </div>
                         <h3>Course-Specific Knowledge</h3>
                         <p>Upload your lectures, problem sets, and readings. Maize learns your specific curriculum, not generic information from the internet.</p>
                     </div>
-                    
+
                     <div class="feature-card">
                         <div class="feature-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <circle cx="12" cy="12" r="10"/>
-                                <path d="M12 16v-4"/>
-                                <path d="M12 8h.01"/>
-                            </svg>
-                        </div>
-                        <h3>Pedagogical Guardrails</h3>
-                        <p>Maize guides students to understand concepts without giving direct answers. Students learn to solve problems themselves.</p>
-                    </div>
-                    
-                    <div class="feature-card">
-                        <div class="feature-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <circle cx="12" cy="12" r="10"/>
                                 <polyline points="12 6 12 12 16 14"/>
                             </svg>
@@ -89,10 +202,10 @@
                         <h3>Available 24/7</h3>
                         <p>Students get help whenever they need it, not just during office hours. Reduce the burden on you and your human TAs.</p>
                     </div>
-                    
+
                     <div class="feature-card">
                         <div class="feature-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M12 20h9"/>
                                 <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
                             </svg>
@@ -100,20 +213,10 @@
                         <h3>Instructor Control</h3>
                         <p>You decide what materials the TA knows. Upload, review, and update content through an easy admin panel.</p>
                     </div>
-                    
+
                     <div class="feature-card">
                         <div class="feature-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                            </svg>
-                        </div>
-                        <h3>Patient Tutoring</h3>
-                        <p>Maize adapts its hints based on how many attempts a student makes. Struggling students get more guidance, naturally.</p>
-                    </div>
-                    
-                    <div class="feature-card">
-                        <div class="feature-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/>
                             </svg>
                         </div>
@@ -124,61 +227,57 @@
             </div>
         </section>
 
-        <section id="comparison" class="comparison-section">
+        <!-- HOW IT WORKS -->
+        <section id="how-it-works" class="steps-section animate-on-scroll">
             <div class="section-container">
-                <h2 class="section-title">Maize vs. General LLMs</h2>
-                <p class="section-subtitle">Why generic AI assistants fall short for education</p>
-                
-                <div class="comparison-table-wrapper">
-                    <table class="comparison-table">
-                        <thead>
-                            <tr>
-                                <th></th>
-                                <th class="highlight-col">
-                                    <img src="/static/images/maize-logo.png" alt="Maize" class="table-logo">
-                                    Maize
-                                </th>
-                                <th>Generic LLMs (ChatGPT, Gemini, etc.)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td class="feature-name">Uses your actual course materials</td>
-                                <td class="highlight-col"><span class="check">Yes</span></td>
-                                <td><span class="cross">No</span></td>
-                            </tr>
-                            <tr>
-                                <td class="feature-name">Guides learning without giving answers</td>
-                                <td class="highlight-col"><span class="check">Built-in</span></td>
-                                <td><span class="cross">Will give away solutions</span></td>
-                            </tr>
-                            <tr>
-                                <td class="feature-name">Knows your specific assignments</td>
-                                <td class="highlight-col"><span class="check">Yes</span></td>
-                                <td><span class="cross">No access</span></td>
-                            </tr>
-                            <tr>
-                                <td class="feature-name">Instructor controls content and methodology</td>
-                                <td class="highlight-col"><span class="check">Full control</span></td>
-                                <td><span class="cross">No control</span></td>
-                            </tr>
-                            <tr>
-                                <td class="feature-name">Designed for education</td>
-                                <td class="highlight-col"><span class="check">Purpose-built</span></td>
-                                <td><span class="cross">Built for general chat</span></td>
-                            </tr>
-                            <tr>
-                                <td class="feature-name">Course materials and chats stay private</td>
-                                <td class="highlight-col"><span class="check">Yes</span></td>
-                                <td><span class="cross">No privacy guarantees</span></td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <h2 class="section-title">Get started in 3 steps</h2>
+                <p class="section-subtitle">From upload to live in minutes</p>
+
+                <div class="steps-grid">
+                    <div class="step-card">
+                        <div class="step-number">1</div>
+                        <div class="step-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 8v8"/>
+                                <path d="M8 12h8"/>
+                            </svg>
+                        </div>
+                        <h3>Create</h3>
+                        <p>Set up your AI teaching assistant for any course. Name it, configure its personality, and set your guidelines.</p>
+                    </div>
+                    <div class="step-connector"></div>
+                    <div class="step-card">
+                        <div class="step-number">2</div>
+                        <div class="step-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="17 8 12 3 7 8"/>
+                                <line x1="12" y1="3" x2="12" y2="15"/>
+                            </svg>
+                        </div>
+                        <h3>Upload</h3>
+                        <p>Add your syllabus, lectures, problem sets, and readings. Maize indexes everything and learns your curriculum.</p>
+                    </div>
+                    <div class="step-connector"></div>
+                    <div class="step-card">
+                        <div class="step-number">3</div>
+                        <div class="step-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+                                <polyline points="16 6 12 2 8 6"/>
+                                <line x1="12" y1="2" x2="12" y2="15"/>
+                            </svg>
+                        </div>
+                        <h3>Share</h3>
+                        <p>Publish your TA and share the link with students. They get 24/7 guided help grounded in your materials.</p>
+                    </div>
                 </div>
             </div>
         </section>
 
-        <section id="pricing" class="pricing-section">
+        <!-- PRICING -->
+        <section id="pricing" class="pricing-section animate-on-scroll">
             <div class="section-container">
                 <h2 class="section-title">Start free. Pay when you publish.</h2>
                 <p class="section-subtitle">Create and test your AI TA before subscribing. No credit card required.</p>
@@ -241,7 +340,8 @@
             </div>
         </section>
 
-        <section id="demo" class="demo-section">
+        <!-- DEMO / CONTACT -->
+        <section id="demo" class="demo-section animate-on-scroll">
             <div class="section-container">
                 <div class="demo-card">
                     <div class="demo-content">
@@ -296,33 +396,108 @@
     </footer>
 
     <script>
+        /* Random demo conversation on each page load */
+        (function() {
+            const conversations = [
+                {
+                    course: "Intro to Microeconomics",
+                    course2: "Macroeconomics 201",
+                    messages: [
+                        { role: "user", text: "How do I find the equilibrium price for problem 3?" },
+                        { role: "assistant", text: "What two equations do you need to set equal to find equilibrium?" },
+                        { role: "user", text: "Oh wait, so I need to set the supply and demand equations equal to each other?" },
+                        { role: "assistant", text: "Exactly! Now try setting them equal using the functions from the problem set." }
+                    ]
+                },
+                {
+                    course: "Calculus II",
+                    course2: "Linear Algebra",
+                    messages: [
+                        { role: "user", text: "I'm stuck on the integration by parts problem from lecture 7." },
+                        { role: "assistant", text: "Which part are you choosing as u and which as dv?" },
+                        { role: "user", text: "I set u = ln(x) and dv = x dx. Is that right?" },
+                        { role: "assistant", text: "Great choice! Now apply the formula and see what integral you get for v du." }
+                    ]
+                },
+                {
+                    course: "Financial Accounting",
+                    course2: "Managerial Accounting",
+                    messages: [
+                        { role: "user", text: "Why doesn't my balance sheet balance after recording the equipment purchase?" },
+                        { role: "assistant", text: "How did you record the cash outflow? Did both sides of the entry get posted?" },
+                        { role: "user", text: "Oh, I think I only debited equipment but forgot the credit to cash." },
+                        { role: "assistant", text: "That's it! Every transaction needs equal debits and credits. Try adding the cash credit." }
+                    ]
+                },
+                {
+                    course: "Organic Chemistry",
+                    course2: "General Chemistry 101",
+                    messages: [
+                        { role: "user", text: "I can't figure out the product of this SN2 reaction with a secondary substrate." },
+                        { role: "assistant", text: "What happens to stereochemistry in an SN2 mechanism?" },
+                        { role: "user", text: "The nucleophile attacks from the back so... inversion of configuration?" },
+                        { role: "assistant", text: "Exactly — backside attack causes inversion. Now draw the product with the inverted stereocenter." }
+                    ]
+                },
+                {
+                    course: "Intro to Statistics",
+                    course2: "Econometrics 301",
+                    messages: [
+                        { role: "user", text: "How do I know whether to use a z-test or a t-test for this problem?" },
+                        { role: "assistant", text: "Do you know the population standard deviation, or only the sample standard deviation?" },
+                        { role: "user", text: "We only have the sample standard deviation and n = 24." },
+                        { role: "assistant", text: "Then you'd use a t-test. Remember, t-tests are for when sigma is unknown — especially with smaller samples." }
+                    ]
+                }
+            ];
+
+            const convo = conversations[Math.floor(Math.random() * conversations.length)];
+            const logo = '/static/images/maize-logo.png';
+
+            document.getElementById('mock-course-title').textContent = convo.course + ' TA';
+            document.getElementById('mock-dash-course').textContent = convo.course;
+            document.getElementById('mock-dash-course2').textContent = convo.course2;
+
+            const container = document.getElementById('mock-messages');
+            convo.messages.forEach(function(msg) {
+                const div = document.createElement('div');
+                div.className = 'mock-msg mock-' + msg.role;
+                if (msg.role === 'user') {
+                    div.textContent = msg.text;
+                } else {
+                    div.innerHTML = '<img src="' + logo + '" alt="" class="mock-msg-avatar"><div class="mock-msg-body">' + msg.text + '</div>';
+                }
+                container.appendChild(div);
+            });
+        })();
+
         async function submitDemoRequest(e) {
             e.preventDefault();
-            
+
             const btn = document.getElementById('demo-submit-btn');
             const status = document.getElementById('demo-status');
-            
+
             btn.disabled = true;
             btn.textContent = 'Sending...';
             status.textContent = '';
             status.className = 'form-status';
-            
+
             const formData = {
                 name: document.getElementById('name').value,
                 email: document.getElementById('email').value,
                 institution: document.getElementById('institution').value,
                 message: document.getElementById('message').value
             };
-            
+
             try {
                 const response = await fetch('/api/demo-request', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(formData)
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (response.ok) {
                     status.textContent = 'Thanks! We\'ll be in touch soon.';
                     status.className = 'form-status success';
@@ -335,11 +510,12 @@
                 status.textContent = 'Network error. Please try again.';
                 status.className = 'form-status error';
             }
-            
+
             btn.disabled = false;
             btn.textContent = 'Send message';
         }
-        
+
+        /* Smooth anchor scrolling */
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
             anchor.addEventListener('click', function (e) {
                 e.preventDefault();
@@ -349,6 +525,17 @@
                 }
             });
         });
+
+        /* Scroll-triggered fade-in animations */
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, { threshold: 0.08 });
+
+        document.querySelectorAll('.animate-on-scroll').forEach(el => observer.observe(el));
     </script>
 </body>
 </html>
