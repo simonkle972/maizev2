@@ -723,13 +723,21 @@ def analyze_query(query: str, ta_id: str = "") -> dict:
     
     # Extract specific problem reference for validation
     problem_ref = extract_problem_reference(query)
-    
+
+    # Detect structural references (slide N, page N) for metadata-based retrieval
+    structural_ref = None
+    struct_match = re.search(r'(?:slide|page|pg)\s*#?\s*(\d+)', query_lower)
+    if struct_match:
+        ref_type = "slide" if "slide" in query_lower else "page"
+        structural_ref = {"type": ref_type, "number": int(struct_match.group(1))}
+        logger.info(f"[{ta_id}] Structural reference detected: {ref_type} {structural_ref['number']}")
+
     # Determine if this query should use early hybrid routing
     # Specific references with sub-parts (like "1a") need full document context
     # to reliably locate the exact content - chunk-based retrieval is unreliable for these
     requires_early_hybrid = bool(
-        problem_ref and 
-        problem_ref.get("problem_number") and 
+        problem_ref and
+        problem_ref.get("problem_number") and
         problem_ref.get("sub_part")
     )
     
@@ -746,6 +754,7 @@ def analyze_query(query: str, ta_id: str = "") -> dict:
         "filename_matched_tokens": None,
         "is_conceptual": False,
         "problem_reference": problem_ref,
+        "structural_reference": structural_ref,
         "requires_early_hybrid": requires_early_hybrid,
         "original_query": query  # For content_title matching in document identification
     }
@@ -1420,6 +1429,63 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
             }
         })
     
+    # STRUCTURAL INJECTION: When query references a specific slide/page number,
+    # directly fetch chunks by chunk_context metadata and inject them into results.
+    # This ensures positional queries ("slide 11", "page 7") always find the right content,
+    # since vector similarity alone can't match structural references.
+    structural_ref = query_analysis.get("structural_reference")
+    if structural_ref:
+        num = structural_ref["number"]
+        context_patterns = [
+            f"Slide {num}:%",        # PPTX chunks (chunk_context = "Slide 11:" or "Slide 11: Title")
+            f"--- Page {num} ---%",  # PDF chunks (chunk_context = "--- Page 7 ---")
+        ]
+
+        structural_query = db.session.query(
+            DocumentChunk.chunk_text,
+            DocumentChunk.file_name,
+            DocumentChunk.doc_type,
+            DocumentChunk.assignment_number,
+            DocumentChunk.instructional_unit_number,
+            DocumentChunk.instructional_unit_label,
+        ).filter(
+            DocumentChunk.ta_id == ta_id,
+            db.or_(*[DocumentChunk.chunk_context.like(p) for p in context_patterns])
+        )
+
+        # Apply same doc_type/unit filters if present to narrow to the right document
+        if has_filters:
+            if query_analysis["doc_type_filter"]:
+                structural_query = structural_query.filter(DocumentChunk.doc_type == query_analysis["doc_type_filter"])
+            if query_analysis.get("unit_filter"):
+                structural_query = structural_query.filter(DocumentChunk.instructional_unit_number == query_analysis["unit_filter"])
+
+        structural_results = structural_query.all()
+
+        if structural_results:
+            logger.info(f"[{ta_id}] Structural injection: found {len(structural_results)} chunks for {structural_ref['type']} {num}")
+            # Collect existing chunk texts for deduplication
+            existing_texts = {c["text"] for c in initial_chunks}
+
+            injected_count = 0
+            for row in structural_results:
+                if row.chunk_text not in existing_texts:
+                    initial_chunks.insert(0, {
+                        "text": row.chunk_text,
+                        "score": 10.0,  # High score to survive reranking
+                        "file_name": row.file_name or "unknown",
+                        "doc_type": row.doc_type or "other",
+                        "metadata": {
+                            "assignment_number": row.assignment_number,
+                            "instructional_unit_number": row.instructional_unit_number,
+                            "instructional_unit_label": row.instructional_unit_label
+                        }
+                    })
+                    existing_texts.add(row.chunk_text)
+                    injected_count += 1
+            if injected_count:
+                logger.info(f"[{ta_id}] Injected {injected_count} structural chunks (deduplicated from {len(structural_results)})")
+
     pre_rerank_candidates = []
     for i, chunk in enumerate(initial_chunks):
         text_preview = chunk["text"][:200].replace("\n", " ").replace("\t", " ").strip()
@@ -1430,7 +1496,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
             "text": text_preview
         })
     diagnostics["pre_rerank_candidates"] = pre_rerank_candidates
-    
+
     chunks, rerank_info = llm_rerank(query, initial_chunks, top_k=final_k)
     diagnostics["rerank_applied"] = rerank_info.get("reranked", False)
     diagnostics["rerank_info"] = rerank_info
