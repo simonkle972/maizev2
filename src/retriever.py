@@ -1072,6 +1072,12 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         except Exception as e:
             logger.warning(f"[{ta_id}] Failed to load session context: {e}")
     
+    # QUERY ANALYSIS: Extract structured filters (doc_type, unit, assignment, filename, etc.)
+    # Moved early so topic switch detection can compare structured fields against cache metadata.
+    # IMPORTANT: Use ORIGINAL query (not enriched) to preserve filename matching and filters.
+    query_analysis = analyze_query(query, ta_id)
+    diagnostics["is_conceptual"] = query_analysis.get("is_conceptual", False)
+
     # FOLLOW-UP DETECTION AND QUERY ENRICHMENT
     # Detect if this is a follow-up query that needs context from conversation history
     followup_info = detect_followup_query(query, conversation_history)
@@ -1128,48 +1134,58 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
     # This is NOT gated on regex follow-up detection - the LLM naturally understands
     # conversational context (answer submissions, clarifications, etc.) without rigid patterns.
     if session_context and session_context.get("document_content") and conversation_history:
-        # Check if user is asking about something new (topic switch detection)
-        # Look for explicit new problem/document references that differ from cached context
-        query_lower = query.lower()
-        cached_problem = session_context.get("problem_reference", "").lower() if session_context.get("problem_reference") else ""
-        
-        # Extract problem numbers for comparison (normalize "Q8", "question 8", "problem 8" all to "8")
-        def extract_problem_number(text):
-            """Extract just the problem number from various formats."""
-            if not text:
-                return None
-            # Match patterns like "q8", "question 8", "problem 8", "8", "q8a", "8a"
-            match = re.search(r'(?:q|question|problem|exercise|section)?\s*(\d+)([a-z])?', text.lower())
-            if match:
-                return match.group(1) + (match.group(2) or "")  # e.g., "8" or "8a"
-            return None
-        
-        # Detect topic switch: user mentions a DIFFERENT problem/document than what's cached
-        problem_match = re.search(r'(problem|question|exercise|section|q)\s*(\d+[a-z]?)', query_lower)
-        doc_match = re.search(r'(problem\s*set|pset|homework|hw|exam|midterm|final|lecture|unit|week)\s*(\d+)?', query_lower)
-        
+        # STRUCTURED TOPIC SWITCH DETECTION
+        # Compare the structured query analysis (doc_type, unit, assignment, filename, problem ref,
+        # structural ref) against the cache metadata. This replaces fragile regex-on-raw-query
+        # matching with field-level comparisons of already-parsed data.
         is_topic_switch = False
-        
-        # Topic switch detection: only switch if the student explicitly references a DIFFERENT
-        # problem number or document. Short conversational messages (answers, clarifications)
-        # should NOT trigger a switch.
-        if problem_match:
-            new_problem_num = extract_problem_number(problem_match.group(0))
-            cached_problem_num = extract_problem_number(cached_problem)
-            
-            if new_problem_num and cached_problem_num and new_problem_num != cached_problem_num:
+        cached_doc_type = (session_context.get("doc_type") or "").lower()
+        cached_filename = (session_context.get("document_filename") or "").lower()
+        cached_problem = (session_context.get("problem_reference") or "").lower()
+
+        query_doc_type = (query_analysis.get("doc_type_filter") or "").lower()
+        query_filename = (query_analysis.get("filename_filter") or "").lower()
+        query_problem = query_analysis.get("problem_reference", {})
+        query_structural = query_analysis.get("structural_reference")
+
+        # 1. Doc type switch (e.g., lecture → homework, exam → lecture)
+        if query_doc_type and cached_doc_type and query_doc_type != cached_doc_type:
+            is_topic_switch = True
+            logger.info(f"[{ta_id}] Topic switch: doc_type '{cached_doc_type}' -> '{query_doc_type}'")
+
+        # 2. Filename switch (query targets a different document by name)
+        if not is_topic_switch and query_filename and cached_filename:
+            if query_filename != cached_filename:
                 is_topic_switch = True
-                logger.info(f"[{ta_id}] Topic switch: cached problem='{cached_problem_num}', new='{new_problem_num}'")
-        
-        if not is_topic_switch and doc_match:
-            cached_doc = session_context.get("document_filename", "").lower()
-            new_doc_num = doc_match.group(2) if doc_match.group(2) else ""
-            cached_doc_num_match = re.search(r'(\d+)', cached_doc)
-            cached_doc_num = cached_doc_num_match.group(1) if cached_doc_num_match else ""
-            
-            if new_doc_num and cached_doc_num and new_doc_num != cached_doc_num:
+                logger.info(f"[{ta_id}] Topic switch: filename '{cached_filename}' -> '{query_filename}'")
+
+        # 3. Problem reference when cache has none (e.g., cache from slide/lecture context)
+        if not is_topic_switch and query_problem and query_problem.get("problem_number") and not cached_problem:
+            is_topic_switch = True
+            logger.info(f"[{ta_id}] Topic switch: query has problem ref '{query_problem.get('full_ref')}' but cache has none")
+
+        # 4. Different problem number within same doc type
+        if not is_topic_switch and query_problem and query_problem.get("problem_number") and cached_problem:
+            cached_num = re.search(r'(\d+)', cached_problem)
+            if cached_num and query_problem["problem_number"] != cached_num.group(1):
                 is_topic_switch = True
-                logger.info(f"[{ta_id}] Topic switch: cached doc='{cached_doc_num}', new='{new_doc_num}'")
+                logger.info(f"[{ta_id}] Topic switch: problem '{cached_problem}' -> '{query_problem.get('full_ref')}'")
+
+        # 5. Structural ref (slide/page) when cache is from a non-lecture context
+        if not is_topic_switch and query_structural:
+            if cached_doc_type and cached_doc_type not in ("lecture", "other", ""):
+                is_topic_switch = True
+                logger.info(f"[{ta_id}] Topic switch: structural ref but cache is doc_type='{cached_doc_type}'")
+
+        # 6. Unit/assignment number switch within same doc type
+        if not is_topic_switch:
+            query_unit = query_analysis.get("unit_filter")
+            query_assignment = query_analysis.get("assignment_filter")
+            if query_doc_type == "lecture" and query_unit and cached_doc_type == "lecture":
+                cached_unit_match = re.search(r'(\d+)', cached_filename) if cached_filename else None
+                if cached_unit_match and str(query_unit) != cached_unit_match.group(1):
+                    is_topic_switch = True
+                    logger.info(f"[{ta_id}] Topic switch: lecture unit change")
         
         if not is_topic_switch:
             # Use cached context - no need to re-search
@@ -1256,11 +1272,6 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         input=effective_query
     )
     query_embedding = response.data[0].embedding
-    
-    # IMPORTANT: Use ORIGINAL query for analyze_query to preserve filename matching and filters
-    # Enriched query is only for semantic search (embeddings), not for filter extraction
-    query_analysis = analyze_query(query, ta_id)
-    diagnostics["is_conceptual"] = query_analysis.get("is_conceptual", False)
     
     # EARLY HYBRID ROUTING: For specific problem references (e.g., "section 1 question a"),
     # skip the unreliable LLM reranker and go directly to full-document mode.
