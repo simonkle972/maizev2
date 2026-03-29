@@ -20,6 +20,14 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET") or secrets.token_hex(32)
 
+# Session cookie security
+app.config['SESSION_COOKIE_SECURE'] = True       # HTTPS only (cookies not sent over HTTP)
+app.config['SESSION_COOKIE_HTTPONLY'] = True      # Prevent JavaScript access to session cookie
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'    # CSRF protection via SameSite policy
+
+# Upload size limit (50MB) — defense-in-depth alongside nginx client_max_body_size
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
+
 app.config["SQLALCHEMY_DATABASE_URI"] = Config.DATABASE_URL
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_recycle": 600,
@@ -1459,4 +1467,4 @@ with app.app_context():
     stale_checker.start()
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=os.environ.get('FLASK_DEBUG', '').lower() == 'true')

@@ -19,11 +19,11 @@ class Config:
     USE_STRIPE_TEST_MODE = os.getenv('USE_STRIPE_TEST_MODE', 'True') == 'True'
 
     if USE_STRIPE_TEST_MODE:
-        STRIPE_PUBLIC_KEY = 'pk_test_51T0pFGI30M44KtHd01UT5URk0LXNYLzsjihP7oSybDXFI6tfZgfcijjUuB5NKMb1rN7s3iwL7pBD8xarxvMurNKB00sVvsTyC5'
+        STRIPE_PUBLIC_KEY = os.getenv('STRIPE_PUBLIC_KEY_TEST', '')
         STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY_TEST')
         STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET_TEST', '')
     else:
-        STRIPE_PUBLIC_KEY = 'pk_live_51T0pF5IM4QLaEDfyu2Qb5K6V2VRT5ocyPRNw4DMliQxPLBLKUuW1WD9wfboVuWw613072q2IewQ5CMAPHt42sdTk00gRCiaAM7'
+        STRIPE_PUBLIC_KEY = os.getenv('STRIPE_PUBLIC_KEY_LIVE', '')
         STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY_LIVE')
         STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET_LIVE', '')
 
@@ -52,7 +52,7 @@ class Config:
     # Email validation settings
     REQUIRE_EDU_EMAIL = True
     
-    ADMIN_SECRET_KEY = os.getenv("ADMIN_SECRET_KEY", "maize-admin-2024")
+    ADMIN_SECRET_KEY = os.getenv("ADMIN_SECRET_KEY")  # Required — no default
     ADMIN_USERNAME = os.getenv("admin_id", "")
     ADMIN_PASSWORD = os.getenv("admin_pw", "")
     
@@ -94,4 +94,4 @@ class Config:
     AUTH0_M2M_CLIENT_ID = os.getenv('AUTH0_M2M_CLIENT_ID')
     AUTH0_M2M_CLIENT_SECRET = os.getenv('AUTH0_M2M_CLIENT_SECRET')
     # Canonical Auth0 domain for Management API (custom domains don't support client_credentials)
-    AUTH0_CANONICAL_DOMAIN = os.getenv('AUTH0_CANONICAL_DOMAIN', 'dev-f6vdicbjf42atxau.us.auth0.com')
+    AUTH0_CANONICAL_DOMAIN = os.getenv('AUTH0_CANONICAL_DOMAIN', '')

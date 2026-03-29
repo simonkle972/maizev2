@@ -10,6 +10,7 @@ import secrets
 
 from models import db, User, Institution, Enrollment, EnrollmentLink, PasswordResetToken, TeachingAssistant
 from auth_student import current_student, login_student, logout_student
+from extensions import limiter
 from utils.validators import (
     validate_edu_email,
     validate_professor_email,
@@ -141,7 +142,7 @@ def professor_signup():
         # Send welcome email (optional, don't block on failure)
         try:
             send_welcome_email(email, f"{first_name} {last_name}", 'professor')
-        except:
+        except Exception:
             pass
 
         # Auto-login the new professor
@@ -290,7 +291,7 @@ def student_signup(token):
         # Send welcome email (optional)
         try:
             send_welcome_email(email, f"{first_name} {last_name}", 'student')
-        except:
+        except Exception:
             pass
 
         # Log in the newly created student (parallel session - does not affect professor sessions)
@@ -401,9 +402,10 @@ def logout():
     logout_user()
     flash('You have been logged out.', 'success')
 
-    # Check for next URL parameter
+    # Check for next URL parameter (validate it's a relative path to prevent open redirect)
+    from urllib.parse import urlparse
     next_url = request.args.get('next')
-    if next_url:
+    if next_url and urlparse(next_url).netloc == '':
         return redirect(next_url)
 
     return redirect(url_for('landing'))
@@ -421,6 +423,7 @@ def student_logout():
 
 
 @auth_bp.route('/student/login', methods=['GET', 'POST'])
+@limiter.limit("10 per minute")
 def student_login():
     """
     Student-only login page.
@@ -489,7 +492,7 @@ def student_login():
                         db.session.commit()
                         flash('Welcome back! Successfully enrolled in the course.', 'success')
                         return redirect(url_for('student.dashboard'))
-                    except:
+                    except Exception:
                         db.session.rollback()
 
         flash('Welcome back!', 'success')
@@ -500,6 +503,7 @@ def student_login():
 
 
 @auth_bp.route('/professor/login', methods=['GET', 'POST'])
+@limiter.limit("10 per minute")
 def professor_login():
     """
     Professor-only login page.
@@ -545,6 +549,7 @@ def professor_login():
 
 
 @auth_bp.route('/admin/login', methods=['GET', 'POST'])
+@limiter.limit("5 per minute")
 def admin_login():
     """
     Admin-only login page.

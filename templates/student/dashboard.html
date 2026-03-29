@@ -14,6 +14,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
     <style>
         body {
             margin: 0;
@@ -683,7 +684,15 @@
                             content = content.replace(`%%%MATH_INLINE_${i}%%%`, mathPlaceholders[i]);
                         }
 
-                        return `<p>${content}</p>`;
+                        // Sanitize HTML to prevent XSS from LLM prompt injection
+                        content = `<p>${content}</p>`;
+                        if (typeof DOMPurify !== 'undefined') {
+                            content = DOMPurify.sanitize(content, {
+                                ALLOWED_TAGS: ['p', 'br', 'strong', 'b', 'em', 'i', 'code', 'pre', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'a', 'span', 'div', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'hr', 'sup', 'sub'],
+                                ALLOWED_ATTR: ['href', 'target', 'rel', 'class']
+                            });
+                        }
+                        return content;
                     }
 
                     function renderLatex(element) {
