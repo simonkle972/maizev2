@@ -114,6 +114,11 @@
                                         <a href="{{ url_for('professor.manage_ta', ta_id=ta.id) }}" class="btn btn-secondary" style="font-size: 12px; padding: 5px 10px; margin-left: 4px;">Manage</a>
                                     {% else %}
                                         <a href="{{ url_for('professor.manage_ta', ta_id=ta.id) }}" class="btn btn-secondary" style="font-size: 12px; padding: 5px 10px;">Manage</a>
+                                        {% if ta.billing_tier in ('tier2', 'tier3') or not ta.requires_billing or current_user.role == 'admin' %}
+                                        <a href="{{ url_for('professor.ta_analytics', ta_id=ta.id) }}" class="btn btn-secondary" style="font-size: 12px; padding: 5px 10px; margin-left: 4px;">Analytics</a>
+                                        {% else %}
+                                        <a href="{{ url_for('professor.ta_analytics', ta_id=ta.id) }}" class="btn btn-secondary" style="font-size: 12px; padding: 5px 10px; margin-left: 4px; opacity: 0.6;">Analytics</a>
+                                        {% endif %}
                                     {% endif %}
                                 </td>
                             </tr>

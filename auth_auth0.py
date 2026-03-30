@@ -286,6 +286,57 @@ def resend_verification():
     return redirect(request.referrer or url_for('professor.dashboard'))
 
 
+def get_auth0_mgmt_token():
+    """Get an Auth0 Management API token using M2M credentials."""
+    import requests as req
+    from config import Config
+
+    canonical = Config.AUTH0_CANONICAL_DOMAIN
+    token_resp = req.post(f'https://{canonical}/oauth/token', json={
+        'client_id': Config.AUTH0_M2M_CLIENT_ID,
+        'client_secret': Config.AUTH0_M2M_CLIENT_SECRET,
+        'audience': f'https://{canonical}/api/v2/',
+        'grant_type': 'client_credentials'
+    }, timeout=10)
+
+    if not token_resp.ok:
+        raise Exception(f"Failed to get M2M token: {token_resp.status_code} {token_resp.text}")
+
+    return token_resp.json()['access_token']
+
+
+def delete_auth0_user(auth0_sub):
+    """Delete a user from Auth0 via the Management API.
+
+    Returns True on success, raises on failure.
+    """
+    import requests as req
+    import logging
+    from config import Config
+
+    logger = logging.getLogger(__name__)
+
+    if not auth0_sub:
+        logger.warning("No auth0_sub provided, skipping Auth0 deletion")
+        return True
+
+    mgmt_token = get_auth0_mgmt_token()
+    canonical = Config.AUTH0_CANONICAL_DOMAIN
+
+    resp = req.delete(
+        f'https://{canonical}/api/v2/users/{auth0_sub}',
+        headers={'Authorization': f'Bearer {mgmt_token}'},
+        timeout=10
+    )
+
+    if resp.status_code == 204 or resp.status_code == 404:
+        logger.info(f"Auth0 user {auth0_sub} deleted (status={resp.status_code})")
+        return True
+    else:
+        logger.error(f"Failed to delete Auth0 user {auth0_sub}: {resp.status_code} {resp.text}")
+        raise Exception(f"Auth0 deletion failed: {resp.status_code}")
+
+
 @auth0_bp.route('/logout')
 def logout():
     """Log out from Auth0 and clear session."""

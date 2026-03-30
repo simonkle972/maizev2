@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/images/favicon-32.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/images/apple-touch-icon.png">
+    <title>Analytics — {{ ta.name }} - Maize TA</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=13">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+    <style>
+        .analytics-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .analytics-header h1 {
+            font-size: 1.5rem;
+            margin: 0;
+            color: #2b1f1a;
+        }
+        .analytics-header h1 span {
+            font-weight: 400;
+            color: #8b7355;
+            font-size: 1.1rem;
+        }
+        .back-link {
+            font-size: 0.85rem;
+            color: #8b7355;
+            text-decoration: none;
+            margin-bottom: 0.25rem;
+            display: inline-block;
+        }
+        .back-link:hover { color: #2b1f1a; }
+
+        /* Date range selector */
+        .range-selector {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        .range-btn {
+            padding: 0.375rem 0.875rem;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 0.375rem;
+            background: white;
+            color: #4a3328;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.15s;
+        }
+        .range-btn:hover { border-color: #c4a882; background: #faf5f0; }
+        .range-btn.active { background: #2b1f1a; color: white; border-color: #2b1f1a; }
+        .custom-range {
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+        }
+        .custom-range input[type="date"] {
+            padding: 0.3rem 0.5rem;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 0.375rem;
+            font-size: 0.8125rem;
+            color: #4a3328;
+        }
+        .custom-range button {
+            padding: 0.375rem 0.75rem;
+            background: #2b1f1a;
+            color: white;
+            border: none;
+            border-radius: 0.375rem;
+            font-size: 0.8125rem;
+            cursor: pointer;
+        }
+
+        /* Stat cards */
+        .stat-cards {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        .stat-card {
+            background: white;
+            border: 1.5px solid #e8e0d8;
+            border-radius: 0.75rem;
+            padding: 1.25rem;
+        }
+        .stat-card .stat-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #8b7355;
+            margin-bottom: 0.375rem;
+        }
+        .stat-card .stat-value {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #2b1f1a;
+            line-height: 1.2;
+        }
+        .stat-card .stat-detail {
+            font-size: 0.8rem;
+            color: #8b7355;
+            margin-top: 0.25rem;
+        }
+
+        /* Chart container */
+        .chart-container {
+            background: white;
+            border: 1.5px solid #e8e0d8;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .chart-container h3 {
+            font-size: 1rem;
+            color: #2b1f1a;
+            margin: 0 0 1rem 0;
+        }
+
+        /* Sections */
+        .analytics-section {
+            background: white;
+            border: 1.5px solid #e8e0d8;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .analytics-section h3 {
+            font-size: 1rem;
+            color: #2b1f1a;
+            margin: 0 0 1rem 0;
+        }
+
+        /* Topics */
+        .topic-bar {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+        .topic-label {
+            min-width: 200px;
+            font-size: 0.875rem;
+            color: #2b1f1a;
+            font-weight: 500;
+        }
+        .topic-bar-bg {
+            flex: 1;
+            height: 24px;
+            background: #f5f0eb;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .topic-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #c4a882, #8b7355);
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+        .topic-count {
+            min-width: 80px;
+            text-align: right;
+            font-size: 0.8125rem;
+            color: #8b7355;
+        }
+        .topic-loading {
+            text-align: center;
+            padding: 2rem;
+            color: #8b7355;
+        }
+
+        /* Challenges table */
+        .challenges-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .challenges-table th {
+            text-align: left;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #8b7355;
+            padding: 0.5rem 0.75rem;
+            border-bottom: 2px solid #e8e0d8;
+        }
+        .challenges-table td {
+            padding: 0.625rem 0.75rem;
+            font-size: 0.875rem;
+            color: #2b1f1a;
+            border-bottom: 1px solid #f0ebe5;
+        }
+        .challenges-table tr:hover td {
+            background: #faf5f0;
+        }
+
+        /* Anonymization notice */
+        .anon-notice {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+            color: #8b7355;
+            background: #f5f0eb;
+            padding: 0.625rem 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        /* Tier gate */
+        .tier-gate {
+            text-align: center;
+            padding: 4rem 2rem;
+        }
+        .tier-gate h2 {
+            font-size: 1.5rem;
+            color: #2b1f1a;
+            margin-bottom: 0.75rem;
+        }
+        .tier-gate p {
+            color: #8b7355;
+            max-width: 480px;
+            margin: 0 auto 1.5rem;
+            line-height: 1.6;
+        }
+
+        @media (max-width: 768px) {
+            .stat-cards { grid-template-columns: repeat(2, 1fr); }
+            .topic-label { min-width: 120px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <header class="admin-header">
+            <a href="{{ url_for('professor.dashboard') }}" class="header-brand">
+                <img src="/static/images/maize-logo.png" alt="Maize TA" width="32" height="32">
+                <span class="header-brand-name">Maize TA</span>
+            </a>
+            <nav class="header-nav">
+                <span class="header-nav-user">{{ current_user.first_name }}</span>
+                <div class="nav-divider"></div>
+                <a href="{{ url_for('professor.dashboard') }}">Dashboard</a>
+                <a href="{{ url_for('professor.profile') }}">Profile</a>
+                <a href="{{ url_for('professor.settings') }}">Billing</a>
+                <a href="{{ url_for('professor.support') }}">Support</a>
+                <div class="nav-divider"></div>
+                <a href="{{ url_for('auth0.logout') }}">Logout</a>
+            </nav>
+        </header>
+
+        <main class="admin-main">
+            <a href="{{ url_for('professor.manage_ta', ta_id=ta.id) }}" class="back-link">&larr; Back to {{ ta.name }}</a>
+
+            {% if tier_gated %}
+            <!-- Tier gate: upgrade prompt -->
+            <div class="tier-gate">
+                <h2>Analytics</h2>
+                <p>Analytics is available on the <strong>Medium</strong> plan and above. Upgrade to see how your students are using {{ ta.name }}, which topics they struggle with, and when they study most.</p>
+                <a href="{{ url_for('professor.change_ta_tier', ta_id=ta.id) }}" class="btn btn-primary">Upgrade plan</a>
+            </div>
+
+            {% else %}
+            <!-- Analytics dashboard -->
+            <div class="analytics-header">
+                <div>
+                    <h1>{{ ta.name }} <span>— Analytics</span></h1>
+                </div>
+                <div class="range-selector">
+                    <a href="?range=7d" class="range-btn {{ 'active' if current_range == '7d' }}">7 days</a>
+                    <a href="?range=30d" class="range-btn {{ 'active' if current_range == '30d' }}">30 days</a>
+                    <a href="?range=90d" class="range-btn {{ 'active' if current_range == '90d' }}">90 days</a>
+                    <a href="?range=all" class="range-btn {{ 'active' if current_range == 'all' }}">All time</a>
+                    <div class="custom-range">
+                        <input type="date" id="custom-start" value="{{ custom_start }}">
+                        <span style="color:#8b7355;">to</span>
+                        <input type="date" id="custom-end" value="{{ custom_end }}">
+                        <button onclick="applyCustomRange()">Apply</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="anon-notice">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                All data is anonymized. Individual students cannot be identified.
+            </div>
+
+            <!-- Summary Stats -->
+            <div class="stat-cards">
+                <div class="stat-card">
+                    <div class="stat-label">Total Interactions</div>
+                    <div class="stat-value">{{ stats.total_interactions | default(0) }}</div>
+                    <div class="stat-detail">Lifetime</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">This Period</div>
+                    <div class="stat-value">{{ stats.period_interactions | default(0) }}</div>
+                    <div class="stat-detail">{{ stats.unique_sessions | default(0) }} sessions</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Peak Day</div>
+                    <div class="stat-value" style="font-size: 1.1rem;">{{ stats.peak_day or 'N/A' }}</div>
+                    <div class="stat-detail">{{ stats.peak_day_count | default(0) }} queries</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Peak Hour</div>
+                    <div class="stat-value" style="font-size: 1.1rem;">{{ stats.peak_hour or 'N/A' }}</div>
+                    <div class="stat-detail">Most active time</div>
+                </div>
+            </div>
+
+            <!-- Usage Over Time Chart -->
+            <div class="chart-container">
+                <h3>Usage Over Time</h3>
+                <canvas id="usageChart" height="80"></canvas>
+            </div>
+
+            <!-- Top Topics (loaded async) -->
+            <div class="analytics-section" id="topics-section">
+                <h3>Top Topics</h3>
+                <div id="topics-content" class="topic-loading">
+                    <div style="display:inline-block;width:20px;height:20px;border:2px solid #e8e0d8;border-top-color:#8b7355;border-radius:50%;animation:spin 0.8s linear infinite;margin-right:0.5rem;vertical-align:middle;"></div>
+                    Analyzing topic patterns...
+                </div>
+            </div>
+
+            <!-- Top Challenges -->
+            {% if challenges %}
+            <div class="analytics-section">
+                <h3>Top Challenges</h3>
+                <table class="challenges-table">
+                    <thead>
+                        <tr>
+                            <th>Document</th>
+                            <th>Problem</th>
+                            <th>Queries</th>
+                            <th>% of Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in challenges %}
+                        <tr>
+                            <td>{{ c.document }}</td>
+                            <td>{{ c.problem }}</td>
+                            <td>{{ c.count }}</td>
+                            <td>{{ c.percentage }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+            {% endif %}
+        </main>
+    </div>
+
+    {% if not tier_gated %}
+    <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+    <script>
+    // Usage over time chart
+    const usageData = {{ usage_data_json | safe }};
+
+    if (usageData.length > 0) {
+        new Chart(document.getElementById('usageChart'), {
+            type: 'line',
+            data: {
+                labels: usageData.map(d => d.date),
+                datasets: [{
+                    label: 'Student Queries',
+                    data: usageData.map(d => d.count),
+                    borderColor: '#8b7355',
+                    backgroundColor: 'rgba(139, 115, 85, 0.1)',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 3,
+                    pointHoverRadius: 6,
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            title: (items) => items[0].label,
+                            label: (item) => `${item.raw} queries`
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { maxTicksLimit: 12, font: { size: 11 } }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: { precision: 0, font: { size: 11 } },
+                        grid: { color: '#f0ebe5' }
+                    }
+                }
+            }
+        });
+    } else {
+        document.getElementById('usageChart').parentElement.innerHTML += '<p style="text-align:center;color:#8b7355;padding:2rem 0;">No usage data for this period.</p>';
+    }
+
+    // Load topics async
+    const rangeParams = new URLSearchParams(window.location.search).toString();
+    fetch(`{{ url_for('professor.ta_analytics_topics', ta_id=ta.id) }}?${rangeParams}`)
+        .then(r => r.json())
+        .then(data => {
+            const container = document.getElementById('topics-content');
+            if (!data.topics || data.topics.length === 0) {
+                container.innerHTML = '<p style="color:#8b7355;">Not enough data to identify topic patterns yet.</p>';
+                return;
+            }
+            const maxCount = Math.max(...data.topics.map(t => t.count));
+            container.innerHTML = data.topics.map(t => `
+                <div class="topic-bar">
+                    <div class="topic-label">${t.label}</div>
+                    <div class="topic-bar-bg">
+                        <div class="topic-bar-fill" style="width: ${(t.count / maxCount * 100)}%"></div>
+                    </div>
+                    <div class="topic-count">${t.count} (${t.percentage}%)</div>
+                </div>
+            `).join('');
+        })
+        .catch(() => {
+            document.getElementById('topics-content').innerHTML = '<p style="color:#dc2626;">Failed to load topic analysis. Please try again.</p>';
+        });
+
+    // Custom date range
+    function applyCustomRange() {
+        const start = document.getElementById('custom-start').value;
+        const end = document.getElementById('custom-end').value;
+        if (start && end) {
+            window.location.href = `?range=custom&start=${start}&end=${end}`;
+        }
+    }
+    </script>
+    {% endif %}
+</body>
+</html>

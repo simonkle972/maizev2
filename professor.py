@@ -6,7 +6,7 @@ Handles TA creation, management, document uploads, and billing.
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, session
 from flask_login import login_required, current_user
 from functools import wraps
-from datetime import datetime
+from datetime import datetime, timedelta
 import secrets
 import os
 import threading
@@ -345,6 +345,116 @@ def change_ta_tier(ta_id):
                          enrollment_count=enrollment_count)
 
 
+@professor_bp.route('/ta/<ta_id>/analytics')
+@professor_required
+def ta_analytics(ta_id):
+    """Professor analytics dashboard for a specific TA."""
+    from src.analytics import get_usage_stats, get_usage_over_time, get_top_challenges
+    import json as json_mod
+
+    ta = TeachingAssistant.query.get_or_404(ta_id)
+
+    # Access control: professor must own this TA (or be admin)
+    is_admin = current_user.role == 'admin'
+    if not is_admin and ta.professor_id != current_user.id:
+        flash('You do not have access to this TA.', 'error')
+        return redirect(url_for('professor.dashboard'))
+
+    # Tier gating: tier2+ or admin
+    has_access = is_admin or ta.billing_tier in ('tier2', 'tier3') or not ta.requires_billing
+    if not has_access:
+        return render_template('professor/analytics.html', ta=ta, tier_gated=True,
+                               billing_tiers=Config.BILLING_TIERS)
+
+    # Parse date range
+    range_param = request.args.get('range', '30d')
+    custom_start = request.args.get('start')
+    custom_end = request.args.get('end')
+
+    now = datetime.utcnow()
+    if range_param == 'custom' and custom_start and custom_end:
+        try:
+            start_date = datetime.strptime(custom_start, '%Y-%m-%d')
+            end_date = datetime.strptime(custom_end, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+        except ValueError:
+            start_date = now - timedelta(days=30)
+            end_date = now
+    elif range_param == '7d':
+        start_date = now - timedelta(days=7)
+        end_date = now
+    elif range_param == '90d':
+        start_date = now - timedelta(days=90)
+        end_date = now
+    elif range_param == 'all':
+        start_date = None
+        end_date = None
+    else:  # Default 30d
+        start_date = now - timedelta(days=30)
+        end_date = now
+
+    stats = get_usage_stats(ta_id, start_date, end_date)
+    usage_data = get_usage_over_time(ta_id, start_date, end_date)
+    challenges = get_top_challenges(ta_id, start_date, end_date)
+
+    return render_template('professor/analytics.html',
+                           ta=ta,
+                           tier_gated=False,
+                           stats=stats,
+                           usage_data_json=json_mod.dumps(usage_data),
+                           challenges=challenges,
+                           current_range=range_param,
+                           custom_start=custom_start or '',
+                           custom_end=custom_end or '',
+                           billing_tiers=Config.BILLING_TIERS)
+
+
+@professor_bp.route('/ta/<ta_id>/analytics/topics')
+@professor_required
+def ta_analytics_topics(ta_id):
+    """Async endpoint for topic clustering (may take 5-10s on first call)."""
+    from src.analytics import cluster_topics
+
+    ta = TeachingAssistant.query.get_or_404(ta_id)
+
+    # Access control
+    is_admin = current_user.role == 'admin'
+    if not is_admin and ta.professor_id != current_user.id:
+        return jsonify({"error": "Access denied"}), 403
+
+    has_access = is_admin or ta.billing_tier in ('tier2', 'tier3') or not ta.requires_billing
+    if not has_access:
+        return jsonify({"error": "Upgrade required"}), 403
+
+    # Parse date range (same logic as main route)
+    range_param = request.args.get('range', '30d')
+    custom_start = request.args.get('start')
+    custom_end = request.args.get('end')
+
+    now = datetime.utcnow()
+    if range_param == 'custom' and custom_start and custom_end:
+        try:
+            start_date = datetime.strptime(custom_start, '%Y-%m-%d')
+            end_date = datetime.strptime(custom_end, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+        except ValueError:
+            start_date = now - timedelta(days=30)
+            end_date = now
+    elif range_param == '7d':
+        start_date = now - timedelta(days=7)
+        end_date = now
+    elif range_param == '90d':
+        start_date = now - timedelta(days=90)
+        end_date = now
+    elif range_param == 'all':
+        start_date = None
+        end_date = None
+    else:
+        start_date = now - timedelta(days=30)
+        end_date = now
+
+    topics = cluster_topics(ta_id, start_date, end_date)
+    return jsonify({"topics": topics})
+
+
 @professor_bp.route('/ta/<ta_id>/test-chat/stream', methods=['POST'])
 @limiter.limit("20 per day")
 @professor_required
@@ -670,6 +780,111 @@ def profile():
             return redirect(url_for('professor.profile'))
 
     return render_template('professor/profile.html')
+
+
+@professor_bp.route('/profile/delete', methods=['POST'])
+@professor_required
+def delete_account():
+    """
+    Permanently delete the professor's account and all associated data.
+    Requires email confirmation to prevent accidental deletion.
+    """
+    import shutil
+    import logging
+    from models import ChatSession, PasswordResetToken
+    from auth_auth0 import delete_auth0_user
+    from utils.stripe_helpers import cancel_ta_subscription, delete_stripe_customer
+
+    logger = logging.getLogger(__name__)
+    user = current_user
+
+    # Verify email confirmation matches
+    confirm_email = request.form.get('confirm_email', '').strip().lower()
+    if confirm_email != user.email.lower():
+        flash('Email confirmation did not match. Account was not deleted.', 'error')
+        return redirect(url_for('professor.profile'))
+
+    try:
+        logger.info(f"Beginning account deletion for professor {user.id} ({user.email})")
+
+        # 1. Delete all TAs owned by this professor (full cascade per TA)
+        owned_tas = TeachingAssistant.query.filter_by(professor_id=user.id).all()
+        for ta in owned_tas:
+            logger.info(f"Deleting TA {ta.id} ({ta.name}) as part of account deletion")
+
+            # Cancel Stripe subscription
+            if ta.stripe_subscription_id:
+                success, error = cancel_ta_subscription(ta)
+                if not success:
+                    logger.warning(f"Failed to cancel Stripe sub for TA {ta.id}: {error}")
+
+            # Delete ChromaDB directory
+            chroma_path = os.path.join(Config.CHROMA_DB_PATH, ta.id)
+            if os.path.exists(chroma_path):
+                try:
+                    shutil.rmtree(chroma_path)
+                except Exception as e:
+                    logger.warning(f"Could not delete ChromaDB for {ta.id}: {e}")
+
+            # Delete document files from disk
+            docs_path = f"data/courses/{ta.id}/docs"
+            if os.path.exists(docs_path):
+                try:
+                    shutil.rmtree(docs_path)
+                except Exception as e:
+                    logger.warning(f"Could not delete document files for {ta.id}: {e}")
+
+            # Manual cleanup of non-cascading relationships
+            DocumentChunk.query.filter_by(ta_id=ta.id).delete()
+            Enrollment.query.filter_by(ta_id=ta.id).delete()
+            EnrollmentLink.query.filter_by(ta_id=ta.id).delete()
+            IndexingJob.query.filter_by(ta_id=ta.id).delete()
+
+            # Delete the TA (cascades Documents, ChatSessions, ChatMessages)
+            db.session.delete(ta)
+
+        # 2. Delete any enrollment links created by this user (for TAs they no longer own)
+        EnrollmentLink.query.filter_by(created_by=user.id).delete()
+
+        # 3. Delete password reset tokens
+        PasswordResetToken.query.filter_by(user_id=user.id).delete()
+
+        # 4. Delete Stripe customer (if exists)
+        if hasattr(user, 'stripe_customer_id') and user.stripe_customer_id:
+            success, error = delete_stripe_customer(user.stripe_customer_id)
+            if not success:
+                logger.warning(f"Failed to delete Stripe customer for user {user.id}: {error}")
+
+        # 5. Delete Auth0 user
+        if user.auth0_sub:
+            try:
+                delete_auth0_user(user.auth0_sub)
+            except Exception as e:
+                logger.warning(f"Failed to delete Auth0 user for {user.id}: {e}")
+                # Continue — don't block account deletion if Auth0 fails
+
+        # 6. Delete the user record
+        user_email = user.email
+        db.session.delete(user)
+        db.session.commit()
+
+        logger.info(f"Account deletion complete for {user_email}")
+
+        # 7. Log out and redirect
+        from flask_login import logout_user
+        from auth_student import logout_student
+        logout_user()
+        logout_student()
+        session.clear()
+
+        flash('Your account and all associated data have been permanently deleted.', 'success')
+        return redirect(url_for('landing'))
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error deleting account for user {user.id}: {e}")
+        flash('An error occurred while deleting your account. Please try again or contact support.', 'error')
+        return redirect(url_for('professor.profile'))
 
 
 @professor_bp.route('/support', methods=['GET', 'POST'])

@@ -245,6 +245,24 @@ def cancel_ta_subscription(ta):
         return False, str(e)
 
 
+def delete_stripe_customer(customer_id):
+    """
+    Delete a Stripe customer account entirely.
+    Used when a professor deletes their account.
+
+    Returns:
+        Tuple of (success: bool, error: str or None)
+    """
+    try:
+        if customer_id:
+            stripe.Customer.delete(customer_id)
+        return True, None
+    except stripe.error.StripeError as e:
+        return False, str(e)
+    except Exception as e:
+        return False, str(e)
+
+
 def resume_ta_subscription(ta):
     """
     Resume paused TA and unpause its Stripe subscription.

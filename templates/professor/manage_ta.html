@@ -353,6 +353,13 @@
                 {% if ta.status != 'draft' %}
                 <p><strong>Enrolled:</strong> {{ ta.current_enrollment_count }} / {{ ta.max_students }} students</p>
                 {% endif %}
+                {% if ta.status != 'draft' %}
+                    {% if ta.billing_tier in ('tier2', 'tier3') or not ta.requires_billing or current_user.role == 'admin' %}
+                    <a href="{{ url_for('professor.ta_analytics', ta_id=ta.id) }}" class="btn btn-secondary" style="margin-top: 0.75rem; display: inline-block; font-size: 0.85rem;">View Analytics</a>
+                    {% else %}
+                    <a href="{{ url_for('professor.ta_analytics', ta_id=ta.id) }}" class="btn btn-secondary" style="margin-top: 0.75rem; display: inline-block; font-size: 0.85rem; opacity: 0.6;">View Analytics</a>
+                    {% endif %}
+                {% endif %}
             </div>
 
             {% if ta.status == 'active' and ta.is_indexed and enrollment_url %}
