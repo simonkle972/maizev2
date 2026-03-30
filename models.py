@@ -67,15 +67,14 @@ class User(db.Model):
 
     @property
     def total_monthly_cost(self):
-        """Calculate total monthly billing across all active TAs."""
+        """Calculate total monthly billing across all active (published, non-paused) TAs."""
         if self.role != 'professor':
             return 0.0
         from config import Config
-        tas = TeachingAssistant.query.filter_by(
-            professor_id=self.id,
-            is_active=True,
-            is_paused=False,
-            requires_billing=True
+        tas = TeachingAssistant.query.filter(
+            TeachingAssistant.professor_id == self.id,
+            TeachingAssistant.requires_billing == True,
+            TeachingAssistant.status == 'active',  # Only published, non-paused TAs
         ).all()
         return sum(Config.BILLING_TIERS.get(ta.billing_tier, {}).get('price_monthly', 0) for ta in tas)
 
