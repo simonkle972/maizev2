@@ -82,7 +82,7 @@
         /* Stat cards */
         .stat-cards {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(5, 1fr);
             gap: 1rem;
             margin-bottom: 2rem;
         }
@@ -148,10 +148,14 @@
             margin-bottom: 0.75rem;
         }
         .topic-label {
-            min-width: 200px;
+            width: 200px;
+            flex-shrink: 0;
             font-size: 0.875rem;
             color: #2b1f1a;
             font-weight: 500;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
         .topic-bar-bg {
             flex: 1;
@@ -199,9 +203,40 @@
             color: #2b1f1a;
             border-bottom: 1px solid #f0ebe5;
         }
-        .challenges-table tr:hover td {
-            background: #faf5f0;
+        .challenge-row { cursor: pointer; }
+        .challenge-row:hover td { background: #faf5f0; }
+        .challenge-detail-row td {
+            padding: 0.75rem 1.5rem !important;
+            background: #faf8f5;
+            border-bottom: 1px solid #e8e0d8;
         }
+        .challenge-detail-row:hover td { background: #faf8f5 !important; }
+        .challenge-detail-row ul {
+            margin: 0.5rem 0 0 0;
+            padding: 0 0 0 1.25rem;
+            list-style: disc;
+        }
+        .challenge-detail-row li {
+            font-size: 0.8125rem;
+            color: #4a3328;
+            margin-bottom: 0.375rem;
+            line-height: 1.5;
+        }
+        .challenge-summary {
+            font-size: 0.8125rem;
+            color: #5a4a3a;
+            font-style: italic;
+            line-height: 1.5;
+            margin-bottom: 0.25rem;
+        }
+        .expand-icon {
+            display: inline-block;
+            transition: transform 0.2s;
+            font-size: 0.625rem;
+            margin-right: 0.5rem;
+            color: #8b7355;
+        }
+        .challenge-row.expanded .expand-icon { transform: rotate(90deg); }
 
         /* Anonymization notice */
         .anon-notice {
@@ -233,9 +268,12 @@
             line-height: 1.6;
         }
 
+        @media (max-width: 1024px) {
+            .stat-cards { grid-template-columns: repeat(3, 1fr); }
+        }
         @media (max-width: 768px) {
             .stat-cards { grid-template-columns: repeat(2, 1fr); }
-            .topic-label { min-width: 120px; }
+            .topic-label { width: 120px; flex-shrink: 0; }
         }
     </style>
 </head>
@@ -326,6 +364,19 @@
                     <div class="stat-value" style="font-size: 1.1rem;">{{ stats.peak_hour or 'N/A' }}</div>
                     <div class="stat-detail">Most active time</div>
                 </div>
+                {% if engagement %}
+                <div class="stat-card">
+                    {% if engagement.type == 'enrollment' %}
+                    <div class="stat-label">Engagement Rate</div>
+                    <div class="stat-value">{{ engagement.engagement_rate }}%</div>
+                    <div class="stat-detail">{{ engagement.active_students }} of {{ engagement.total_enrolled }} enrolled</div>
+                    {% else %}
+                    <div class="stat-label">Unique Users</div>
+                    <div class="stat-value">{{ engagement.unique_users }}</div>
+                    <div class="stat-detail">{{ engagement.anon_sessions }} anonymous session{{ 's' if engagement.anon_sessions != 1 }}</div>
+                    {% endif %}
+                </div>
+                {% endif %}
             </div>
 
             <!-- Usage Over Time Chart -->
@@ -358,11 +409,14 @@
                     </thead>
                     <tbody>
                         {% for c in challenges %}
-                        <tr>
-                            <td>{{ c.document }}</td>
+                        <tr class="challenge-row" data-doc="{{ c.document_generic }}" data-prob="{{ c.problem }}">
+                            <td title="{{ c.document_generic }}"><span class="expand-icon">&#9654;</span>{{ c.document }}</td>
                             <td>{{ c.problem }}</td>
                             <td>{{ c.count }}</td>
                             <td>{{ c.percentage }}%</td>
+                        </tr>
+                        <tr class="challenge-detail-row" style="display:none">
+                            <td colspan="4"></td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -456,6 +510,54 @@
             window.location.href = `?range=custom&start=${start}&end=${end}`;
         }
     }
+
+    // HTML escape helper
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Challenge drill-down
+    document.querySelectorAll('.challenge-row').forEach(row => {
+        row.addEventListener('click', function() {
+            const detailRow = this.nextElementSibling;
+            const isExpanded = this.classList.toggle('expanded');
+            detailRow.style.display = isExpanded ? '' : 'none';
+
+            if (isExpanded && !detailRow.dataset.loaded) {
+                const doc = this.dataset.doc;
+                const prob = this.dataset.prob;
+                const params = new URLSearchParams(window.location.search);
+                params.set('doc', doc);
+                params.set('prob', prob);
+
+                const td = detailRow.querySelector('td');
+                td.innerHTML = '<em style="color:#8b7355;">Loading sample queries...</em>';
+
+                fetch(`{{ url_for('professor.ta_challenge_queries', ta_id=ta.id) }}?${params}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        let html = '';
+                        if (data.summary) {
+                            html += `<div class="challenge-summary">${escapeHtml(data.summary)}</div>`;
+                        }
+                        if (data.queries && data.queries.length > 0) {
+                            html += '<strong style="font-size:0.6875rem;color:#8b7355;text-transform:uppercase;letter-spacing:0.05em;">Sample Student Queries</strong><ul>' +
+                                data.queries.map(q => `<li>${escapeHtml(q)}</li>`).join('') + '</ul>';
+                        }
+                        if (!html) {
+                            html = '<em style="color:#8b7355;">No sample queries available.</em>';
+                        }
+                        td.innerHTML = html;
+                        detailRow.dataset.loaded = 'true';
+                    })
+                    .catch(() => {
+                        td.innerHTML = '<em style="color:#dc2626;">Failed to load details.</em>';
+                    });
+            }
+        });
+    });
     </script>
     {% endif %}
 </body>

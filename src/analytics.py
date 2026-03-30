@@ -11,7 +11,7 @@ import time
 from datetime import datetime, timedelta
 from collections import Counter
 
-from models import db, ChatMessage, ChatSession
+from models import db, ChatMessage, ChatSession, Document, Enrollment, TeachingAssistant
 from config import Config
 
 logger = logging.getLogger(__name__)
@@ -217,17 +217,181 @@ def get_top_challenges(ta_id, start_date=None, end_date=None, limit=15):
     if not challenge_counter:
         return []
 
+    # Resolve generic labels to actual filenames
+    docs = Document.query.filter_by(ta_id=ta_id).all()
+    type_map = {'Homework': 'homework', 'Lecture': 'lecture', 'Exam': 'exam', 'Reading': 'reading'}
+    doc_lookup = {}
+    for d in docs:
+        if d.doc_type:
+            num = str(d.assignment_number or d.instructional_unit_number or '')
+            key = (d.doc_type.lower(), num)
+            doc_lookup[key] = d.display_name or d.original_filename
+
     # Build result sorted by count
     results = []
     for (doc, prob), count in challenge_counter.most_common(limit):
+        resolved_name = doc
+        if doc != "(General)":
+            parts = doc.split(' ', 1)
+            dtype = type_map.get(parts[0], parts[0].lower())
+            dnum = parts[1] if len(parts) > 1 else ''
+            filename = doc_lookup.get((dtype, dnum))
+            if filename:
+                resolved_name = filename
         results.append({
-            "document": doc,
+            "document": resolved_name,
+            "document_generic": doc,
             "problem": prob,
             "count": count,
             "percentage": round(count / total_with_ref * 100, 1) if total_with_ref > 0 else 0,
         })
 
     return results
+
+
+def get_challenge_sample_queries(ta_id, doc_label, prob_label, start_date=None, end_date=None, limit=5):
+    """
+    Return sample student queries matching a specific challenge (doc_label + prob_label).
+    Re-runs the same regex parsing as get_top_challenges to find matching messages.
+    """
+    from src.retriever import extract_problem_reference
+
+    query = db.session.query(ChatMessage.content).join(ChatSession).filter(
+        ChatSession.ta_id == ta_id,
+        ChatMessage.role == 'user'
+    )
+    if start_date:
+        query = query.filter(ChatMessage.created_at >= start_date)
+    if end_date:
+        query = query.filter(ChatMessage.created_at <= end_date)
+
+    messages = query.limit(500).all()
+    if not messages:
+        return []
+
+    doc_patterns = [
+        (r'(?:homework|hw|assignment|problem\s*set|pset|ps)\s*#?\s*(\d+)', 'Homework'),
+        (r'(?:lecture|lec)\s*#?\s*(\d+)', 'Lecture'),
+        (r'(?:exam|midterm|final|quiz)\s*#?\s*(\d+)?', 'Exam'),
+        (r'(?:reading|chapter|ch)\s*#?\s*(\d+)', 'Reading'),
+    ]
+
+    samples = []
+    for (content,) in messages:
+        query_lower = content.lower()
+
+        # Extract document reference
+        msg_doc = None
+        for pattern, doc_type in doc_patterns:
+            match = re.search(pattern, query_lower)
+            if match:
+                num = match.group(1) if match.group(1) else ""
+                msg_doc = f"{doc_type} {num}".strip() if num else doc_type
+                break
+
+        # Extract problem reference
+        prob_ref = extract_problem_reference(content)
+        msg_prob = None
+        if prob_ref and prob_ref.get('problem_number'):
+            sub = prob_ref.get('sub_part', '')
+            msg_prob = f"Problem {prob_ref['problem_number']}{sub or ''}"
+
+        msg_doc_key = msg_doc or "(General)"
+        msg_prob_key = msg_prob or "(General)"
+
+        if msg_doc_key == doc_label and msg_prob_key == prob_label:
+            samples.append(content[:200])
+            if len(samples) >= limit:
+                break
+
+    return samples
+
+
+def get_challenge_summary(queries, doc_label, prob_label):
+    """
+    Generate a 1-2 sentence AI summary of what students struggle with for a specific challenge.
+    Uses gpt-4o-mini for speed and cost efficiency.
+    Returns summary string or None on failure.
+    """
+    import openai
+
+    if not queries:
+        return None
+
+    try:
+        client = openai.OpenAI()
+        query_list = "\n".join(f"- {q}" for q in queries[:10])
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{
+                "role": "user",
+                "content": (
+                    f"These are student questions about {doc_label} {prob_label} from a course:\n\n"
+                    f"{query_list}\n\n"
+                    "In 1-2 sentences, describe what students are specifically struggling with. "
+                    "Be concrete and course-specific. Do not list the questions back."
+                )
+            }],
+            max_tokens=150,
+            temperature=0.3,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        logger.warning(f"Challenge summary generation failed: {e}")
+        return None
+
+
+def get_engagement_stats(ta_id, start_date=None, end_date=None):
+    """
+    Calculate student engagement metrics.
+    Professor TAs (with enrollments): returns engagement rate.
+    Admin TAs (public, no enrollments): returns absolute unique user count.
+    """
+    ta = TeachingAssistant.query.get(ta_id)
+    if not ta:
+        return {'type': 'absolute', 'unique_users': 0, 'anon_sessions': 0}
+
+    # Count distinct logged-in users with sessions in period
+    active_query = db.session.query(db.func.count(db.distinct(ChatSession.user_id))).filter(
+        ChatSession.ta_id == ta_id,
+        ChatSession.user_id.isnot(None)
+    )
+    if start_date:
+        active_query = active_query.filter(ChatSession.created_at >= start_date)
+    if end_date:
+        active_query = active_query.filter(ChatSession.created_at <= end_date)
+    active_students = active_query.scalar() or 0
+
+    # Count anonymous sessions
+    anon_query = db.session.query(db.func.count(ChatSession.id)).filter(
+        ChatSession.ta_id == ta_id,
+        ChatSession.user_id.is_(None)
+    )
+    if start_date:
+        anon_query = anon_query.filter(ChatSession.created_at >= start_date)
+    if end_date:
+        anon_query = anon_query.filter(ChatSession.created_at <= end_date)
+    anon_sessions = anon_query.scalar() or 0
+
+    # For professor TAs: calculate engagement rate from enrollments
+    total_enrolled = Enrollment.query.filter_by(ta_id=ta_id).count()
+    is_professor_ta = ta.professor_id is not None and ta.requires_billing
+
+    if is_professor_ta and total_enrolled > 0:
+        engagement_rate = round(active_students / total_enrolled * 100, 1)
+        return {
+            'type': 'enrollment',
+            'active_students': active_students,
+            'total_enrolled': total_enrolled,
+            'engagement_rate': engagement_rate,
+            'anon_sessions': anon_sessions,
+        }
+    else:
+        return {
+            'type': 'absolute',
+            'unique_users': active_students,
+            'anon_sessions': anon_sessions,
+        }
 
 
 def cluster_topics(ta_id, start_date=None, end_date=None):

@@ -28,6 +28,36 @@ from extensions import limiter
 professor_bp = Blueprint('professor', __name__, url_prefix='/professor')
 
 
+def _parse_date_range():
+    """Parse date range from request args. Returns (start_date, end_date, range_param)."""
+    range_param = request.args.get('range', '30d')
+    custom_start = request.args.get('start')
+    custom_end = request.args.get('end')
+
+    now = datetime.utcnow()
+    if range_param == 'custom' and custom_start and custom_end:
+        try:
+            start_date = datetime.strptime(custom_start, '%Y-%m-%d')
+            end_date = datetime.strptime(custom_end, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+        except ValueError:
+            start_date = now - timedelta(days=30)
+            end_date = now
+    elif range_param == '7d':
+        start_date = now - timedelta(days=7)
+        end_date = now
+    elif range_param == '90d':
+        start_date = now - timedelta(days=90)
+        end_date = now
+    elif range_param == 'all':
+        start_date = None
+        end_date = None
+    else:  # Default 30d
+        start_date = now - timedelta(days=30)
+        end_date = now
+
+    return start_date, end_date, range_param, custom_start or '', custom_end or ''
+
+
 def professor_required(f):
     """Decorator to require professor role."""
     @wraps(f)
@@ -349,7 +379,7 @@ def change_ta_tier(ta_id):
 @login_required
 def ta_analytics(ta_id):
     """Analytics dashboard for a specific TA. Accessible by professors (who own it) and admins."""
-    from src.analytics import get_usage_stats, get_usage_over_time, get_top_challenges
+    from src.analytics import get_usage_stats, get_usage_over_time, get_top_challenges, get_engagement_stats
     import json as json_mod
 
     ta = TeachingAssistant.query.get_or_404(ta_id)
@@ -366,35 +396,12 @@ def ta_analytics(ta_id):
         return render_template('professor/analytics.html', ta=ta, tier_gated=True,
                                billing_tiers=Config.BILLING_TIERS)
 
-    # Parse date range
-    range_param = request.args.get('range', '30d')
-    custom_start = request.args.get('start')
-    custom_end = request.args.get('end')
-
-    now = datetime.utcnow()
-    if range_param == 'custom' and custom_start and custom_end:
-        try:
-            start_date = datetime.strptime(custom_start, '%Y-%m-%d')
-            end_date = datetime.strptime(custom_end, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
-        except ValueError:
-            start_date = now - timedelta(days=30)
-            end_date = now
-    elif range_param == '7d':
-        start_date = now - timedelta(days=7)
-        end_date = now
-    elif range_param == '90d':
-        start_date = now - timedelta(days=90)
-        end_date = now
-    elif range_param == 'all':
-        start_date = None
-        end_date = None
-    else:  # Default 30d
-        start_date = now - timedelta(days=30)
-        end_date = now
+    start_date, end_date, range_param, custom_start, custom_end = _parse_date_range()
 
     stats = get_usage_stats(ta_id, start_date, end_date)
     usage_data = get_usage_over_time(ta_id, start_date, end_date)
     challenges = get_top_challenges(ta_id, start_date, end_date)
+    engagement = get_engagement_stats(ta_id, start_date, end_date)
 
     return render_template('professor/analytics.html',
                            ta=ta,
@@ -402,9 +409,10 @@ def ta_analytics(ta_id):
                            stats=stats,
                            usage_data_json=json_mod.dumps(usage_data),
                            challenges=challenges,
+                           engagement=engagement,
                            current_range=range_param,
-                           custom_start=custom_start or '',
-                           custom_end=custom_end or '',
+                           custom_start=custom_start,
+                           custom_end=custom_end,
                            billing_tiers=Config.BILLING_TIERS)
 
 
@@ -425,34 +433,37 @@ def ta_analytics_topics(ta_id):
     if not has_access:
         return jsonify({"error": "Upgrade required"}), 403
 
-    # Parse date range (same logic as main route)
-    range_param = request.args.get('range', '30d')
-    custom_start = request.args.get('start')
-    custom_end = request.args.get('end')
-
-    now = datetime.utcnow()
-    if range_param == 'custom' and custom_start and custom_end:
-        try:
-            start_date = datetime.strptime(custom_start, '%Y-%m-%d')
-            end_date = datetime.strptime(custom_end, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
-        except ValueError:
-            start_date = now - timedelta(days=30)
-            end_date = now
-    elif range_param == '7d':
-        start_date = now - timedelta(days=7)
-        end_date = now
-    elif range_param == '90d':
-        start_date = now - timedelta(days=90)
-        end_date = now
-    elif range_param == 'all':
-        start_date = None
-        end_date = None
-    else:
-        start_date = now - timedelta(days=30)
-        end_date = now
+    start_date, end_date, _, _, _ = _parse_date_range()
 
     topics = cluster_topics(ta_id, start_date, end_date)
     return jsonify({"topics": topics})
+
+
+@professor_bp.route('/ta/<ta_id>/analytics/challenge-queries')
+@login_required
+def ta_challenge_queries(ta_id):
+    """Return sample student queries and AI summary for a specific challenge drill-down."""
+    from src.analytics import get_challenge_sample_queries, get_challenge_summary
+
+    ta = TeachingAssistant.query.get_or_404(ta_id)
+
+    # Access control
+    is_admin = current_user.role == 'admin'
+    if not is_admin and ta.professor_id != current_user.id:
+        return jsonify({"error": "Access denied"}), 403
+
+    has_access = is_admin or ta.billing_tier in ('tier2', 'tier3') or not ta.requires_billing
+    if not has_access:
+        return jsonify({"error": "Upgrade required"}), 403
+
+    doc_label = request.args.get('doc', '')
+    prob_label = request.args.get('prob', '')
+    start_date, end_date, _, _, _ = _parse_date_range()
+
+    queries = get_challenge_sample_queries(ta_id, doc_label, prob_label, start_date, end_date)
+    summary = get_challenge_summary(queries, doc_label, prob_label)
+
+    return jsonify({"queries": queries, "summary": summary})
 
 
 @professor_bp.route('/ta/<ta_id>/test-chat/stream', methods=['POST'])
