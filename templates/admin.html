@@ -929,13 +929,16 @@
                 tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No teaching assistants found</td></tr>';
             } else {
                 tbody.innerHTML = pageTAs.map(ta => `
-                    <tr onclick="showEditTAModal('${ta.id}')">
+                    <tr onclick="window.location='/admin/ta/${ta.id}'" style="cursor:pointer">
                         <td><strong>${escapeHtml(ta.name)}</strong><br><small style="color:var(--text-light)">${escapeHtml(ta.course_name)}</small></td>
                         <td>${escapeHtml(ta.institution_name) || '—'}</td>
                         <td>${getStatusBadge(ta)}</td>
                         <td>${ta.indexed_count} indexed / ${ta.pending_count} pending</td>
                         <td>${formatDateTime(ta.last_activity_at)}</td>
-                        <td><a href="/${ta.slug}" target="_blank" class="slug-link" onclick="event.stopPropagation()">/${ta.slug}</a></td>
+                        <td>
+                            <a href="/${ta.slug}" target="_blank" class="slug-link" onclick="event.stopPropagation()">/${ta.slug}</a>
+                            <a href="/professor/ta/${ta.id}/analytics" onclick="event.stopPropagation()" style="margin-left:8px;font-size:0.75rem;color:#8b7355;text-decoration:none;">Analytics ↗</a>
+                        </td>
                     </tr>
                 `).join('');
             }

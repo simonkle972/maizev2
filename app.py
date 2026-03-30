@@ -306,6 +306,14 @@ def admin_required(f):
 def admin_panel():
     return render_template('admin.html')
 
+@app.route('/admin/ta/<ta_id>')
+@admin_required
+def admin_manage_ta(ta_id):
+    """Dedicated admin page for managing a single TA."""
+    ta = TeachingAssistant.query.get_or_404(ta_id)
+    documents = Document.query.filter_by(ta_id=ta_id).order_by(Document.created_at.desc()).all()
+    return render_template('admin_manage_ta.html', ta=ta, documents=documents)
+
 @app.route('/admin/logout')
 def admin_logout():
     """Redirect old admin logout to new unified logout."""
