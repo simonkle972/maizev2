@@ -346,9 +346,9 @@ def change_ta_tier(ta_id):
 
 
 @professor_bp.route('/ta/<ta_id>/analytics')
-@professor_required
+@login_required
 def ta_analytics(ta_id):
-    """Professor analytics dashboard for a specific TA."""
+    """Analytics dashboard for a specific TA. Accessible by professors (who own it) and admins."""
     from src.analytics import get_usage_stats, get_usage_over_time, get_top_challenges
     import json as json_mod
 
@@ -409,9 +409,9 @@ def ta_analytics(ta_id):
 
 
 @professor_bp.route('/ta/<ta_id>/analytics/topics')
-@professor_required
+@login_required
 def ta_analytics_topics(ta_id):
-    """Async endpoint for topic clustering (may take 5-10s on first call)."""
+    """Async endpoint for topic clustering. Accessible by professors (who own it) and admins."""
     from src.analytics import cluster_topics
 
     ta = TeachingAssistant.query.get_or_404(ta_id)
