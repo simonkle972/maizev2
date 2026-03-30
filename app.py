@@ -311,7 +311,7 @@ def admin_panel():
 def admin_manage_ta(ta_id):
     """Dedicated admin page for managing a single TA."""
     ta = TeachingAssistant.query.get_or_404(ta_id)
-    documents = Document.query.filter_by(ta_id=ta_id).order_by(Document.created_at.desc()).all()
+    documents = Document.query.filter_by(ta_id=ta_id).order_by(Document.uploaded_at.desc()).all()
     return render_template('admin_manage_ta.html', ta=ta, documents=documents)
 
 @app.route('/admin/logout')

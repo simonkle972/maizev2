@@ -249,17 +249,27 @@
             <nav class="header-nav">
                 <span class="header-nav-user">{{ current_user.first_name }}</span>
                 <div class="nav-divider"></div>
+                {% if current_user.role == 'admin' %}
+                <a href="/admin">Admin Panel</a>
+                <div class="nav-divider"></div>
+                <a href="/admin/logout">Logout</a>
+                {% else %}
                 <a href="{{ url_for('professor.dashboard') }}">Dashboard</a>
                 <a href="{{ url_for('professor.profile') }}">Profile</a>
                 <a href="{{ url_for('professor.settings') }}">Billing</a>
                 <a href="{{ url_for('professor.support') }}">Support</a>
                 <div class="nav-divider"></div>
                 <a href="{{ url_for('auth0.logout') }}">Logout</a>
+                {% endif %}
             </nav>
         </header>
 
         <main class="admin-main">
+            {% if current_user.role == 'admin' %}
+            <a href="{{ url_for('admin_manage_ta', ta_id=ta.id) }}" class="back-link">&larr; Back to {{ ta.name }}</a>
+            {% else %}
             <a href="{{ url_for('professor.manage_ta', ta_id=ta.id) }}" class="back-link">&larr; Back to {{ ta.name }}</a>
+            {% endif %}
 
             {% if tier_gated %}
             <!-- Tier gate: upgrade prompt -->
