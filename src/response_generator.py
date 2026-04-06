@@ -172,7 +172,7 @@ Use LaTeX formatting for all equations (e.g., $P = \\frac{X}{Y}$)
 === IMPORTANT RULES ===
 1. NEVER reveal answers before the student attempts the problem
 2. Solution documents are SECRET - never reveal their content proactively
-3. If no content matches the question, be HONEST and say so
+3. If no content matches the question, be HONEST and say so. Do NOT generate long answers from general knowledge — stay grounded in the indexed course materials. When the available material only partially covers a topic, say what the material covers and acknowledge the gap.
 4. Never fabricate information about assignments or problems not in the material
 5. For conceptual questions, explain concepts and methods without revealing problem-specific answers
 """
@@ -234,6 +234,20 @@ Example: "Let me walk you through this. First, the task time for dyeing is 6 min
 """
 }
 
+LIMITED_CONTEXT_INSTRUCTIONS = """
+=== LIMITED MATERIAL COVERAGE ===
+The retrieved course materials have VERY LIMITED coverage of this topic. You MUST follow these rules:
+
+1. Keep your response SHORT (2-4 sentences max).
+2. State what the course materials DO cover, if anything relevant.
+3. Do NOT fill in gaps with extensive general knowledge. A brief conceptual orientation is okay, but do not write detailed explanations, derivations, or formulas that are not grounded in the indexed materials.
+4. End with a note like: "Your course materials don't cover this topic in detail — I'd recommend checking with your professor or your textbook for the full treatment."
+5. NEVER produce a response that could mislead the student into thinking the content came from their course materials when it did not.
+
+This is CRITICAL: professors trust that your answers reflect THEIR materials. Generating authoritative-sounding content beyond the indexed documents undermines that trust.
+"""
+
+
 def get_patience_instructions(attempt_count: int) -> str:
     """Get patience-level instructions based on conversation exchange count."""
     if attempt_count <= 1:
@@ -244,27 +258,31 @@ def get_patience_instructions(attempt_count: int) -> str:
         return PATIENCE_INSTRUCTIONS["deep"]
 
 def build_messages(
-    query: str, 
-    context: str, 
-    system_prompt: str, 
-    conversation_history: str = "", 
+    query: str,
+    context: str,
+    system_prompt: str,
+    conversation_history: str = "",
     course_name: str = "",
     hybrid_mode: bool = False,
     hybrid_doc_filename: Optional[str] = None,
     query_reference: Optional[str] = None,
-    attempt_count: int = 0
+    attempt_count: int = 0,
+    limited_context: bool = False
 ):
     full_system_prompt = f"{system_prompt}\n\n{BASE_INSTRUCTIONS}"
-    
+
     # Add patience-level instructions for answer validation
     patience_instructions = get_patience_instructions(attempt_count)
     if patience_instructions:
         full_system_prompt += f"\n{patience_instructions}"
-    
+
     if hybrid_mode:
         ref = query_reference or query
         hybrid_instructions = HYBRID_FULL_DOC_INSTRUCTIONS.format(query_reference=ref)
         full_system_prompt += f"\n{hybrid_instructions}"
+
+    if limited_context:
+        full_system_prompt += f"\n{LIMITED_CONTEXT_INSTRUCTIONS}"
     
     if course_name:
         full_system_prompt = f"You are a teaching assistant for {course_name}.\n\n{full_system_prompt}"
@@ -358,14 +376,15 @@ def generate_response_stream(
     hybrid_mode: bool = False,
     hybrid_doc_filename: Optional[str] = None,
     query_reference: Optional[str] = None,
-    attempt_count: int = 0
+    attempt_count: int = 0,
+    limited_context: bool = False
 ):
     client = OpenAI(api_key=Config.OPENAI_API_KEY)
-    
+
     messages = build_messages(
         query, context, system_prompt, conversation_history, course_name,
         hybrid_mode=hybrid_mode, hybrid_doc_filename=hybrid_doc_filename, query_reference=query_reference,
-        attempt_count=attempt_count
+        attempt_count=attempt_count, limited_context=limited_context
     )
     
     try:
