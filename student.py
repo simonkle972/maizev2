@@ -280,10 +280,12 @@ def chat_stream(ta_id):
 
             # Detect limited context: retrieval quality too low to give grounded answers
             score_top1 = retrieval_diagnostics.get("score_top1", 0) or 0
+            total_chunks_in_ta = retrieval_diagnostics.get("total_chunks_in_ta", 0) or 0
             limited_context = (
                 chunk_count == 0
                 or (chunk_count <= 2 and score_top1 < 0.5)
-                or (hybrid_mode and score_top1 < 0.3)
+                or (hybrid_mode and score_top1 < 0.6)
+                or total_chunks_in_ta <= 5
             )
 
             # Generate streaming response
