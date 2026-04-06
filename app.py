@@ -1367,6 +1367,16 @@ def chat_stream_api(slug):
             query_reference = retrieval_diagnostics.get("validation_expected_ref")
             attempt_count = retrieval_diagnostics.get("attempt_count", 0)
 
+            # Detect limited context: retrieval quality too low to give grounded answers
+            score_top1 = retrieval_diagnostics.get("score_top1", 0) or 0
+            total_chunks_in_ta = retrieval_diagnostics.get("total_chunks_in_ta", 0) or 0
+            limited_context = (
+                chunk_count == 0
+                or (chunk_count <= 2 and score_top1 < 0.5)
+                or (hybrid_mode and score_top1 < 0.6)
+                or total_chunks_in_ta <= 5
+            )
+
             generation_start = time.time()
             for token in generate_response_stream(
                 query=query,
@@ -1377,7 +1387,8 @@ def chat_stream_api(slug):
                 hybrid_mode=hybrid_mode,
                 hybrid_doc_filename=hybrid_doc_filename,
                 query_reference=query_reference,
-                attempt_count=attempt_count
+                attempt_count=attempt_count,
+                limited_context=limited_context
             ):
                 full_response += token
                 yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
