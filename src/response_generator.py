@@ -276,7 +276,7 @@ def build_messages(
     if patience_instructions:
         full_system_prompt += f"\n{patience_instructions}"
 
-    if hybrid_mode:
+    if hybrid_mode and not limited_context:
         ref = query_reference or query
         hybrid_instructions = HYBRID_FULL_DOC_INSTRUCTIONS.format(query_reference=ref)
         full_system_prompt += f"\n{hybrid_instructions}"
