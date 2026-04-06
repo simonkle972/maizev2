@@ -287,11 +287,21 @@ def build_messages(
     if course_name:
         full_system_prompt = f"You are a teaching assistant for {course_name}.\n\n{full_system_prompt}"
     
-    if hybrid_mode and hybrid_doc_filename:
+    if limited_context:
+        context_header = """WARNING — LIMITED MATERIAL: The retrieved content below is thin (e.g. a syllabus, course outline, or brief mention). It does NOT contain detailed explanations, formulas, or worked examples for this topic.
+
+STRICT RULES FOR THIS RESPONSE:
+- Keep your answer to 2-4 sentences MAX
+- ONLY reference what the material below actually says
+- Do NOT generate formulas, derivations, or detailed explanations that are not in the material below
+- End your response with: "Your course materials don't cover this topic in detail — I'd recommend checking with your professor or textbook for more."
+
+Here is the limited course material available:"""
+    elif hybrid_mode and hybrid_doc_filename:
         context_header = f"Here is the COMPLETE document '{hybrid_doc_filename}' to help answer the student's question:"
     else:
         context_header = "Here is relevant course material to help answer the student's question:"
-    
+
     user_message = f"""{context_header}
 
 ---
