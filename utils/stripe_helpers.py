@@ -513,7 +513,7 @@ def create_customer_portal_session(professor, base_url):
     """
     try:
         if not professor.stripe_customer_id:
-            return None, "No Stripe customer ID found"
+            return None, "No active subscriptions yet — publish your first TA to get started"
 
         session = stripe.billing_portal.Session.create(
             customer=professor.stripe_customer_id,

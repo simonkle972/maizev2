@@ -68,7 +68,11 @@
             {% endif %}
 
             <div style="margin-top: 30px;">
+                {% if current_user.stripe_customer_id %}
                 <a href="{{ url_for('professor.billing_portal') }}" class="btn btn-primary">Manage Subscriptions in Stripe</a>
+                {% else %}
+                <p style="color: #8b7355; font-size: 0.9rem;">No active subscriptions yet. Publish your first TA to manage billing here.</p>
+                {% endif %}
             </div>
         </main>
     </div>
