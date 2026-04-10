@@ -399,6 +399,157 @@ def find_matching_documents(query: str, ta_id: str, threshold: float = 0.4) -> l
 
 INITIAL_RETRIEVAL_K = 20
 FINAL_K = 8
+SUPPLEMENTARY_K = 4
+ASSIGNMENT_DOC_TYPES = {"homework", "exam"}
+
+# Boilerplate phrases to strip from problem text before concept extraction
+_PROBLEM_BOILERPLATE = re.compile(
+    r'\b(?:true\s+or\s+false|explain\s+your\s+(?:response|answer)|'
+    r'short\s+paragraph|please\s+(?:explain|answer|provide|note)|'
+    r'in\s+a\s+(?:short|brief)\s+paragraph|figure\s+below|'
+    r'(?:less|more)\s+than\s+\d+\s+words|'
+    r'problem\s+set|as\s+of\s+\w+\s+\d+|subject\s+to\s+change)\b',
+    re.IGNORECASE
+)
+
+_STOP_WORDS = {
+    'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+    'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
+    'should', 'may', 'might', 'shall', 'can', 'need', 'dare', 'ought',
+    'used', 'to', 'of', 'in', 'for', 'on', 'with', 'at', 'by', 'from',
+    'as', 'into', 'through', 'during', 'before', 'after', 'above', 'below',
+    'between', 'out', 'off', 'over', 'under', 'again', 'further', 'then',
+    'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all', 'each',
+    'every', 'both', 'few', 'more', 'most', 'other', 'some', 'such', 'no',
+    'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very',
+    'and', 'but', 'or', 'yet', 'if', 'that', 'which', 'who', 'whom',
+    'this', 'these', 'those', 'what', 'it', 'its', 'he', 'she', 'they',
+    'them', 'his', 'her', 'their', 'my', 'your', 'our', 'we', 'you', 'i',
+    'me', 'us', 'him', 'up', 'about', 'also', 'just', 'because', 'whether',
+}
+
+
+def _extract_concept_query(problem_text: str, max_tokens: int = 60) -> str:
+    """
+    Extract concept keywords from problem text for supplementary retrieval.
+    Strips boilerplate, stop words, and keeps domain-relevant terms.
+    """
+    # Remove boilerplate phrases
+    cleaned = _PROBLEM_BOILERPLATE.sub(' ', problem_text)
+    # Remove non-alphanumeric except spaces and hyphens
+    cleaned = re.sub(r'[^a-zA-Z0-9\s\-]', ' ', cleaned)
+    # Tokenize and filter
+    words = cleaned.lower().split()
+    concept_words = [w for w in words if w not in _STOP_WORDS and len(w) > 2]
+    # Deduplicate while preserving order
+    seen = set()
+    unique = []
+    for w in concept_words:
+        if w not in seen:
+            seen.add(w)
+            unique.append(w)
+    # Take up to max_tokens words
+    return ' '.join(unique[:max_tokens])
+
+
+def retrieve_supplementary_teaching_material(ta_id, primary_chunks, query_analysis):
+    """
+    When primary retrieval returns only assignment-type content (homework/exam),
+    extract concept keywords from the problem text and do a supplementary
+    vector search for teaching materials (lectures, readings).
+
+    Returns:
+        tuple: (supplementary_chunks: list, triggered: bool)
+    """
+    from sqlalchemy import not_
+
+    # Guard 1: Don't trigger for conceptual queries (already search broadly)
+    if query_analysis.get("is_conceptual"):
+        return [], False
+
+    # Guard 2: Only trigger when doc_type_filter is an assignment type
+    doc_type_filter = query_analysis.get("doc_type_filter")
+    if doc_type_filter not in ASSIGNMENT_DOC_TYPES:
+        return [], False
+
+    # Guard 3: Check if primary chunks already include teaching material
+    primary_doc_types = {c.get("doc_type", "other") for c in primary_chunks}
+    if primary_doc_types - ASSIGNMENT_DOC_TYPES:  # Has non-assignment types
+        return [], False
+
+    # Guard 4: Need primary chunks to extract concept query from
+    if not primary_chunks:
+        return [], False
+
+    # Extract concept keywords from the problem text
+    # Use first chunk (or full doc text for hybrid) as the source
+    problem_text = primary_chunks[0].get("text", "")[:1500]  # Cap to avoid huge embeds
+    concept_query = _extract_concept_query(problem_text)
+
+    if len(concept_query.split()) < 3:
+        logger.info(f"[{ta_id}] Supplementary retrieval: concept query too short, skipping")
+        return [], False
+
+    logger.info(f"[{ta_id}] Supplementary retrieval: concept query = '{concept_query[:100]}...'")
+
+    # Embed the concept query
+    try:
+        client = get_openai_client()
+        response = client.embeddings.create(
+            model=Config.EMBEDDING_MODEL,
+            input=concept_query
+        )
+        concept_embedding = response.data[0].embedding
+    except Exception as e:
+        logger.warning(f"[{ta_id}] Supplementary retrieval: embedding failed: {e}")
+        return [], False
+
+    # Vector search excluding assignment doc types
+    try:
+        supp_results = db.session.query(
+            DocumentChunk.chunk_text,
+            DocumentChunk.file_name,
+            DocumentChunk.doc_type,
+            DocumentChunk.assignment_number,
+            DocumentChunk.instructional_unit_number,
+            DocumentChunk.instructional_unit_label,
+            (1 - DocumentChunk.embedding.cosine_distance(concept_embedding)).label('score')
+        ).filter(
+            DocumentChunk.ta_id == ta_id,
+            not_(DocumentChunk.doc_type.in_(list(ASSIGNMENT_DOC_TYPES))),
+        ).order_by(
+            DocumentChunk.embedding.cosine_distance(concept_embedding)
+        ).limit(INITIAL_RETRIEVAL_K).all()
+    except Exception as e:
+        logger.warning(f"[{ta_id}] Supplementary retrieval: query failed: {e}")
+        return [], False
+
+    if not supp_results:
+        return [], False
+
+    # Take top SUPPLEMENTARY_K with minimum score threshold
+    MIN_SUPPLEMENTARY_SCORE = 0.35
+    supplementary_chunks = []
+    for row in supp_results[:SUPPLEMENTARY_K]:
+        score = float(row.score) if row.score else 0.0
+        if score < MIN_SUPPLEMENTARY_SCORE:
+            break
+        supplementary_chunks.append({
+            "text": row.chunk_text,
+            "score": score,
+            "file_name": row.file_name or "unknown",
+            "doc_type": row.doc_type or "other",
+            "retrieval_role": "teaching_material",
+        })
+
+    if supplementary_chunks:
+        logger.info(
+            f"[{ta_id}] Supplementary retrieval: found {len(supplementary_chunks)} teaching chunks "
+            f"(scores: {[round(c['score'], 3) for c in supplementary_chunks]}, "
+            f"sources: {[c['file_name'] for c in supplementary_chunks]})"
+        )
+
+    return supplementary_chunks, len(supplementary_chunks) > 0
 
 
 def llm_rerank(query: str, chunks: list, top_k: int = FINAL_K) -> tuple:
@@ -1032,6 +1183,8 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         "score_top8": 0.0,
         "score_mean": 0.0,
         "score_spread": 0.0,
+        "supplementary_teaching_found": False,
+        "supplementary_chunk_count": 0,
         "chunk_scores": [],
         "chunk_sources_detail": [],
         "rerank_applied": False,
@@ -1332,7 +1485,15 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                             logger.info(f"[{ta_id}] Cached document context for session: {filename}")
                     except Exception as e:
                         logger.warning(f"[{ta_id}] Failed to cache session context: {e}")
-                
+
+                # Supplementary teaching material retrieval
+                supp_chunks, supp_triggered = retrieve_supplementary_teaching_material(
+                    ta_id, hybrid_chunks, query_analysis)
+                if supp_triggered:
+                    hybrid_chunks.extend(supp_chunks)
+                    diagnostics["supplementary_teaching_found"] = True
+                    diagnostics["supplementary_chunk_count"] = len(supp_chunks)
+
                 return hybrid_chunks, diagnostics
             elif token_estimate > Config.HYBRID_MAX_DOC_TOKENS:
                 logger.warning(f"[{ta_id}] Document too large for early hybrid: {token_estimate} tokens, falling back to chunk retrieval")
@@ -1610,6 +1771,15 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                         logger.warning(f"[{ta_id}] Failed to cache session context in hybrid fallback: {e}")
                 
                 logger.info(f"[{ta_id}] Hybrid fallback complete | doc={filename} | tokens={token_estimate}")
+
+                # Supplementary teaching material retrieval
+                supp_chunks, supp_triggered = retrieve_supplementary_teaching_material(
+                    ta_id, hybrid_chunks, query_analysis)
+                if supp_triggered:
+                    hybrid_chunks.extend(supp_chunks)
+                    diagnostics["supplementary_teaching_found"] = True
+                    diagnostics["supplementary_chunk_count"] = len(supp_chunks)
+
                 return hybrid_chunks, diagnostics
             elif token_estimate > Config.HYBRID_MAX_DOC_TOKENS:
                 logger.warning(f"[{ta_id}] Document too large for hybrid fallback: {token_estimate} tokens > {Config.HYBRID_MAX_DOC_TOKENS}")
@@ -1659,5 +1829,13 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                     logger.info(f"[{ta_id}] Cached document context for session (chunk retrieval): {top_doc}")
         except Exception as e:
             logger.warning(f"[{ta_id}] Failed to cache session context in chunk retrieval: {e}")
-    
+
+    # Supplementary teaching material retrieval
+    supp_chunks, supp_triggered = retrieve_supplementary_teaching_material(
+        ta_id, chunks, query_analysis)
+    if supp_triggered:
+        chunks.extend(supp_chunks)
+        diagnostics["supplementary_teaching_found"] = True
+        diagnostics["supplementary_chunk_count"] = len(supp_chunks)
+
     return chunks, diagnostics

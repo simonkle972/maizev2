@@ -262,12 +262,16 @@ def chat_stream(ta_id):
 
             yield f"data: {json.dumps({'type': 'status', 'message': 'Analyzing relevant content...'})}\n\n"
 
-            context = "\n\n---\n\n".join([
-                f"[From: {c['file_name']}]\n{c['text']}"
-                for c in chunks
-            ])
+            # Build context with role-tagged blocks (problem context first, teaching material second)
+            primary = [c for c in chunks if c.get('retrieval_role') != 'teaching_material']
+            teaching = [c for c in chunks if c.get('retrieval_role') == 'teaching_material']
+            parts = [f"[From: {c['file_name']}]\n{c['text']}" for c in primary]
+            if teaching:
+                parts.append("[RELEVANT TEACHING MATERIAL FROM COURSE LECTURES]")
+                parts.extend(f"[From: {c['file_name']}]\n{c['text']}" for c in teaching)
+            context = "\n\n---\n\n".join(parts)
 
-            sources = [c['file_name'] for c in chunks[:3]]
+            sources = list(dict.fromkeys(c['file_name'] for c in chunks[:8]))[:3]
             yield f"data: {json.dumps({'type': 'sources', 'sources': sources})}\n\n"
 
             yield f"data: {json.dumps({'type': 'status', 'message': 'Generating response...'})}\n\n"
@@ -281,12 +285,13 @@ def chat_stream(ta_id):
             # Detect limited context: retrieval quality too low to give grounded answers
             score_top1 = retrieval_diagnostics.get("score_top1", 0) or 0
             total_chunks_in_ta = retrieval_diagnostics.get("total_chunks_in_ta", 0) or 0
+            supplementary_found = retrieval_diagnostics.get("supplementary_teaching_found", False)
             limited_context = (
                 chunk_count == 0
                 or (chunk_count <= 2 and score_top1 < 0.5)
                 or (hybrid_mode and score_top1 < 0.6)
                 or total_chunks_in_ta <= 5
-            )
+            ) and not supplementary_found
 
             # Generate streaming response
             generation_start = time.time()
