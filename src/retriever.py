@@ -452,15 +452,55 @@ def _extract_concept_query(problem_text: str, max_tokens: int = 60) -> str:
     return ' '.join(unique[:max_tokens])
 
 
-def retrieve_supplementary_teaching_material(ta_id, primary_chunks, query_analysis, diagnostics):
+def _extract_concepts_via_llm(problem_text, ta_id):
+    """
+    Use gpt-4o-mini step-back prompting to extract academic concepts from problem text.
+    Returns a concept string suitable for embedding, or None on failure.
+    """
+    import openai
+    try:
+        client = openai.OpenAI()
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{
+                "role": "user",
+                "content": (
+                    f"A student asked about this problem from their coursework:\n\n"
+                    f'"{problem_text[:1500]}"\n\n'
+                    "What 3-5 key academic concepts, theories, or terms must a student "
+                    "understand to correctly answer this question?\n\n"
+                    "Return ONLY a comma-separated list of concept names. Be specific and academic.\n"
+                    'Example: "marginal rate of substitution, indifference curves, budget constraint, utility maximization"'
+                )
+            }],
+            max_tokens=100,
+            temperature=0.0,
+        )
+        concepts = response.choices[0].message.content.strip()
+        logger.info(f"[{ta_id}] Supplementary: LLM concept extraction = '{concepts}'")
+        return concepts
+    except Exception as e:
+        logger.warning(f"[{ta_id}] Supplementary: LLM concept extraction failed: {e}")
+        return None
+
+
+def retrieve_supplementary_teaching_material(ta_id, primary_chunks, query_analysis, diagnostics, original_chunks=None):
     """
     When primary retrieval returns only assignment-type content (homework/exam),
-    extract concept keywords from the problem text and do a supplementary
-    vector search for teaching materials (lectures, readings).
+    use LLM step-back prompting to extract academic concepts from the problem text,
+    then do a supplementary vector search for teaching materials (lectures, readings).
+
+    Args:
+        ta_id: Teaching assistant ID
+        primary_chunks: The chunks being returned (may be hybrid full-doc)
+        query_analysis: Output from analyze_query()
+        diagnostics: Diagnostics dict (mutated to add supplementary info)
+        original_chunks: Pre-hybrid filtered chunks (contain actual question text)
 
     Returns:
         tuple: (supplementary_chunks: list, triggered: bool)
     """
+    from models import db, DocumentChunk
     from sqlalchemy import not_, or_
 
     # Guard 1: Don't trigger for conceptual queries (already search broadly)
@@ -486,42 +526,29 @@ def retrieve_supplementary_teaching_material(ta_id, primary_chunks, query_analys
         diagnostics["supplementary_skip_reason"] = "no_primary_chunks"
         return [], False
 
-    logger.info(f"[{ta_id}] Supplementary retrieval: all guards passed (doc_type_filter={doc_type_filter}, primary_doc_types={primary_doc_types})")
+    logger.info(f"[{ta_id}] Supplementary: all guards passed (doc_type_filter={doc_type_filter}, primary_doc_types={primary_doc_types})")
 
-    # Extract concept keywords from the specific problem text
-    full_text = primary_chunks[0].get("text", "")
-    problem_ref = query_analysis.get("problem_reference", {})
-    problem_num = problem_ref.get("problem_number")
+    # Build problem text from original pre-hybrid chunks (more granular than full doc)
+    if original_chunks:
+        problem_text = "\n".join(c.get("text", "")[:500] for c in original_chunks[:3])
+        logger.info(f"[{ta_id}] Supplementary: using {len(original_chunks[:3])} original chunks for concept extraction ({len(problem_text)} chars)")
+    else:
+        problem_text = primary_chunks[0].get("text", "")[:2000]
+        logger.info(f"[{ta_id}] Supplementary: using primary chunk text for concept extraction ({len(problem_text)} chars)")
 
-    # For hybrid full-doc chunks, locate the specific problem within the document
-    problem_text = ""
-    if problem_num and len(full_text) > 2000:
-        patterns = [
-            rf'(?:^|\n)\s*{re.escape(problem_num)}[\.\)]\s',
-            rf'\b(?:question|problem|q)\s*{re.escape(problem_num)}\b',
-            rf'\b{re.escape(problem_num)}\.\s+(?:True|Using|Consider|Suppose|Explain|What|How|Why|The|A\s)',
-        ]
-        for pattern in patterns:
-            match = re.search(pattern, full_text, re.IGNORECASE)
-            if match:
-                start = max(0, match.start() - 50)
-                end = min(len(full_text), match.start() + 500)
-                problem_text = full_text[start:end]
-                logger.info(f"[{ta_id}] Supplementary: found problem {problem_num} at pos {match.start()}, extracted {len(problem_text)} chars")
-                break
+    # Step-back prompting: use LLM to extract academic concepts
+    concept_query = _extract_concepts_via_llm(problem_text, ta_id)
 
-    if not problem_text:
-        problem_text = full_text[:1500]
-        logger.info(f"[{ta_id}] Supplementary: problem {problem_num} not found in doc, using first {len(problem_text)} chars")
+    # Fallback to keyword extraction if LLM fails
+    if not concept_query or len(concept_query.split()) < 2:
+        concept_query = _extract_concept_query(problem_text)
+        logger.info(f"[{ta_id}] Supplementary: fell back to keyword extraction = '{concept_query[:100]}'")
 
-    concept_query = _extract_concept_query(problem_text)
     diagnostics["supplementary_concept_query"] = concept_query[:200]
 
-    if len(concept_query.split()) < 3:
+    if len(concept_query.split()) < 2:
         diagnostics["supplementary_skip_reason"] = f"concept_query_too_short ({concept_query})"
         return [], False
-
-    logger.info(f"[{ta_id}] Supplementary: concept_query = '{concept_query[:150]}'")
 
     # Embed the concept query
     try:
@@ -567,7 +594,7 @@ def retrieve_supplementary_teaching_material(ta_id, primary_chunks, query_analys
         return [], False
 
     # Log top scores for debugging
-    top_scores = [(float(r.score), r.file_name, r.doc_type) for r in supp_results[:5]]
+    top_scores = [(round(float(r.score), 3), r.file_name, r.doc_type) for r in supp_results[:5]]
     logger.info(f"[{ta_id}] Supplementary: top 5 results = {top_scores}")
 
     # Take top SUPPLEMENTARY_K with minimum score threshold
@@ -592,7 +619,7 @@ def retrieve_supplementary_teaching_material(ta_id, primary_chunks, query_analys
             f"sources: {[c['file_name'] for c in supplementary_chunks]})"
         )
     else:
-        diagnostics["supplementary_skip_reason"] = f"all_below_threshold (top={top_scores[0][0]:.3f} < {MIN_SUPPLEMENTARY_SCORE})"
+        diagnostics["supplementary_skip_reason"] = f"all_below_threshold (top={top_scores[0][0]} < {MIN_SUPPLEMENTARY_SCORE})"
 
     return supplementary_chunks, len(supplementary_chunks) > 0
 
@@ -1533,7 +1560,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
 
                 # Supplementary teaching material retrieval
                 supp_chunks, supp_triggered = retrieve_supplementary_teaching_material(
-                    ta_id, hybrid_chunks, query_analysis, diagnostics)
+                    ta_id, hybrid_chunks, query_analysis, diagnostics, original_chunks=[])
                 if supp_triggered:
                     hybrid_chunks.extend(supp_chunks)
                     diagnostics["supplementary_teaching_found"] = True
@@ -1819,7 +1846,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
 
                 # Supplementary teaching material retrieval
                 supp_chunks, supp_triggered = retrieve_supplementary_teaching_material(
-                    ta_id, hybrid_chunks, query_analysis, diagnostics)
+                    ta_id, hybrid_chunks, query_analysis, diagnostics, original_chunks=chunks)
                 if supp_triggered:
                     hybrid_chunks.extend(supp_chunks)
                     diagnostics["supplementary_teaching_found"] = True
