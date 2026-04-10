@@ -482,9 +482,33 @@ def retrieve_supplementary_teaching_material(ta_id, primary_chunks, query_analys
     if not primary_chunks:
         return [], False
 
-    # Extract concept keywords from the problem text
-    # Use first chunk (or full doc text for hybrid) as the source
-    problem_text = primary_chunks[0].get("text", "")[:1500]  # Cap to avoid huge embeds
+    # Extract concept keywords from the specific problem text
+    full_text = primary_chunks[0].get("text", "")
+    problem_ref = query_analysis.get("problem_reference", {})
+    problem_num = problem_ref.get("problem_number")
+
+    # For hybrid full-doc chunks, locate the specific problem within the document
+    problem_text = ""
+    if problem_num and len(full_text) > 2000:
+        # Search for the problem number in the document (e.g., "3." or "3 " at question boundary)
+        patterns = [
+            rf'(?:^|\n)\s*{re.escape(problem_num)}[\.\)]\s',  # "3." or "3)" at line start
+            rf'\b(?:question|problem|q)\s*{re.escape(problem_num)}\b',  # "question 3", "Q3"
+            rf'\b{re.escape(problem_num)}\.\s+(?:True|Using|Consider|Suppose|Explain|What|How|Why|The|A\s)',  # "3. True or false..."
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, full_text, re.IGNORECASE)
+            if match:
+                start = max(0, match.start() - 50)
+                end = min(len(full_text), match.start() + 500)
+                problem_text = full_text[start:end]
+                logger.info(f"[{ta_id}] Supplementary retrieval: found problem {problem_num} in full doc at pos {match.start()}")
+                break
+
+    # Fallback: use first 1500 chars (works for non-hybrid single-chunk results)
+    if not problem_text:
+        problem_text = full_text[:1500]
+
     concept_query = _extract_concept_query(problem_text)
 
     if len(concept_query.split()) < 3:
