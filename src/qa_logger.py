@@ -53,7 +53,11 @@ QA_LOG_HEADERS = [
     "validation_matches_found",
     "llm_model",
     "is_anonymous",
-    "is_preview"
+    "is_preview",
+    "supplementary_teaching_found",
+    "supplementary_chunk_count",
+    "supplementary_concept_query",
+    "supplementary_skip_reason"
 ]
 
 INDEX_LOG_HEADERS = [
@@ -251,7 +255,11 @@ def log_qa_entry(
                 str(diag.get("validation_matches_found", 0)),
                 llm_model,
                 str(is_anonymous),
-                str(is_preview)
+                str(is_preview),
+                str(diag.get("supplementary_teaching_found", False)),
+                str(diag.get("supplementary_chunk_count", 0)),
+                diag.get("supplementary_concept_query") or "",
+                diag.get("supplementary_skip_reason") or ""
             ]
             
             service.spreadsheets().values().append(

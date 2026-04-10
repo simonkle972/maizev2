@@ -452,7 +452,7 @@ def _extract_concept_query(problem_text: str, max_tokens: int = 60) -> str:
     return ' '.join(unique[:max_tokens])
 
 
-def retrieve_supplementary_teaching_material(ta_id, primary_chunks, query_analysis):
+def retrieve_supplementary_teaching_material(ta_id, primary_chunks, query_analysis, diagnostics):
     """
     When primary retrieval returns only assignment-type content (homework/exam),
     extract concept keywords from the problem text and do a supplementary
@@ -461,26 +461,32 @@ def retrieve_supplementary_teaching_material(ta_id, primary_chunks, query_analys
     Returns:
         tuple: (supplementary_chunks: list, triggered: bool)
     """
-    from sqlalchemy import not_
+    from sqlalchemy import not_, or_
 
     # Guard 1: Don't trigger for conceptual queries (already search broadly)
     if query_analysis.get("is_conceptual"):
+        diagnostics["supplementary_skip_reason"] = "is_conceptual"
         return [], False
 
     # Guard 2: Only trigger when doc_type_filter is an assignment type
     doc_type_filter = query_analysis.get("doc_type_filter")
     if doc_type_filter not in ASSIGNMENT_DOC_TYPES:
+        diagnostics["supplementary_skip_reason"] = f"doc_type_filter={doc_type_filter}"
         return [], False
 
     # Guard 3: Check if primary chunks already include known teaching material
     TEACHING_DOC_TYPES = {"lecture", "reading", "syllabus"}
     primary_doc_types = {c.get("doc_type") for c in primary_chunks}
     if primary_doc_types & TEACHING_DOC_TYPES:
+        diagnostics["supplementary_skip_reason"] = f"already_has_teaching={primary_doc_types & TEACHING_DOC_TYPES}"
         return [], False
 
     # Guard 4: Need primary chunks to extract concept query from
     if not primary_chunks:
+        diagnostics["supplementary_skip_reason"] = "no_primary_chunks"
         return [], False
+
+    logger.info(f"[{ta_id}] Supplementary retrieval: all guards passed (doc_type_filter={doc_type_filter}, primary_doc_types={primary_doc_types})")
 
     # Extract concept keywords from the specific problem text
     full_text = primary_chunks[0].get("text", "")
@@ -490,11 +496,10 @@ def retrieve_supplementary_teaching_material(ta_id, primary_chunks, query_analys
     # For hybrid full-doc chunks, locate the specific problem within the document
     problem_text = ""
     if problem_num and len(full_text) > 2000:
-        # Search for the problem number in the document (e.g., "3." or "3 " at question boundary)
         patterns = [
-            rf'(?:^|\n)\s*{re.escape(problem_num)}[\.\)]\s',  # "3." or "3)" at line start
-            rf'\b(?:question|problem|q)\s*{re.escape(problem_num)}\b',  # "question 3", "Q3"
-            rf'\b{re.escape(problem_num)}\.\s+(?:True|Using|Consider|Suppose|Explain|What|How|Why|The|A\s)',  # "3. True or false..."
+            rf'(?:^|\n)\s*{re.escape(problem_num)}[\.\)]\s',
+            rf'\b(?:question|problem|q)\s*{re.escape(problem_num)}\b',
+            rf'\b{re.escape(problem_num)}\.\s+(?:True|Using|Consider|Suppose|Explain|What|How|Why|The|A\s)',
         ]
         for pattern in patterns:
             match = re.search(pattern, full_text, re.IGNORECASE)
@@ -502,20 +507,21 @@ def retrieve_supplementary_teaching_material(ta_id, primary_chunks, query_analys
                 start = max(0, match.start() - 50)
                 end = min(len(full_text), match.start() + 500)
                 problem_text = full_text[start:end]
-                logger.info(f"[{ta_id}] Supplementary retrieval: found problem {problem_num} in full doc at pos {match.start()}")
+                logger.info(f"[{ta_id}] Supplementary: found problem {problem_num} at pos {match.start()}, extracted {len(problem_text)} chars")
                 break
 
-    # Fallback: use first 1500 chars (works for non-hybrid single-chunk results)
     if not problem_text:
         problem_text = full_text[:1500]
+        logger.info(f"[{ta_id}] Supplementary: problem {problem_num} not found in doc, using first {len(problem_text)} chars")
 
     concept_query = _extract_concept_query(problem_text)
+    diagnostics["supplementary_concept_query"] = concept_query[:200]
 
     if len(concept_query.split()) < 3:
-        logger.info(f"[{ta_id}] Supplementary retrieval: concept query too short, skipping")
+        diagnostics["supplementary_skip_reason"] = f"concept_query_too_short ({concept_query})"
         return [], False
 
-    logger.info(f"[{ta_id}] Supplementary retrieval: concept query = '{concept_query[:100]}...'")
+    logger.info(f"[{ta_id}] Supplementary: concept_query = '{concept_query[:150]}'")
 
     # Embed the concept query
     try:
@@ -526,10 +532,11 @@ def retrieve_supplementary_teaching_material(ta_id, primary_chunks, query_analys
         )
         concept_embedding = response.data[0].embedding
     except Exception as e:
-        logger.warning(f"[{ta_id}] Supplementary retrieval: embedding failed: {e}")
+        diagnostics["supplementary_skip_reason"] = f"embedding_failed: {e}"
+        logger.warning(f"[{ta_id}] Supplementary: embedding failed: {e}")
         return [], False
 
-    # Vector search excluding assignment doc types
+    # Vector search: exclude assignment doc types, include NULL doc_types
     try:
         supp_results = db.session.query(
             DocumentChunk.chunk_text,
@@ -541,16 +548,27 @@ def retrieve_supplementary_teaching_material(ta_id, primary_chunks, query_analys
             (1 - DocumentChunk.embedding.cosine_distance(concept_embedding)).label('score')
         ).filter(
             DocumentChunk.ta_id == ta_id,
-            not_(DocumentChunk.doc_type.in_(list(ASSIGNMENT_DOC_TYPES))),
+            or_(
+                not_(DocumentChunk.doc_type.in_(list(ASSIGNMENT_DOC_TYPES))),
+                DocumentChunk.doc_type.is_(None)
+            ),
         ).order_by(
             DocumentChunk.embedding.cosine_distance(concept_embedding)
         ).limit(INITIAL_RETRIEVAL_K).all()
     except Exception as e:
-        logger.warning(f"[{ta_id}] Supplementary retrieval: query failed: {e}")
+        diagnostics["supplementary_skip_reason"] = f"query_failed: {e}"
+        logger.warning(f"[{ta_id}] Supplementary: vector query failed: {e}")
         return [], False
 
+    logger.info(f"[{ta_id}] Supplementary: vector search returned {len(supp_results)} results")
+
     if not supp_results:
+        diagnostics["supplementary_skip_reason"] = "no_teaching_chunks_found"
         return [], False
+
+    # Log top scores for debugging
+    top_scores = [(float(r.score), r.file_name, r.doc_type) for r in supp_results[:5]]
+    logger.info(f"[{ta_id}] Supplementary: top 5 results = {top_scores}")
 
     # Take top SUPPLEMENTARY_K with minimum score threshold
     MIN_SUPPLEMENTARY_SCORE = 0.35
@@ -569,10 +587,12 @@ def retrieve_supplementary_teaching_material(ta_id, primary_chunks, query_analys
 
     if supplementary_chunks:
         logger.info(
-            f"[{ta_id}] Supplementary retrieval: found {len(supplementary_chunks)} teaching chunks "
+            f"[{ta_id}] Supplementary: SUCCESS - {len(supplementary_chunks)} teaching chunks "
             f"(scores: {[round(c['score'], 3) for c in supplementary_chunks]}, "
             f"sources: {[c['file_name'] for c in supplementary_chunks]})"
         )
+    else:
+        diagnostics["supplementary_skip_reason"] = f"all_below_threshold (top={top_scores[0][0]:.3f} < {MIN_SUPPLEMENTARY_SCORE})"
 
     return supplementary_chunks, len(supplementary_chunks) > 0
 
@@ -1513,7 +1533,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
 
                 # Supplementary teaching material retrieval
                 supp_chunks, supp_triggered = retrieve_supplementary_teaching_material(
-                    ta_id, hybrid_chunks, query_analysis)
+                    ta_id, hybrid_chunks, query_analysis, diagnostics)
                 if supp_triggered:
                     hybrid_chunks.extend(supp_chunks)
                     diagnostics["supplementary_teaching_found"] = True
@@ -1799,7 +1819,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
 
                 # Supplementary teaching material retrieval
                 supp_chunks, supp_triggered = retrieve_supplementary_teaching_material(
-                    ta_id, hybrid_chunks, query_analysis)
+                    ta_id, hybrid_chunks, query_analysis, diagnostics)
                 if supp_triggered:
                     hybrid_chunks.extend(supp_chunks)
                     diagnostics["supplementary_teaching_found"] = True
@@ -1857,7 +1877,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
 
     # Supplementary teaching material retrieval
     supp_chunks, supp_triggered = retrieve_supplementary_teaching_material(
-        ta_id, chunks, query_analysis)
+        ta_id, chunks, query_analysis, diagnostics)
     if supp_triggered:
         chunks.extend(supp_chunks)
         diagnostics["supplementary_teaching_found"] = True
