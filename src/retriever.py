@@ -472,9 +472,10 @@ def retrieve_supplementary_teaching_material(ta_id, primary_chunks, query_analys
     if doc_type_filter not in ASSIGNMENT_DOC_TYPES:
         return [], False
 
-    # Guard 3: Check if primary chunks already include teaching material
-    primary_doc_types = {c.get("doc_type", "other") for c in primary_chunks}
-    if primary_doc_types - ASSIGNMENT_DOC_TYPES:  # Has non-assignment types
+    # Guard 3: Check if primary chunks already include known teaching material
+    TEACHING_DOC_TYPES = {"lecture", "reading", "syllabus"}
+    primary_doc_types = {c.get("doc_type") for c in primary_chunks}
+    if primary_doc_types & TEACHING_DOC_TYPES:
         return [], False
 
     # Guard 4: Need primary chunks to extract concept query from
