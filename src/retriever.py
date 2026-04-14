@@ -1457,6 +1457,14 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                 logger.info(f"[{ta_id}] Early conversation (exchange #{len(student_messages)}) - solution doc not yet included")
                 diagnostics["solution_doc_added"] = False
             
+            # Include cached supplementary teaching material
+            supplementary_content = session_context.get("supplementary_content", "")
+            if supplementary_content:
+                combined_content += f"\n\n---\n\n{supplementary_content}"
+                diagnostics["supplementary_teaching_found"] = True
+                diagnostics["supplementary_chunk_count"] = len(session_context.get("supplementary_sources", []))
+                logger.info(f"[{ta_id}] Including cached supplementary teaching material in follow-up")
+
             cached_chunk = {
                 "text": combined_content,
                 "score": 1.0,
@@ -1535,36 +1543,39 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                 }]
                 
                 logger.info(f"[{ta_id}] Early hybrid complete | doc={filename} | tokens={token_estimate}")
-                
-                # CACHE TO SESSION: Save this successful retrieval for follow-up queries
-                if session_id:
-                    try:
-                        session = ChatSession.query.get(session_id)
-                        # SECURITY: Only cache if session belongs to this TA
-                        if session and session.ta_id == ta_id:
-                            # Preserve existing attempt_counts from session_context if available
-                            existing_attempts = session_context.get("attempt_counts", {}) if session_context else {}
-                            session.active_context = {
-                                "ta_id": ta_id,  # Store ta_id for cross-tenant security validation
-                                "document_filename": filename,
-                                "document_content": full_text,
-                                "problem_reference": problem_ref.get("full_ref") if problem_ref else None,
-                                "doc_type": "problem_set",
-                                "cached_at": datetime.utcnow().isoformat(),
-                                "attempt_counts": existing_attempts
-                            }
-                            db.session.commit()
-                            logger.info(f"[{ta_id}] Cached document context for session: {filename}")
-                    except Exception as e:
-                        logger.warning(f"[{ta_id}] Failed to cache session context: {e}")
 
-                # Supplementary teaching material retrieval
+                # Supplementary teaching material retrieval (before cache so we can store it)
                 supp_chunks, supp_triggered = retrieve_supplementary_teaching_material(
                     ta_id, hybrid_chunks, query_analysis, diagnostics, original_chunks=[])
                 if supp_triggered:
                     hybrid_chunks.extend(supp_chunks)
                     diagnostics["supplementary_teaching_found"] = True
                     diagnostics["supplementary_chunk_count"] = len(supp_chunks)
+
+                # CACHE TO SESSION: Save retrieval + supplementary content for follow-ups
+                if session_id:
+                    try:
+                        session = ChatSession.query.get(session_id)
+                        if session and session.ta_id == ta_id:
+                            existing_attempts = session_context.get("attempt_counts", {}) if session_context else {}
+                            supp_content = "\n\n---\n\n".join(
+                                f"[TEACHING MATERIAL — From: {c['file_name']}]\n{c['text']}" for c in supp_chunks
+                            ) if supp_triggered else ""
+                            session.active_context = {
+                                "ta_id": ta_id,
+                                "document_filename": filename,
+                                "document_content": full_text,
+                                "problem_reference": problem_ref.get("full_ref") if problem_ref else None,
+                                "doc_type": "problem_set",
+                                "cached_at": datetime.utcnow().isoformat(),
+                                "attempt_counts": existing_attempts,
+                                "supplementary_content": supp_content,
+                                "supplementary_sources": [c['file_name'] for c in supp_chunks] if supp_triggered else [],
+                            }
+                            db.session.commit()
+                            logger.info(f"[{ta_id}] Cached document context for session: {filename}")
+                    except Exception as e:
+                        logger.warning(f"[{ta_id}] Failed to cache session context: {e}")
 
                 return hybrid_chunks, diagnostics
             elif token_estimate > Config.HYBRID_MAX_DOC_TOKENS:
@@ -1821,13 +1832,25 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                 }]
                 
                 # CACHE THE DOCUMENT for follow-up queries
-                # This ensures answer submissions and clarification questions use the same document
+                logger.info(f"[{ta_id}] Hybrid fallback complete | doc={filename} | tokens={token_estimate}")
+
+                # Supplementary teaching material retrieval (before cache so we can store it)
+                supp_chunks, supp_triggered = retrieve_supplementary_teaching_material(
+                    ta_id, hybrid_chunks, query_analysis, diagnostics, original_chunks=chunks)
+                if supp_triggered:
+                    hybrid_chunks.extend(supp_chunks)
+                    diagnostics["supplementary_teaching_found"] = True
+                    diagnostics["supplementary_chunk_count"] = len(supp_chunks)
+
+                # CACHE TO SESSION: Save retrieval + supplementary content for follow-ups
                 if session_id:
                     try:
                         session = ChatSession.query.get(session_id)
-                        # SECURITY: Only cache if session belongs to this TA
                         if session and session.ta_id == ta_id:
                             existing_attempts = session_context.get("attempt_counts", {}) if session_context else {}
+                            supp_content = "\n\n---\n\n".join(
+                                f"[TEACHING MATERIAL — From: {c['file_name']}]\n{c['text']}" for c in supp_chunks
+                            ) if supp_triggered else ""
                             session.active_context = {
                                 "ta_id": ta_id,
                                 "document_filename": filename,
@@ -1835,22 +1858,14 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                                 "problem_reference": problem_ref.get("full_ref") if problem_ref else None,
                                 "doc_type": chunks[0].get("doc_type", "other") if chunks else "other",
                                 "cached_at": datetime.utcnow().isoformat(),
-                                "attempt_counts": existing_attempts
+                                "attempt_counts": existing_attempts,
+                                "supplementary_content": supp_content,
+                                "supplementary_sources": [c['file_name'] for c in supp_chunks] if supp_triggered else [],
                             }
                             db.session.commit()
                             logger.info(f"[{ta_id}] Cached document context for session (hybrid fallback): {filename}")
                     except Exception as e:
                         logger.warning(f"[{ta_id}] Failed to cache session context in hybrid fallback: {e}")
-                
-                logger.info(f"[{ta_id}] Hybrid fallback complete | doc={filename} | tokens={token_estimate}")
-
-                # Supplementary teaching material retrieval
-                supp_chunks, supp_triggered = retrieve_supplementary_teaching_material(
-                    ta_id, hybrid_chunks, query_analysis, diagnostics, original_chunks=chunks)
-                if supp_triggered:
-                    hybrid_chunks.extend(supp_chunks)
-                    diagnostics["supplementary_teaching_found"] = True
-                    diagnostics["supplementary_chunk_count"] = len(supp_chunks)
 
                 return hybrid_chunks, diagnostics
             elif token_estimate > Config.HYBRID_MAX_DOC_TOKENS:
@@ -1876,17 +1891,27 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         (not diagnostics.get("validation_performed") or diagnostics.get("validation_passed"))  # And validation passed (if performed)
     )
     
+    # Supplementary teaching material retrieval (before cache so we can store it)
+    supp_chunks, supp_triggered = retrieve_supplementary_teaching_material(
+        ta_id, chunks, query_analysis, diagnostics)
+    if supp_triggered:
+        chunks.extend(supp_chunks)
+        diagnostics["supplementary_teaching_found"] = True
+        diagnostics["supplementary_chunk_count"] = len(supp_chunks)
+
     if should_cache_chunks:
         try:
-            # Get the primary document from top chunk
             top_doc = chunks[0].get("file_name", "")
             if top_doc:
                 session = ChatSession.query.get(session_id)
-                # SECURITY: Only cache if session belongs to this TA
                 if session and session.ta_id == ta_id:
-                    # Concatenate chunk texts as the cached content
-                    combined_content = "\n\n---\n\n".join([c.get("text", "") for c in chunks])
+                    # Only cache primary chunks (not supplementary) as document_content
+                    primary_only = [c for c in chunks if c.get("retrieval_role") != "teaching_material"]
+                    combined_content = "\n\n---\n\n".join([c.get("text", "") for c in primary_only])
                     existing_attempts = session_context.get("attempt_counts", {}) if session_context else {}
+                    supp_content = "\n\n---\n\n".join(
+                        f"[TEACHING MATERIAL — From: {c['file_name']}]\n{c['text']}" for c in supp_chunks
+                    ) if supp_triggered else ""
                     session.active_context = {
                         "ta_id": ta_id,
                         "document_filename": top_doc,
@@ -1895,19 +1920,13 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                         "doc_type": chunks[0].get("doc_type", "other"),
                         "cached_at": datetime.utcnow().isoformat(),
                         "attempt_counts": existing_attempts,
-                        "cache_source": "chunk_retrieval"  # Track that this came from chunks, not full doc
+                        "cache_source": "chunk_retrieval",
+                        "supplementary_content": supp_content,
+                        "supplementary_sources": [c['file_name'] for c in supp_chunks] if supp_triggered else [],
                     }
                     db.session.commit()
                     logger.info(f"[{ta_id}] Cached document context for session (chunk retrieval): {top_doc}")
         except Exception as e:
             logger.warning(f"[{ta_id}] Failed to cache session context in chunk retrieval: {e}")
-
-    # Supplementary teaching material retrieval
-    supp_chunks, supp_triggered = retrieve_supplementary_teaching_material(
-        ta_id, chunks, query_analysis, diagnostics)
-    if supp_triggered:
-        chunks.extend(supp_chunks)
-        diagnostics["supplementary_teaching_found"] = True
-        diagnostics["supplementary_chunk_count"] = len(supp_chunks)
 
     return chunks, diagnostics
