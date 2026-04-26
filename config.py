@@ -82,6 +82,10 @@ class Config:
     HYBRID_MAX_DOC_TOKENS = 80000
     HYBRID_SCORE_SPREAD_THRESHOLD = 2
 
+    CONTEXTUALIZER_ENABLED = os.getenv('CONTEXTUALIZER_ENABLED', 'true').lower() == 'true'
+    CONTEXTUALIZER_MODEL = os.getenv('CONTEXTUALIZER_MODEL', 'gpt-4o-mini')
+    CONTEXTUALIZER_MAX_HISTORY = 6
+
     # Auth0 Configuration (professor app)
     AUTH0_DOMAIN = os.getenv('AUTH0_DOMAIN')
     AUTH0_CLIENT_ID = os.getenv('AUTH0_CLIENT_ID')

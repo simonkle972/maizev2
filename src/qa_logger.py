@@ -57,7 +57,14 @@ QA_LOG_HEADERS = [
     "supplementary_teaching_found",
     "supplementary_chunk_count",
     "supplementary_concept_query",
-    "supplementary_skip_reason"
+    "supplementary_skip_reason",
+    "contextualizer_enabled",
+    "contextualizer_fallback",
+    "contextualizer_latency_ms",
+    "rewritten_query",
+    "intent",
+    "current_focus",
+    "cache_action"
 ]
 
 INDEX_LOG_HEADERS = [
@@ -259,7 +266,14 @@ def log_qa_entry(
                 str(diag.get("supplementary_teaching_found", False)),
                 str(diag.get("supplementary_chunk_count", 0)),
                 diag.get("supplementary_concept_query") or "",
-                diag.get("supplementary_skip_reason") or ""
+                diag.get("supplementary_skip_reason") or "",
+                str(diag.get("contextualizer_enabled", False)),
+                str(diag.get("contextualizer_fallback", False)),
+                str(diag.get("contextualizer_latency_ms", 0)),
+                (diag.get("rewritten_query") or "")[:2000],
+                diag.get("intent") or "",
+                (diag.get("current_focus") or "")[:300],
+                diag.get("cache_action") or ""
             ]
             
             service.spreadsheets().values().append(

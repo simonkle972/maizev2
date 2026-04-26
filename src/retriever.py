@@ -452,6 +452,53 @@ def _extract_concept_query(problem_text: str, max_tokens: int = 60) -> str:
     return ' '.join(unique[:max_tokens])
 
 
+def _fetch_concept_supplementary_chunks(ta_id: str, query: str, limit: int = 4, min_similarity: float = 0.4) -> list:
+    """
+    Fetch teaching-material chunks (lecture/reading/syllabus) matching a query.
+
+    Used when the contextualizer identifies a turn as `concept_lookup`: the session cache
+    is preserved (primary document stays), but fresh teaching material for the newly-mentioned
+    concept is retrieved and appended. This is what lets a student working on PS4 ask about
+    "money supply" and get the PS4 context + relevant lecture material, without cache swap.
+
+    Returns a list of chunk dicts (same shape as other retrieval paths). Empty on failure.
+    """
+    from models import db, DocumentChunk
+
+    TEACHING_TYPES = ["lecture", "reading", "syllabus"]
+    try:
+        client = get_openai_client()
+        response = client.embeddings.create(model=Config.EMBEDDING_MODEL, input=query)
+        query_emb = response.data[0].embedding
+
+        rows = db.session.query(
+            DocumentChunk,
+            DocumentChunk.embedding.cosine_distance(query_emb).label("distance")
+        ).filter(
+            DocumentChunk.ta_id == ta_id,
+            DocumentChunk.doc_type.in_(TEACHING_TYPES)
+        ).order_by("distance").limit(limit * 3).all()
+
+        result = []
+        for chunk, distance in rows:
+            similarity = float(1 - distance)
+            if similarity < min_similarity:
+                continue
+            result.append({
+                "text": chunk.chunk_text,
+                "file_name": chunk.file_name or "unknown",
+                "doc_type": chunk.doc_type,
+                "score": similarity,
+                "chunk_index": chunk.chunk_index,
+            })
+            if len(result) >= limit:
+                break
+        return result
+    except Exception as e:
+        logger.warning(f"[{ta_id}] _fetch_concept_supplementary_chunks failed: {e}")
+        return []
+
+
 def _extract_concepts_via_llm(problem_text, ta_id):
     """
     Use gpt-4o-mini step-back prompting to extract academic concepts from problem text.
@@ -1219,6 +1266,151 @@ def enrich_query_with_context(query: str, history_context: dict) -> str:
     return query
 
 
+def _format_history_for_contextualizer(conversation_history: list, max_turns: int) -> str:
+    """Format the last N turns of conversation history as alternating Student/TA lines."""
+    if not conversation_history:
+        return ""
+
+    normalized = []
+    for msg in conversation_history[-(max_turns * 2):]:
+        role = getattr(msg, "role", None)
+        content = getattr(msg, "content", None)
+        if role is None and isinstance(msg, dict):
+            role = msg.get("role")
+            content = msg.get("content")
+        if role and content:
+            label = "Student" if role == "user" else "TA"
+            normalized.append(f"{label}: {content[:400]}")
+
+    return "\n".join(normalized)
+
+
+def contextualize_query(query: str, conversation_history: list = None, session_context: dict = None, ta_id: str = "") -> dict:
+    """
+    Pre-retrieval contextualization: rewrite the query into a self-contained form
+    and classify the student's intent using a single cheap LLM call.
+
+    Returns a dict with:
+        rewritten_query: self-contained query with coreferences resolved
+        intent: one of "continuation" | "concept_lookup" | "pivot" | "clarification" | "new"
+        current_focus: short phrase describing what the student is working on
+        reason: one-line justification
+        latency_ms: time spent in the contextualizer call
+        fallback: True if the call failed and we're returning the raw query
+
+    On failure, returns a dict with fallback=True and rewritten_query=query so callers
+    can proceed with heuristic-only behavior.
+    """
+    import time, json
+
+    result = {
+        "rewritten_query": query,
+        "intent": "new",
+        "current_focus": "",
+        "reason": "",
+        "latency_ms": 0,
+        "fallback": False,
+    }
+
+    if not Config.CONTEXTUALIZER_ENABLED:
+        result["reason"] = "contextualizer_disabled"
+        return result
+
+    # If there's no prior context at all, the raw query IS the rewritten query — skip the LLM call.
+    has_history = bool(conversation_history)
+    has_cache = bool(session_context and session_context.get("document_filename"))
+    if not has_history and not has_cache:
+        result["reason"] = "no_prior_context"
+        return result
+
+    history_text = _format_history_for_contextualizer(
+        conversation_history or [], Config.CONTEXTUALIZER_MAX_HISTORY
+    )
+
+    if has_cache:
+        cache_summary = (
+            f"Document: {session_context.get('document_filename', 'unknown')} | "
+            f"Type: {session_context.get('doc_type', 'unknown')} | "
+            f"Problem ref: {session_context.get('problem_reference') or 'none'}"
+        )
+    else:
+        cache_summary = "none"
+
+    prompt = f"""You help a Teaching Assistant understand what a student is asking in context.
+
+Student's current message:
+"{query}"
+
+Recent conversation (oldest first):
+{history_text or "(none)"}
+
+Currently cached context from prior retrieval:
+{cache_summary}
+
+Your tasks:
+1. Rewrite the student's current message into a complete, self-contained query that resolves pronouns and implicit references using the conversation. If already self-contained, return it unchanged.
+2. Classify intent as EXACTLY ONE of:
+   - "continuation": follow-up on the same problem/topic currently being discussed (same problem, same document)
+   - "concept_lookup": student asks about a related concept that isn't itself a new problem — stay on the current problem but pull in supporting material
+   - "pivot": student is moving to a distinct new problem, document, or topic
+   - "clarification": student asking for re-explanation of something already covered
+   - "new": no prior conversation / fresh start
+3. Summarize the student's current focus in one short phrase.
+4. Give a one-line justification for your intent classification.
+
+IMPORTANT RULES:
+- Bias toward "continuation" or "concept_lookup" when in doubt. A real pivot usually involves an explicit new problem reference ("let's do PS3 now") or a clearly unrelated topic.
+- A mention of a concept (e.g. "money supply", "Bayes theorem") is "concept_lookup" NOT "pivot" if the conversation is still about the originally discussed problem.
+- A bare problem reference (e.g. "Q3") that's consistent with the cached document's known problems is "continuation", not "pivot".
+
+Respond with JSON ONLY, no prose:
+{{"rewritten_query": "...", "intent": "...", "current_focus": "...", "reason": "..."}}"""
+
+    start = time.time()
+    try:
+        client = get_openai_client()
+        response = client.chat.completions.create(
+            model=Config.CONTEXTUALIZER_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"},
+            max_tokens=300,
+            temperature=0.0,
+        )
+        raw = response.choices[0].message.content.strip()
+        parsed = json.loads(raw)
+
+        # Validate the returned intent
+        valid_intents = {"continuation", "concept_lookup", "pivot", "clarification", "new"}
+        intent = parsed.get("intent", "new")
+        if intent not in valid_intents:
+            logger.warning(f"[{ta_id}] Contextualizer returned invalid intent '{intent}', defaulting to 'continuation'")
+            intent = "continuation" if has_cache else "new"
+
+        rewritten = (parsed.get("rewritten_query") or query).strip()
+        if not rewritten:
+            rewritten = query
+
+        result.update({
+            "rewritten_query": rewritten,
+            "intent": intent,
+            "current_focus": (parsed.get("current_focus") or "")[:200],
+            "reason": (parsed.get("reason") or "")[:200],
+            "latency_ms": int((time.time() - start) * 1000),
+        })
+        logger.info(
+            f"[{ta_id}] Contextualizer: intent={intent} | focus='{result['current_focus']}' "
+            f"| rewritten='{rewritten[:120]}' | {result['latency_ms']}ms"
+        )
+        return result
+
+    except Exception as e:
+        logger.warning(f"[{ta_id}] Contextualizer failed: {type(e).__name__}: {e}")
+        result["latency_ms"] = int((time.time() - start) * 1000)
+        result["fallback"] = True
+        result["reason"] = f"fallback: {type(e).__name__}"
+        return result
+
+
 def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_history: list = None, session_id: str = None) -> tuple:
     """
     Retrieve relevant chunks for a query with hybrid fallback.
@@ -1276,7 +1468,14 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         "session_cache_used": False,
         "session_cache_document": None,
         "attempt_count": 0,
-        "current_problem_key": None
+        "current_problem_key": None,
+        "contextualizer_enabled": Config.CONTEXTUALIZER_ENABLED,
+        "contextualizer_latency_ms": 0,
+        "contextualizer_fallback": False,
+        "rewritten_query": query,
+        "intent": "new",
+        "current_focus": "",
+        "cache_action": "none",
     }
     
     # SESSION CONTEXT CACHE: Check if we have cached context from previous successful retrieval
@@ -1297,10 +1496,25 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         except Exception as e:
             logger.warning(f"[{ta_id}] Failed to load session context: {e}")
     
+    # PRE-RETRIEVAL CONTEXTUALIZATION
+    # One cheap LLM call that rewrites the query to be self-contained (coreference resolution)
+    # and classifies intent (continuation | concept_lookup | pivot | clarification | new).
+    # The rewritten query feeds downstream retrieval; the intent steers cache behavior.
+    # Falls back silently to raw-query heuristic path if disabled or if the call fails.
+    ctx_result = contextualize_query(query, conversation_history, session_context, ta_id)
+    diagnostics["contextualizer_latency_ms"] = ctx_result["latency_ms"]
+    diagnostics["contextualizer_fallback"] = ctx_result["fallback"]
+    diagnostics["rewritten_query"] = ctx_result["rewritten_query"]
+    diagnostics["intent"] = ctx_result["intent"]
+    diagnostics["current_focus"] = ctx_result["current_focus"]
+
+    contextualizer_worked = Config.CONTEXTUALIZER_ENABLED and not ctx_result["fallback"]
+    effective_query_for_analysis = ctx_result["rewritten_query"] if contextualizer_worked else query
+
     # QUERY ANALYSIS: Extract structured filters (doc_type, unit, assignment, filename, etc.)
-    # Moved early so topic switch detection can compare structured fields against cache metadata.
-    # IMPORTANT: Use ORIGINAL query (not enriched) to preserve filename matching and filters.
-    query_analysis = analyze_query(query, ta_id)
+    # Use the contextualized (rewritten) query when available so filename matching resolves
+    # "Q3" → "PS4 Q3" correctly instead of falling prey to ambiguous short references.
+    query_analysis = analyze_query(effective_query_for_analysis, ta_id)
     diagnostics["is_conceptual"] = query_analysis.get("is_conceptual", False)
 
     # FOLLOW-UP DETECTION AND QUERY ENRICHMENT
@@ -1330,8 +1544,10 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
     
     # If follow-up detected, enrich the query with context from history
     # BUT only if history actually contains a problem/document reference worth enriching with
-    effective_query = query
-    if followup_info["needs_context_enrichment"] and conversation_history:
+    # When the contextualizer produced a rewritten query, use that directly and skip the
+    # legacy enrichment path (they do the same job; contextualizer does it better).
+    effective_query = ctx_result["rewritten_query"] if contextualizer_worked else query
+    if not contextualizer_worked and followup_info["needs_context_enrichment"] and conversation_history:
         history_context = extract_context_from_history(conversation_history)
         
         # Only enrich if we found useful context (problem or document reference)
@@ -1411,7 +1627,29 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                 if cached_unit_match and str(query_unit) != cached_unit_match.group(1):
                     is_topic_switch = True
                     logger.info(f"[{ta_id}] Topic switch: lecture unit change")
-        
+
+        # CONTEXTUALIZER OVERRIDE: when the LLM-classified intent is available and confident,
+        # it takes precedence over the above heuristics. This is what fixes the class of bugs
+        # where concept mentions (e.g., "money supply") were triggering false topic switches.
+        heuristic_decision = is_topic_switch
+        if contextualizer_worked:
+            intent = ctx_result["intent"]
+            if intent == "pivot":
+                if not heuristic_decision:
+                    logger.info(f"[{ta_id}] Contextualizer override: pivot detected, invalidating cache")
+                is_topic_switch = True
+                diagnostics["cache_action"] = "invalidated_by_contextualizer_pivot"
+            elif intent in ("continuation", "clarification", "concept_lookup"):
+                if heuristic_decision:
+                    logger.info(f"[{ta_id}] Contextualizer override: intent='{intent}' preserves cache against heuristic switch")
+                is_topic_switch = False
+                diagnostics["cache_action"] = f"preserved_by_contextualizer_{intent}"
+            else:
+                # "new" intent shouldn't happen here (we only enter this block with history+cache)
+                diagnostics["cache_action"] = "heuristic_switch" if is_topic_switch else "heuristic_preserved"
+        else:
+            diagnostics["cache_action"] = "heuristic_switch" if is_topic_switch else "heuristic_preserved"
+
         if not is_topic_switch:
             # Use cached context - no need to re-search
             logger.info(f"[{ta_id}] Using cached session context for follow-up (document: {session_context.get('document_filename')})")
@@ -1464,6 +1702,22 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                 diagnostics["supplementary_teaching_found"] = True
                 diagnostics["supplementary_chunk_count"] = len(session_context.get("supplementary_sources", []))
                 logger.info(f"[{ta_id}] Including cached supplementary teaching material in follow-up")
+
+            # FRESH CONCEPT LOOKUP: when intent is concept_lookup, pull new teaching material
+            # for the current turn's concept against the rewritten query. Cache stays intact;
+            # the fresh material is appended for this turn only (not persisted to cache).
+            if contextualizer_worked and ctx_result["intent"] == "concept_lookup":
+                fresh_supp = _fetch_concept_supplementary_chunks(ta_id, effective_query, limit=4)
+                if fresh_supp:
+                    fresh_text = "\n\n---\n\n".join(
+                        f"[TEACHING MATERIAL — From: {c['file_name']}]\n{c['text']}"
+                        for c in fresh_supp
+                    )
+                    combined_content += f"\n\n---\n\n{fresh_text}"
+                    diagnostics["supplementary_teaching_found"] = True
+                    diagnostics["supplementary_chunk_count"] = (diagnostics.get("supplementary_chunk_count") or 0) + len(fresh_supp)
+                    diagnostics["supplementary_concept_lookup_fresh"] = True
+                    logger.info(f"[{ta_id}] Fresh concept_lookup supplementary: +{len(fresh_supp)} teaching chunks for '{effective_query[:80]}'")
 
             cached_chunk = {
                 "text": combined_content,

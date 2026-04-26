@@ -4,7 +4,7 @@ import secrets
 import threading
 import time
 from datetime import datetime, timedelta
-from flask import Flask, request, jsonify, render_template, session, redirect, url_for, send_from_directory, Response, stream_with_context, flash
+from flask import Flask, request, jsonify, render_template, session, redirect, url_for, send_from_directory, flash
 from flask_migrate import Migrate
 from flask_login import LoginManager, login_required, current_user
 from config import Config
@@ -1269,7 +1269,8 @@ def ta_chat(slug):
 
 @app.route('/<slug>/api/chat/stream', methods=['POST'])
 def chat_stream_api(slug):
-    import json
+    """Public/admin slug-based streaming chat API. Delegates to shared helper."""
+    from src.chat_streaming import stream_chat_response
 
     ta = TeachingAssistant.query.filter_by(slug=slug, is_active=True).first()
     if not ta:
@@ -1289,167 +1290,13 @@ def chat_stream_api(slug):
     if not query:
         return jsonify({"error": "Query required"}), 400
 
-    if not session_id:
-        session_id = secrets.token_urlsafe(16)
-        user_id = current_user.id if current_user.is_authenticated else None
-        chat_session = ChatSession(id=session_id, ta_id=ta.id, user_id=user_id)
-        db.session.add(chat_session)
-        db.session.commit()
-    else:
-        chat_session = ChatSession.query.filter_by(id=session_id, ta_id=ta.id).first()
-        if not chat_session:
-            session_id = secrets.token_urlsafe(16)
-            user_id = current_user.id if current_user.is_authenticated else None
-            chat_session = ChatSession(id=session_id, ta_id=ta.id, user_id=user_id)
-            db.session.add(chat_session)
-            db.session.commit()
-        elif current_user.is_authenticated and not chat_session.user_id:
-            chat_session.user_id = current_user.id
-            db.session.commit()
-
-    user_message = ChatMessage(session_id=session_id, role="user", content=query)
-    db.session.add(user_message)
-    db.session.commit()
-
-    ta_id = ta.id
-    ta_slug = ta.slug
-    ta_name = ta.name
-    ta_system_prompt = ta.system_prompt
-    ta_course_name = ta.course_name
-
-    def generate():
-        import time
-        from src.qa_logger import log_qa_entry
-
-        start_time = time.time()
-        retrieval_latency_ms = 0
-        generation_latency_ms = 0
-        chunk_count = 0
-        sources = []
-        full_response = ""
-
-        try:
-            from src.retriever import retrieve_context
-            from src.response_generator import generate_response_stream, escape_hash_in_latex
-
-            yield f"data: {json.dumps({'type': 'status', 'message': 'Searching course materials...'})}\n\n"
-
-            recent_messages = ChatMessage.query.filter_by(session_id=session_id).order_by(ChatMessage.created_at.desc()).limit(10).all()
-            conversation_history = list(reversed(recent_messages))
-
-            history_text = ""
-            if conversation_history:
-                history_parts = []
-                for msg in conversation_history[-6:]:
-                    role = "Student" if msg.role == "user" else "Assistant"
-                    history_parts.append(f"{role}: {msg.content[:300]}...")
-                history_text = "\n".join(history_parts)
-
-            retrieval_start = time.time()
-            chunks, retrieval_diagnostics = retrieve_context(ta_id, query, top_k=8, conversation_history=conversation_history, session_id=session_id)
-            retrieval_latency_ms = int((time.time() - retrieval_start) * 1000)
-            chunk_count = len(chunks)
-
-            yield f"data: {json.dumps({'type': 'status', 'message': 'Analyzing relevant content...'})}\n\n"
-
-            # Build context with role-tagged blocks (problem context first, teaching material second)
-            primary = [c for c in chunks if c.get('retrieval_role') != 'teaching_material']
-            teaching = [c for c in chunks if c.get('retrieval_role') == 'teaching_material']
-            parts = [f"[From: {c['file_name']}]\n{c['text']}" for c in primary]
-            if teaching:
-                parts.append("[RELEVANT TEACHING MATERIAL FROM COURSE LECTURES]")
-                parts.extend(f"[From: {c['file_name']}]\n{c['text']}" for c in teaching)
-            context = "\n\n---\n\n".join(parts)
-
-            sources = list(dict.fromkeys(c['file_name'] for c in chunks[:8]))[:3]
-            yield f"data: {json.dumps({'type': 'sources', 'sources': sources})}\n\n"
-
-            yield f"data: {json.dumps({'type': 'status', 'message': 'Generating response...'})}\n\n"
-
-            hybrid_mode = retrieval_diagnostics.get("hybrid_fallback_triggered", False)
-            hybrid_doc_filename = retrieval_diagnostics.get("hybrid_doc_filename")
-            query_reference = retrieval_diagnostics.get("validation_expected_ref")
-            attempt_count = retrieval_diagnostics.get("attempt_count", 0)
-
-            # Detect limited context: retrieval quality too low to give grounded answers
-            score_top1 = retrieval_diagnostics.get("score_top1", 0) or 0
-            total_chunks_in_ta = retrieval_diagnostics.get("total_chunks_in_ta", 0) or 0
-            supplementary_found = retrieval_diagnostics.get("supplementary_teaching_found", False)
-            limited_context = (
-                chunk_count == 0
-                or (chunk_count <= 2 and score_top1 < 0.5)
-                or (hybrid_mode and score_top1 < 0.6)
-                or total_chunks_in_ta <= 5
-            ) and not supplementary_found
-
-            generation_start = time.time()
-            for token in generate_response_stream(
-                query=query,
-                context=context,
-                system_prompt=ta_system_prompt,
-                conversation_history=history_text,
-                course_name=ta_course_name,
-                hybrid_mode=hybrid_mode,
-                hybrid_doc_filename=hybrid_doc_filename,
-                query_reference=query_reference,
-                attempt_count=attempt_count,
-                limited_context=limited_context
-            ):
-                full_response += token
-                yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
-            generation_latency_ms = int((time.time() - generation_start) * 1000)
-
-            full_response = escape_hash_in_latex(full_response)
-
-            chat_session_update = ChatSession.query.get(session_id)
-            assistant_message = ChatMessage(
-                session_id=session_id,
-                role="assistant",
-                content=full_response,
-                sources=sources
-            )
-            db.session.add(assistant_message)
-            if chat_session_update:
-                chat_session_update.last_activity = datetime.utcnow()
-            db.session.commit()
-
-            total_latency_ms = int((time.time() - start_time) * 1000)
-            token_count = len(full_response.split())
-
-            log_qa_entry(
-                ta_id=str(ta_id),
-                ta_slug=ta_slug,
-                ta_name=ta_name,
-                course_name=ta_course_name,
-                session_id=session_id,
-                query=query,
-                answer=full_response,
-                sources=sources,
-                chunk_count=chunk_count,
-                latency_ms=total_latency_ms,
-                retrieval_latency_ms=retrieval_latency_ms,
-                generation_latency_ms=generation_latency_ms,
-                token_count=token_count,
-                retrieval_diagnostics=retrieval_diagnostics,
-                llm_model=Config.LLM_MODEL,
-                is_anonymous=True
-            )
-
-            yield f"data: {json.dumps({'type': 'done', 'session_id': session_id})}\n\n"
-
-        except Exception as e:
-            logger.error(f"Streaming chat error for {slug}: {e}")
-            import traceback
-            logger.error(f"Traceback: {traceback.format_exc()}")
-            yield f"data: {json.dumps({'type': 'error', 'message': 'An error occurred processing your question.'})}\n\n"
-
-    return Response(
-        stream_with_context(generate()),
-        mimetype='text/event-stream',
-        headers={
-            'Cache-Control': 'no-cache',
-            'X-Accel-Buffering': 'no'
-        }
+    user_id = current_user.id if current_user.is_authenticated else None
+    return stream_chat_response(
+        ta=ta,
+        query=query,
+        session_id=session_id,
+        user_id=user_id,
+        is_anonymous=True,
     )
 
 def check_stale_indexing_jobs():
