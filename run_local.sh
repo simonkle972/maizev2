@@ -36,6 +36,11 @@ fi
 # Set environment file
 export DOTENV_PATH=.env.local
 
+# CRITICAL: prevent Flask CLI from auto-loading .env (which contains PROD credentials).
+# Without this, `flask db upgrade` would silently run against the production database.
+# config.py's load_dotenv(override=True) is the second safeguard; this is the first.
+export FLASK_SKIP_DOTENV=1
+
 # Run database migrations
 echo "🔄 Running database migrations..."
 flask db upgrade

@@ -2,8 +2,15 @@ import os
 from dotenv import load_dotenv
 
 # Load environment file (defaults to .env, can override with DOTENV_PATH)
-dotenv_path = os.getenv('DOTENV_PATH', '.env')
-load_dotenv(dotenv_path)
+# When DOTENV_PATH is explicitly set (e.g. .env.local for dev), use override=True
+# so it WINS over any vars already loaded by Flask CLI's auto .env preload.
+# Without this, dev runs against whatever DATABASE_URL is in .env (often prod) — which has caused
+# accidental migrations against production. Do not change without understanding this.
+_explicit_dotenv = os.getenv('DOTENV_PATH')
+if _explicit_dotenv:
+    load_dotenv(_explicit_dotenv, override=True)
+else:
+    load_dotenv('.env')
 
 class Config:
     # OpenAI Configuration

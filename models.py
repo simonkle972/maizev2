@@ -144,6 +144,9 @@ class TeachingAssistant(db.Model):
     status = db.Column(db.String(16), nullable=False, default='draft', server_default='draft')  # 'draft' | 'active' | 'paused'
     published_at = db.Column(db.DateTime, nullable=True)
 
+    # Phase 1: admin-only feature. Toggle is hidden from professors; only admin-created TAs can have it on.
+    image_upload_enabled = db.Column(db.Boolean, default=False, nullable=False, server_default='false')
+
     # Relationships
     professor = db.relationship('User', backref='taught_tas', foreign_keys=[professor_id])
     documents = db.relationship('Document', backref='ta', lazy='dynamic', cascade='all, delete-orphan')
@@ -199,13 +202,15 @@ class ChatSession(db.Model):
 
 class ChatMessage(db.Model):
     __tablename__ = 'chat_messages'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     session_id = db.Column(db.String(32), db.ForeignKey('chat_sessions.id'), nullable=False)
     role = db.Column(db.String(16), nullable=False)
     content = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     sources = db.Column(db.JSON, nullable=True)
+    image_data = db.Column(db.LargeBinary, nullable=True)  # Optional student-uploaded image attached to a user message
+    image_mime = db.Column(db.String(64), nullable=True)  # e.g. 'image/png', 'image/jpeg'
 
 class DocumentChunk(db.Model):
     __tablename__ = 'document_chunks'
