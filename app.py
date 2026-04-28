@@ -744,6 +744,18 @@ def upload_document(ta_id):
     db.session.add(doc)
     db.session.flush()
 
+    # SYNCHRONOUS LIGHTWEIGHT METADATA — filename heuristic. Runs in microseconds,
+    # so the docs table immediately shows a sensible doc_type. The slow LLM-based
+    # extractor still runs in the background to refine.
+    from src.document_processor import infer_doc_metadata_from_filename
+    heuristic = infer_doc_metadata_from_filename(original_filename)
+    if heuristic.get("doc_type"):
+        doc.doc_type = heuristic["doc_type"]
+    if heuristic.get("assignment_number"):
+        doc.assignment_number = heuristic["assignment_number"]
+    if heuristic.get("instructional_unit_number"):
+        doc.instructional_unit_number = heuristic["instructional_unit_number"]
+
     ta.document_count = Document.query.filter_by(ta_id=ta_id).count()
     ta.is_indexed = False
     ta.indexing_status = None
@@ -752,7 +764,9 @@ def upload_document(ta_id):
 
     doc_id = doc.id
 
-    # Extract metadata in background thread (text extraction + LLM can take 10-30s)
+    # Extract metadata in background thread (text extraction + LLM can take 10-30s).
+    # IMPORTANT: only overwrite a field when the LLM returns a non-null value, so we
+    # don't clobber the synchronous filename-heuristic guess if the LLM came up empty.
     def extract_metadata_bg(app_obj, doc_id, file_content, file_ext, original_filename):
         with app_obj.app_context():
             from src.document_processor import extract_metadata_from_file_content
@@ -760,11 +774,16 @@ def upload_document(ta_id):
                 metadata = extract_metadata_from_file_content(file_content, file_ext, original_filename)
                 doc = Document.query.get(doc_id)
                 if doc:
-                    doc.doc_type = metadata.get("doc_type")
-                    doc.assignment_number = metadata.get("assignment_number")
-                    doc.instructional_unit_number = metadata.get("instructional_unit_number")
-                    doc.instructional_unit_label = metadata.get("instructional_unit_label")
-                    doc.content_title = metadata.get("content_title")
+                    if metadata.get("doc_type"):
+                        doc.doc_type = metadata["doc_type"]
+                    if metadata.get("assignment_number"):
+                        doc.assignment_number = metadata["assignment_number"]
+                    if metadata.get("instructional_unit_number"):
+                        doc.instructional_unit_number = metadata["instructional_unit_number"]
+                    if metadata.get("instructional_unit_label"):
+                        doc.instructional_unit_label = metadata["instructional_unit_label"]
+                    if metadata.get("content_title"):
+                        doc.content_title = metadata["content_title"]
                     doc.metadata_extracted = metadata.get("extraction_success", False)
                     doc.extraction_metadata = metadata
                     db.session.commit()
@@ -783,7 +802,12 @@ def upload_document(ta_id):
         "success": True,
         "document_id": doc_id,
         "filename": original_filename,
-        "display_name": display_name
+        "display_name": display_name,
+        # Heuristic metadata so the frontend can render the row inline without polling
+        "doc_type": doc.doc_type,
+        "assignment_number": doc.assignment_number,
+        "instructional_unit_number": doc.instructional_unit_number,
+        "metadata_extracted": doc.metadata_extracted,  # Will become True once bg thread completes
     })
 
 @app.route('/admin/api/tas/<ta_id>/documents/<int:doc_id>', methods=['DELETE'])
@@ -810,6 +834,27 @@ def delete_document(ta_id, doc_id):
     db.session.commit()
     
     return jsonify({"success": True})
+
+
+@app.route('/admin/api/tas/<ta_id>/documents/<int:doc_id>', methods=['GET'])
+@admin_api_required
+def get_document_metadata(ta_id, doc_id):
+    """Return current metadata for a doc — used by the upload UX to poll for
+    background-thread metadata extraction completion."""
+    doc = Document.query.filter_by(id=doc_id, ta_id=ta_id).first()
+    if not doc:
+        return jsonify({"error": "Document not found"}), 404
+    return jsonify({
+        "id": doc.id,
+        "display_name": doc.display_name,
+        "filename": doc.filename,
+        "doc_type": doc.doc_type,
+        "assignment_number": doc.assignment_number,
+        "instructional_unit_number": doc.instructional_unit_number,
+        "instructional_unit_label": doc.instructional_unit_label,
+        "content_title": doc.content_title,
+        "metadata_extracted": bool(doc.metadata_extracted),
+    })
 
 
 @app.route('/admin/api/tas/<ta_id>/documents/<int:doc_id>', methods=['PATCH'])
@@ -1111,9 +1156,12 @@ def get_indexing_status(ta_id):
     if not ta:
         return jsonify({"error": "TA not found"}), 404
     
+    total_docs = Document.query.filter_by(ta_id=ta_id).count()
     return jsonify({
         "status": ta.indexing_status,
         "progress": ta.indexing_progress,
+        "docs_processed": ta.indexing_progress or 0,
+        "total_docs": total_docs,
         "error": ta.indexing_error,
         "is_indexed": ta.is_indexed,
         "indexed_at": ta.indexed_at.isoformat() if ta.indexed_at else None

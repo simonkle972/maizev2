@@ -947,11 +947,93 @@ Return ONLY valid JSON, no other text."""
                 }
 
 
+def infer_doc_metadata_from_filename(filename: str) -> dict:
+    """
+    Synchronous lightweight metadata inference from a filename. Used at upload
+    time so the docs table immediately shows a sensible doc_type instead of
+    blank — the slow LLM-based extractor still runs in the background to refine.
+
+    Returns a dict with whichever of {doc_type, assignment_number,
+    instructional_unit_number} could be inferred. Empty dict if nothing matched.
+
+    Patterns mirror analyze_query() in src/retriever.py for consistency between
+    upload-time tagging and query-time filtering.
+    """
+    if not filename:
+        return {}
+
+    name_lower = filename.lower()
+    # Strip extension for cleaner matching
+    if '.' in name_lower:
+        name_lower = name_lower.rsplit('.', 1)[0]
+
+    out = {}
+
+    # Capture 1-3 digit numbers only — avoids matching year-like values (2024, etc.)
+    # as assignment/unit numbers.
+    NUM = r'(\d{1,3})(?!\d)'
+
+    # Homework / problem set — highest specificity first
+    hw_match = re.search(r'(?:homework|hw|assignment|problem\s*set|p\s*set|pset|ps)\s*[-_#]?\s*' + NUM, name_lower)
+    if hw_match:
+        out['doc_type'] = 'homework'
+        out['assignment_number'] = hw_match.group(1)
+        return out
+    if re.search(r'(?:^|[^a-z])(?:homework|hw|assignment|problem\s*set|pset)(?:[^a-z]|$)', name_lower):
+        out['doc_type'] = 'homework'
+        return out
+
+    # Solutions to homework (still classify as homework — solutions ARE homework material)
+    if re.search(r'(?:solution|answer|key)', name_lower) and re.search(r'(?:homework|hw|problem\s*set|pset|ps|assignment)', name_lower):
+        out['doc_type'] = 'homework'
+        sol_num = re.search(r'(?:homework|hw|problem\s*set|pset|ps|assignment)\s*[-_#]?\s*' + NUM, name_lower)
+        if sol_num:
+            out['assignment_number'] = sol_num.group(1)
+        return out
+
+    # Exam / quiz / midterm / final
+    exam_num_match = re.search(r'(?:exam|midterm|quiz|test)\s*[-_#]?\s*' + NUM, name_lower)
+    if exam_num_match:
+        out['doc_type'] = 'exam'
+        out['assignment_number'] = exam_num_match.group(1)
+        return out
+    if re.search(r'(?:^|[^a-z])(?:final|midterm|exam|quiz)(?:[^a-z]|$)', name_lower):
+        out['doc_type'] = 'exam'
+        return out
+
+    # Lecture / class / week / module / session
+    lec_match = re.search(r'(?:lecture|lec|class|week|module|session|day)\s*[-_#]?\s*' + NUM, name_lower)
+    if lec_match:
+        out['doc_type'] = 'lecture'
+        out['instructional_unit_number'] = int(lec_match.group(1))
+        return out
+    if re.search(r'(?:^|[^a-z])(?:lecture|slides|notes)(?:[^a-z]|$)', name_lower):
+        out['doc_type'] = 'lecture'
+        return out
+
+    # Reading / chapter / article
+    ch_match = re.search(r'(?:chapter|ch|reading)\s*[-_#]?\s*' + NUM, name_lower)
+    if ch_match:
+        out['doc_type'] = 'reading'
+        out['instructional_unit_number'] = int(ch_match.group(1))
+        return out
+    if re.search(r'(?:^|[^a-z])(?:reading|article|chapter|paper)(?:[^a-z]|$)', name_lower):
+        out['doc_type'] = 'reading'
+        return out
+
+    # Syllabus
+    if re.search(r'syllabus|course\s*outline', name_lower):
+        out['doc_type'] = 'syllabus'
+        return out
+
+    return out
+
+
 def extract_metadata_from_file_content(file_content: bytes, file_type: str, original_filename: str) -> dict:
     """
     Extract document metadata from file content at upload time.
     This runs LLM classification immediately so admins can review/edit before indexing.
-    
+
     Returns dict with: doc_type, assignment_number, instructional_unit_number, content_title, etc.
     """
     import tempfile

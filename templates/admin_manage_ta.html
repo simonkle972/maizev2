@@ -457,6 +457,10 @@
     function handleFileSelect(e) { uploadFiles(e.target.files); }
 
     async function uploadFiles(files) {
+        const tbody = document.getElementById('doc-tbody');
+        const isEmptyState = !tbody;  // No table yet — fall back to a reload after upload
+        let needsReload = false;
+
         for (const file of files) {
             const item = document.createElement('div');
             item.className = 'upload-item';
@@ -467,50 +471,147 @@
             formData.append('file', file);
             try {
                 const resp = await fetch(`/admin/api/tas/${TA_ID}/upload`, { method: 'POST', body: formData });
+                console.log(`[upload] ${file.name}: status=${resp.status} ok=${resp.ok}`);
                 if (resp.ok) {
-                    item.querySelector('.status').textContent = 'Done';
+                    const docData = await resp.json();
+                    item.querySelector('.status').textContent = 'Uploaded ✓';
                     item.querySelector('.status').className = 'status done';
+                    if (tbody) {
+                        appendDocRow(tbody, docData);
+                        pollDocMetadata(docData.document_id);
+                    } else {
+                        // First doc in an empty TA — reload to render the table properly
+                        needsReload = true;
+                    }
                 } else {
                     const err = await resp.json().catch(() => ({}));
+                    console.error(`[upload] ${file.name} failed:`, err);
                     item.querySelector('.status').textContent = err.error || 'Failed';
                     item.querySelector('.status').className = 'status failed';
                 }
             } catch (e) {
+                console.error(`[upload] ${file.name} threw:`, e);
                 item.querySelector('.status').textContent = 'Failed';
                 item.querySelector('.status').className = 'status failed';
             }
         }
-        // Reload page to show new docs
-        setTimeout(() => window.location.reload(), 1000);
+
+        if (isEmptyState && needsReload) {
+            // Brief pause so the user sees "Uploaded ✓" before the reload
+            setTimeout(() => window.location.reload(), 600);
+        }
     }
 
-    // --- Document auto-save ---
-    document.querySelectorAll('.doc-display-name, .doc-type-select, .doc-unit-number').forEach(el => {
-        el.addEventListener('change', async () => {
-            const row = el.closest('tr');
-            const docId = row.dataset.docId;
-            const status = row.querySelector('.save-status');
-            status.textContent = 'Saving...';
-            status.style.color = '#2563eb';
+    // --- Render a doc row inline (matches the Jinja-rendered structure) ---
+    function appendDocRow(tbody, doc) {
+        const tr = document.createElement('tr');
+        tr.dataset.docId = doc.document_id;
+        const docType = doc.doc_type || '';
+        const unitNum = doc.instructional_unit_number || '';
+        const displayName = (doc.display_name || doc.filename || '').replace(/"/g, '&quot;');
+        const filename = (doc.filename || '').replace(/</g, '&lt;');
+        tr.innerHTML = `
+            <td><input type="text" class="doc-display-name" value="${displayName}" data-original="${displayName}"></td>
+            <td>
+                <select class="doc-type-select" data-original="${docType}">
+                    <option value=""${!docType ? ' selected' : ''}>--</option>
+                    <option value="homework"${docType === 'homework' ? ' selected' : ''}>Homework</option>
+                    <option value="exam"${docType === 'exam' ? ' selected' : ''}>Exam</option>
+                    <option value="lecture"${docType === 'lecture' ? ' selected' : ''}>Lecture</option>
+                    <option value="reading"${docType === 'reading' ? ' selected' : ''}>Reading</option>
+                    <option value="syllabus"${docType === 'syllabus' ? ' selected' : ''}>Syllabus</option>
+                    <option value="other"${docType === 'other' ? ' selected' : ''}>Other</option>
+                </select>
+            </td>
+            <td><input type="number" class="doc-unit-number" value="${unitNum}" data-original="${unitNum}" min="1" max="99" style="width:60px;"></td>
+            <td style="font-size: 0.8rem; color: #6b7280;">${filename}</td>
+            <td>
+                <div class="doc-actions">
+                    <span class="metadata-status" style="font-size: 0.7rem; color: #2563eb; margin-right: 4px;">${doc.metadata_extracted ? '' : 'Reading metadata…'}</span>
+                    <span class="save-status"></span>
+                    <button class="delete-btn" onclick="deleteDocument(${doc.document_id})">Delete</button>
+                </div>
+            </td>
+        `;
+        tbody.appendChild(tr);
+        attachDocRowListeners(tr);
 
+        // Enable the Index button if it was disabled (empty-table case)
+        const indexBtn = document.getElementById('index-btn');
+        if (indexBtn) indexBtn.disabled = false;
+    }
+
+    // --- Poll the metadata endpoint until the LLM extractor completes ---
+    function pollDocMetadata(docId) {
+        if (!docId) return;
+        let attempts = 0;
+        const maxAttempts = 30;  // ~60 s at 2 s interval
+        const tick = setInterval(async () => {
+            attempts += 1;
             try {
-                await apiCall(`/admin/api/tas/${TA_ID}/documents/${docId}`, {
-                    method: 'PATCH',
-                    body: JSON.stringify({
-                        display_name: row.querySelector('.doc-display-name').value,
-                        doc_type: row.querySelector('.doc-type-select').value,
-                        unit_number: row.querySelector('.doc-unit-number').value || null
-                    })
-                });
-                status.textContent = 'Saved';
-                status.style.color = '#15803d';
-                setTimeout(() => status.textContent = '', 2000);
+                const data = await apiCall(`/admin/api/tas/${TA_ID}/documents/${docId}`);
+                if (data.metadata_extracted) {
+                    const row = document.querySelector(`tr[data-doc-id="${docId}"]`);
+                    if (row) {
+                        // Refresh fields if the LLM produced more specific values
+                        const typeSelect = row.querySelector('.doc-type-select');
+                        if (typeSelect && data.doc_type && typeSelect.value !== data.doc_type) {
+                            typeSelect.value = data.doc_type;
+                        }
+                        const unitInput = row.querySelector('.doc-unit-number');
+                        if (unitInput && data.instructional_unit_number && !unitInput.value) {
+                            unitInput.value = data.instructional_unit_number;
+                        }
+                        const metaStatus = row.querySelector('.metadata-status');
+                        if (metaStatus) metaStatus.textContent = '';
+                    }
+                    clearInterval(tick);
+                } else if (attempts >= maxAttempts) {
+                    const row = document.querySelector(`tr[data-doc-id="${docId}"]`);
+                    if (row) {
+                        const metaStatus = row.querySelector('.metadata-status');
+                        if (metaStatus) metaStatus.textContent = '';
+                    }
+                    clearInterval(tick);
+                }
             } catch (e) {
-                status.textContent = 'Error';
-                status.style.color = '#ef4444';
+                console.warn('[meta-poll] failed:', e);
+                clearInterval(tick);
             }
+        }, 2000);
+    }
+
+    // --- Document auto-save listener (extracted so we can call it for new rows too) ---
+    function attachDocRowListeners(row) {
+        row.querySelectorAll('.doc-display-name, .doc-type-select, .doc-unit-number').forEach(el => {
+            el.addEventListener('change', async () => {
+                const r = el.closest('tr');
+                const docId = r.dataset.docId;
+                const status = r.querySelector('.save-status');
+                status.textContent = 'Saving...';
+                status.style.color = '#2563eb';
+                try {
+                    await apiCall(`/admin/api/tas/${TA_ID}/documents/${docId}`, {
+                        method: 'PATCH',
+                        body: JSON.stringify({
+                            display_name: r.querySelector('.doc-display-name').value,
+                            doc_type: r.querySelector('.doc-type-select').value,
+                            unit_number: r.querySelector('.doc-unit-number').value || null
+                        })
+                    });
+                    status.textContent = 'Saved';
+                    status.style.color = '#15803d';
+                    setTimeout(() => status.textContent = '', 2000);
+                } catch (e) {
+                    status.textContent = 'Error';
+                    status.style.color = '#ef4444';
+                }
+            });
         });
-    });
+    }
+
+    // Attach listeners to all existing doc rows (rendered server-side)
+    document.querySelectorAll('#doc-tbody tr').forEach(row => attachDocRowListeners(row));
 
     // --- Delete document ---
     async function deleteDocument(docId) {
