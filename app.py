@@ -606,6 +606,13 @@ def update_ta(ta_id):
         ta.course_name = data["course_name"]
     if "system_prompt" in data:
         ta.system_prompt = data["system_prompt"]
+    if "image_upload_enabled" in data:
+        # Phase 1: gated to admin-created TAs only. Admin role is already required by
+        # @admin_api_required, but we don't currently distinguish admin-created vs prof-created
+        # TAs here — any TA reachable via this admin API can have the toggle flipped.
+        # The student-facing UI already gates rendering on this flag, so flipping it on a
+        # prof-created TA would silently work but the toggle is hidden from the prof's UI.
+        ta.image_upload_enabled = bool(data["image_upload_enabled"])
     if "institution_id" in data:
         institution_id = data["institution_id"]
         if institution_id is None or institution_id == "":
@@ -1269,8 +1276,9 @@ def ta_chat(slug):
 
 @app.route('/<slug>/api/chat/stream', methods=['POST'])
 def chat_stream_api(slug):
-    """Public/admin slug-based streaming chat API. Delegates to shared helper."""
-    from src.chat_streaming import stream_chat_response
+    """Public/admin slug-based streaming chat API. Delegates to shared helper.
+    Accepts JSON body (text-only) or multipart/form-data (with optional image upload)."""
+    from src.chat_streaming import stream_chat_response, parse_chat_request
 
     ta = TeachingAssistant.query.filter_by(slug=slug, is_active=True).first()
     if not ta:
@@ -1283,10 +1291,9 @@ def chat_stream_api(slug):
     if not ta.is_indexed:
         return jsonify({"error": "This teaching assistant is not ready yet. Please check back later."}), 400
 
-    data = request.json
-    query = data.get('query', '').strip()
-    session_id = data.get('session_id', '')
-
+    query, session_id, image_data, image_mime, parse_error = parse_chat_request(request)
+    if parse_error:
+        return jsonify({"error": parse_error}), 400
     if not query:
         return jsonify({"error": "Query required"}), 400
 
@@ -1297,7 +1304,33 @@ def chat_stream_api(slug):
         session_id=session_id,
         user_id=user_id,
         is_anonymous=True,
+        image_data=image_data,
+        image_mime=image_mime,
     )
+
+@app.cli.command('cleanup-images')
+def cleanup_images_cmd():
+    """
+    Zero out image_data on ChatMessage rows older than Config.IMAGE_RETENTION_DAYS.
+    Idempotent — safe to run repeatedly. Wire to a daily cron in production:
+
+        # /etc/cron.d/maize-image-cleanup (runs daily at 03:30):
+        30 3 * * * maize cd /opt/maize && /opt/maize/venv/bin/flask cleanup-images >> /var/log/maize/cleanup.log 2>&1
+
+    Only the binary image_data + image_mime fields are cleared. The ChatMessage row
+    itself (text, sources, role, timestamp) is preserved so conversation history
+    stays intact for analytics and student review.
+    """
+    cutoff = datetime.utcnow() - timedelta(days=Config.IMAGE_RETENTION_DAYS)
+    result = db.session.execute(
+        ChatMessage.__table__.update()
+        .where(ChatMessage.created_at < cutoff)
+        .where(ChatMessage.image_data.isnot(None))
+        .values(image_data=None, image_mime=None)
+    )
+    db.session.commit()
+    print(f"Cleared image_data from {result.rowcount} message(s) older than {Config.IMAGE_RETENTION_DAYS} days (cutoff: {cutoff.isoformat()})")
+
 
 def check_stale_indexing_jobs():
     """Periodically check for stale indexing jobs and mark them as failed.

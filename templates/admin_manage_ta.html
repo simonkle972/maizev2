@@ -319,6 +319,25 @@
                 </div>
             </div>
 
+            <!-- Features (admin-only beta) -->
+            <div class="card">
+                <h3>Features <span style="font-weight: normal; font-size: 0.75rem; color: #8b7355; background: #faf5f0; padding: 2px 8px; border-radius: 4px; margin-left: 0.5rem;">Beta — admin only</span></h3>
+                <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 1.5rem; margin-top: 0.75rem;">
+                    <div style="flex: 1;">
+                        <label for="image-upload-toggle" style="font-weight: 500; color: #2b1f1a; cursor: pointer;">Student image upload</label>
+                        <p style="font-size: 0.85rem; color: #8b7355; margin: 0.25rem 0 0;">
+                            Allow students to attach an image (a drawing, diagram, or photograph of handwritten work) to chat messages. The TA interprets the image alongside the text query using GPT-5.2 vision. Single image per turn, max 5 MB, jpg/png/heic.
+                        </p>
+                    </div>
+                    <label class="toggle-switch" style="position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0;">
+                        <input type="checkbox" id="image-upload-toggle" {{ 'checked' if ta.image_upload_enabled }} onchange="saveImageUploadToggle()" style="opacity: 0; width: 0; height: 0;">
+                        <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: {{ '#2b1f1a' if ta.image_upload_enabled else '#d1c8bb' }}; border-radius: 24px; transition: 0.2s;" id="toggle-slider">
+                            <span style="position: absolute; height: 18px; width: 18px; left: {{ '23px' if ta.image_upload_enabled else '3px' }}; bottom: 3px; background: white; border-radius: 50%; transition: 0.2s;" id="toggle-knob"></span>
+                        </span>
+                    </label>
+                </div>
+            </div>
+
             <!-- Danger Zone -->
             <div class="danger-zone">
                 <h4>Danger Zone</h4>
@@ -348,6 +367,30 @@
             throw new Error(err.error || `Request failed (${resp.status})`);
         }
         return resp.json();
+    }
+
+    // --- Image upload feature toggle (Phase 1: admin-only) ---
+    async function saveImageUploadToggle() {
+        const toggle = document.getElementById('image-upload-toggle');
+        const slider = document.getElementById('toggle-slider');
+        const knob = document.getElementById('toggle-knob');
+        const enabled = toggle.checked;
+        // Optimistic visual update
+        slider.style.background = enabled ? '#2b1f1a' : '#d1c8bb';
+        knob.style.left = enabled ? '23px' : '3px';
+        try {
+            await apiCall(`/admin/api/tas/${TA_ID}`, {
+                method: 'PUT',
+                body: JSON.stringify({ image_upload_enabled: enabled })
+            });
+            showNotification(`Image upload ${enabled ? 'enabled' : 'disabled'}`, 'success');
+        } catch (e) {
+            // Revert on error
+            toggle.checked = !enabled;
+            slider.style.background = !enabled ? '#2b1f1a' : '#d1c8bb';
+            knob.style.left = !enabled ? '23px' : '3px';
+            showNotification('Failed to update: ' + e.message, 'error');
+        }
     }
 
     // --- Metadata save ---

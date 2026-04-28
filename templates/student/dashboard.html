@@ -489,7 +489,15 @@
 
             {% if selected_ta and current_student.email_verified %}
                 <!-- Embedded Chat Interface -->
-                <div class="chat-container-embedded">
+                <div class="chat-container-embedded" id="chat-container-embedded" style="position: relative;">
+                    {% if selected_ta.image_upload_enabled %}
+                    <div id="image-drop-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(43, 31, 26, 0.82); border: 3px dashed #c4a882; border-radius: 12px; display: none; align-items: center; justify-content: center; pointer-events: none; z-index: 100;">
+                        <div style="text-align: center; color: white;">
+                            <div style="font-size: 1.25rem; font-weight: 500; margin-bottom: 0.25rem;">Drop your image to attach</div>
+                            <div style="font-size: 0.875rem; opacity: 0.85;">JPG, PNG, or HEIC, up to 5 MB</div>
+                        </div>
+                    </div>
+                    {% endif %}
                     <div class="chat-header-embedded">
                         <h1>{{ selected_ta.name }}</h1>
                         <p class="course-name">{{ selected_ta.course_name }}</p>
@@ -507,6 +515,13 @@
 
                     <div class="chat-footer-embedded">
                         <form id="chat-form" onsubmit="sendMessage(event)">
+                            {% if selected_ta.image_upload_enabled %}
+                            <div id="image-staging" style="display:none; padding: 8px 12px; border-radius: 8px; background: #faf5f0; border: 1px solid #e8e0d8; margin-bottom: 8px; align-items: center; gap: 12px;">
+                                <img id="image-staging-thumb" src="" alt="Staged image" style="max-height: 64px; max-width: 96px; object-fit: cover; border-radius: 4px; border: 1px solid #e0d8cc;">
+                                <span id="image-staging-name" style="font-size: 0.875rem; color: #4a3328; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
+                                <button type="button" onclick="clearStagedImage()" title="Remove image" style="background: transparent; border: none; cursor: pointer; color: #8b7355; font-size: 1.125rem; padding: 4px 8px;">✕</button>
+                            </div>
+                            {% endif %}
                             <div class="input-group">
                                 <button type="button" id="clear-btn" class="btn-clear" onclick="clearHistory()" title="Start new conversation">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -514,6 +529,14 @@
                                         <path d="M3 3v5h5"/>
                                     </svg>
                                 </button>
+                                {% if selected_ta.image_upload_enabled %}
+                                <button type="button" id="image-btn" class="btn-clear" onclick="document.getElementById('image-input').click()" title="Attach an image of your work">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                                    </svg>
+                                </button>
+                                <input type="file" id="image-input" accept="image/jpeg,image/png,image/heic,image/heif" capture="environment" style="display:none" onchange="handleImageSelected(event)">
+                                {% endif %}
                                 <textarea
                                     id="query-input"
                                     placeholder="Ask a question about the course..."
@@ -530,6 +553,86 @@
                 <script>
                     let sessionId = '';
                     const taId = '{{ selected_ta.id }}';
+                    const imageUploadEnabled = {{ 'true' if selected_ta.image_upload_enabled else 'false' }};
+                    let stagedImageFile = null;
+                    let stagedImageDataUrl = null;
+
+                    const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+                    const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/heic', 'image/heif'];
+
+                    // Shared by click-to-upload AND drag-and-drop. Returns true if accepted.
+                    function stageImageFile(file) {
+                        if (!file) return false;
+                        if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+                            alert(`Unsupported image format: ${file.type || 'unknown'}. Use JPG, PNG, or HEIC.`);
+                            return false;
+                        }
+                        if (file.size > MAX_IMAGE_BYTES) {
+                            alert(`Image is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Max 5 MB.`);
+                            return false;
+                        }
+                        stagedImageFile = file;
+                        const reader = new FileReader();
+                        reader.onload = function(e) {
+                            stagedImageDataUrl = e.target.result;
+                            document.getElementById('image-staging-thumb').src = stagedImageDataUrl;
+                            document.getElementById('image-staging-name').textContent = file.name;
+                            const staging = document.getElementById('image-staging');
+                            staging.style.display = 'flex';
+                        };
+                        reader.readAsDataURL(file);
+                        return true;
+                    }
+
+                    function handleImageSelected(event) {
+                        const file = event.target.files && event.target.files[0];
+                        const accepted = stageImageFile(file);
+                        if (!accepted) event.target.value = '';
+                    }
+
+                    function clearStagedImage() {
+                        stagedImageFile = null;
+                        stagedImageDataUrl = null;
+                        const staging = document.getElementById('image-staging');
+                        if (staging) staging.style.display = 'none';
+                        const fileInput = document.getElementById('image-input');
+                        if (fileInput) fileInput.value = '';
+                    }
+
+                    // Drag-and-drop wiring on the embedded chat container.
+                    if (imageUploadEnabled) {
+                        const dropContainer = document.getElementById('chat-container-embedded');
+                        const dropOverlay = document.getElementById('image-drop-overlay');
+                        let dragDepth = 0;
+                        const dragHasFiles = (e) => e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files');
+
+                        dropContainer.addEventListener('dragenter', (e) => {
+                            if (!dragHasFiles(e)) return;
+                            e.preventDefault();
+                            dragDepth += 1;
+                            if (dragDepth === 1 && dropOverlay) dropOverlay.style.display = 'flex';
+                        });
+                        dropContainer.addEventListener('dragover', (e) => {
+                            if (!dragHasFiles(e)) return;
+                            e.preventDefault();
+                        });
+                        dropContainer.addEventListener('dragleave', (e) => {
+                            if (!dragHasFiles(e)) return;
+                            dragDepth -= 1;
+                            if (dragDepth <= 0) {
+                                dragDepth = 0;
+                                if (dropOverlay) dropOverlay.style.display = 'none';
+                            }
+                        });
+                        dropContainer.addEventListener('drop', (e) => {
+                            if (!dragHasFiles(e)) return;
+                            e.preventDefault();
+                            dragDepth = 0;
+                            if (dropOverlay) dropOverlay.style.display = 'none';
+                            const file = e.dataTransfer.files && e.dataTransfer.files[0];
+                            if (file) stageImageFile(file);
+                        });
+                    }
 
                     function handleKeydown(e) {
                         if (e.key === 'Enter' && !e.shiftKey) {
@@ -559,6 +662,7 @@
                         `;
 
                         sessionId = generateSessionId();
+                        clearStagedImage();
 
                         const input = document.getElementById('query-input');
                         input.value = '';
@@ -574,17 +678,22 @@
                         autoResize(this);
                     });
 
-                    function addMessage(role, content, sources = []) {
+                    function addMessage(role, content, sources = [], imageDataUrl = null) {
                         const messagesEl = document.getElementById('messages');
                         const messageDiv = document.createElement('div');
                         messageDiv.className = `message ${role}`;
 
+                        let imageHtml = '';
+                        if (imageDataUrl) {
+                            imageHtml = `<div class="message-image" style="margin-bottom: 8px;"><img src="${imageDataUrl}" alt="Uploaded work" style="max-width: 100%; max-height: 320px; border-radius: 8px; border: 1px solid #e0d8cc; display: block;"></div>`;
+                        }
+
                         let html = '';
                         if (role === 'user') {
-                            html = `<div class="message-content">${formatContent(content)}</div>`;
+                            html = `<div class="message-content">${imageHtml}${formatContent(content)}</div>`;
                         } else {
                             html = `<img src="/static/images/maize-logo.png" alt="Maize" class="ta-avatar">`;
-                            html += `<div class="message-content">${formatContent(content)}`;
+                            html += `<div class="message-content">${imageHtml}${formatContent(content)}`;
 
                             if (sources && sources.length > 0) {
                                 const uniqueSources = [...new Set(sources)];
@@ -821,9 +930,13 @@
 
                         if (!query) return;
 
-                        addMessage('user', query);
+                        const submittingImageDataUrl = stagedImageDataUrl;
+                        const submittingImageFile = stagedImageFile;
+
+                        addMessage('user', query, [], submittingImageDataUrl);
                         input.value = '';
                         autoResize(input);
+                        clearStagedImage();
 
                         const sendBtn = document.getElementById('send-btn');
                         sendBtn.disabled = true;
@@ -832,11 +945,23 @@
                         addStreamingMessage();
 
                         try {
-                            const response = await fetch(`/student/ta/${taId}/api/chat/stream`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ query, session_id: sessionId })
-                            });
+                            let response;
+                            if (submittingImageFile) {
+                                const formData = new FormData();
+                                formData.append('query', query);
+                                formData.append('session_id', sessionId);
+                                formData.append('image', submittingImageFile);
+                                response = await fetch(`/student/ta/${taId}/api/chat/stream`, {
+                                    method: 'POST',
+                                    body: formData,
+                                });
+                            } else {
+                                response = await fetch(`/student/ta/${taId}/api/chat/stream`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ query, session_id: sessionId })
+                                });
+                            }
 
                             if (!response.ok) {
                                 const errorData = await response.json();

@@ -175,6 +175,22 @@ Use LaTeX formatting for all equations (e.g., $P = \\frac{X}{Y}$)
 3. If no content matches the question, be HONEST and say so. Do NOT generate long answers from general knowledge — stay grounded in the indexed course materials. When the available material only partially covers a topic, say what the material covers and acknowledge the gap.
 4. Never fabricate information about assignments or problems not in the material
 5. For conceptual questions, explain concepts and methods without revealing problem-specific answers
+
+=== STUDENT-UPLOADED IMAGES ===
+When the student uploads an image (a drawing, diagram, or photograph of handwritten work), first briefly describe what you see, then let the surrounding conversation guide your response. Three cases:
+- IN-CONTEXT HOMEWORK ATTEMPT — if a specific problem is being actively discussed, treat the image as the student's work and apply the same answer-validation rules as for typed solutions (patience escalation, no full-reveal of solutions).
+- COLD-START UPLOAD — if the image arrives without conversational context, describe what you see and ask the student what they'd like to discuss. Don't assume it's a homework attempt and don't volunteer evaluative feedback.
+- CONCEPT EXPLORATION — if the image illustrates an idea the student is trying to understand (rather than a graded attempt), engage with it as any teaching dialogue would; the homework-attempt rules don't apply.
+
+FOR HANDWRITTEN WORK SPECIFICALLY — TRANSCRIPTION-FIRST:
+Before evaluating handwritten math, derivations, or written solutions, ALWAYS surface back what you read. Format: "Here's what I read: [transcription]. Did I read that correctly?"
+This is required for handwritten content even when you're confident, because misread notation is one of the most common failure modes. Silently misinterpreting then grading against the misread is the worst outcome.
+For ambiguous symbols (smudged exponents, '×' vs 'x', '÷' vs '+'), call out the specific ambiguity rather than guessing.
+
+TONE IS FORMATIVE, NOT EVALUATIVE:
+Frame your responses as supporting the student's next iteration of the work, not as a final verdict. You're a study partner who helps them see their own next step, not a grader who pronounces things correct or incorrect. Even when an answer is clearly wrong, lead with the question that helps them spot it themselves.
+
+The image is one input among many, not an automatic prompt to grade. Don't redraw or re-derive correct content for the student as a shortcut around their reasoning.
 """
 
 HYBRID_FULL_DOC_INSTRUCTIONS = """
@@ -267,8 +283,25 @@ def build_messages(
     hybrid_doc_filename: Optional[str] = None,
     query_reference: Optional[str] = None,
     attempt_count: int = 0,
-    limited_context: bool = False
+    limited_context: bool = False,
+    current_image: Optional[dict] = None,
+    history_for_llm: Optional[list] = None,
 ):
+    """
+    Build the messages array for the LLM call.
+
+    Two modes:
+    - TEXT-ONLY (default): conversation history is passed as a prose string in the user
+      message; current user message is plain text. Same behavior as before.
+    - MULTIMODAL (when current_image OR history_for_llm provided): conversation history
+      becomes a structured list of message dicts (with images preserved on prior turns),
+      and the current user message becomes a content list with both text and image parts.
+
+    `history_for_llm`, when given, REPLACES the prose `conversation_history` for the
+    structured part of the message list. Already-formatted structured messages, one per turn.
+    """
+    import base64 as _base64
+
     full_system_prompt = f"{system_prompt}\n\n{BASE_INSTRUCTIONS}"
 
     # Add patience-level instructions for answer validation
@@ -283,10 +316,10 @@ def build_messages(
 
     if limited_context:
         full_system_prompt += f"\n{LIMITED_CONTEXT_INSTRUCTIONS}"
-    
+
     if course_name:
         full_system_prompt = f"You are a teaching assistant for {course_name}.\n\n{full_system_prompt}"
-    
+
     if limited_context:
         context_header = """WARNING — LIMITED MATERIAL: The retrieved content below is thin (e.g. a syllabus, course outline, or brief mention). It does NOT contain detailed explanations, formulas, or worked examples for this topic.
 
@@ -302,26 +335,39 @@ Here is the limited course material available:"""
     else:
         context_header = "Here is relevant course material to help answer the student's question:"
 
-    user_message = f"""{context_header}
+    # Build the current-turn user-message text. When using structured history, the prose
+    # conversation_history is omitted from this text (history is in its own messages).
+    use_structured_history = history_for_llm is not None
+    user_text = f"""{context_header}
 
 ---
 {context if context else "No specific course material was found for this question."}
 ---
 
 """
-    
-    if conversation_history:
-        user_message += f"""Recent conversation for context:
+    if conversation_history and not use_structured_history:
+        user_text += f"""Recent conversation for context:
 {conversation_history}
 
 """
-    
-    user_message += f"Student's question: {query}"
-    
-    return [
-        {"role": "system", "content": full_system_prompt},
-        {"role": "user", "content": user_message}
-    ]
+    user_text += f"Student's question: {query}"
+
+    # Current-turn user content: multimodal list when an image is attached; otherwise plain string.
+    if current_image and current_image.get("data"):
+        mime = current_image.get("mime") or "image/jpeg"
+        b64 = _base64.b64encode(current_image["data"]).decode("ascii")
+        current_user_content = [
+            {"type": "text", "text": user_text},
+            {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
+        ]
+    else:
+        current_user_content = user_text
+
+    messages = [{"role": "system", "content": full_system_prompt}]
+    if use_structured_history:
+        messages.extend(history_for_llm)
+    messages.append({"role": "user", "content": current_user_content})
+    return messages
 
 def generate_response(
     query: str,
@@ -387,14 +433,17 @@ def generate_response_stream(
     hybrid_doc_filename: Optional[str] = None,
     query_reference: Optional[str] = None,
     attempt_count: int = 0,
-    limited_context: bool = False
+    limited_context: bool = False,
+    current_image: Optional[dict] = None,
+    history_for_llm: Optional[list] = None,
 ):
     client = OpenAI(api_key=Config.OPENAI_API_KEY)
 
     messages = build_messages(
         query, context, system_prompt, conversation_history, course_name,
         hybrid_mode=hybrid_mode, hybrid_doc_filename=hybrid_doc_filename, query_reference=query_reference,
-        attempt_count=attempt_count, limited_context=limited_context
+        attempt_count=attempt_count, limited_context=limited_context,
+        current_image=current_image, history_for_llm=history_for_llm,
     )
     
     try:

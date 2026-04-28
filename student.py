@@ -176,8 +176,9 @@ def ta_sessions(ta_id):
 @student_required
 @student_enrolled_in_ta
 def chat_stream(ta_id):
-    """Authenticated streaming chat API for enrolled students. Delegates to shared helper."""
-    from src.chat_streaming import stream_chat_response
+    """Authenticated streaming chat API for enrolled students. Delegates to shared helper.
+    Accepts JSON body (text-only) or multipart/form-data (with optional image upload)."""
+    from src.chat_streaming import stream_chat_response, parse_chat_request
 
     if not current_student.email_verified:
         return jsonify({"error": "Please verify your email address to use the AI TA. Check your inbox for a verification email."}), 403
@@ -190,10 +191,9 @@ def chat_stream(ta_id):
     if not ta.is_indexed:
         return jsonify({"error": "This teaching assistant is not ready yet. Please check back later."}), 400
 
-    data = request.json
-    query = data.get('query', '').strip()
-    session_id = data.get('session_id', '')
-
+    query, session_id, image_data, image_mime, parse_error = parse_chat_request(request)
+    if parse_error:
+        return jsonify({"error": parse_error}), 400
     if not query:
         return jsonify({"error": "Query required"}), 400
 
@@ -203,4 +203,6 @@ def chat_stream(ta_id):
         session_id=session_id,
         user_id=current_student.id,
         is_anonymous=False,
+        image_data=image_data,
+        image_mime=image_mime,
     )

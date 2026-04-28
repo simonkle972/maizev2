@@ -93,6 +93,11 @@ class Config:
     CONTEXTUALIZER_MODEL = os.getenv('CONTEXTUALIZER_MODEL', 'gpt-4o-mini')
     CONTEXTUALIZER_MAX_HISTORY = 6
 
+    # Days to retain student-uploaded image_data on ChatMessage rows before the
+    # `flask cleanup-images` CLI command zeroes them out. Keeps storage bounded
+    # and limits the privacy footprint of student work.
+    IMAGE_RETENTION_DAYS = int(os.getenv('IMAGE_RETENTION_DAYS', '30'))
+
     # Auth0 Configuration (professor app)
     AUTH0_DOMAIN = os.getenv('AUTH0_DOMAIN')
     AUTH0_CLIENT_ID = os.getenv('AUTH0_CLIENT_ID')
