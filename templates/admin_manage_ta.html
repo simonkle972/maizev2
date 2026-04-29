@@ -458,7 +458,7 @@
 
     async function uploadFiles(files) {
         const tbody = document.getElementById('doc-tbody');
-        const isEmptyState = !tbody;  // No table yet — fall back to a reload after upload
+        const isEmptyState = !tbody;
         let needsReload = false;
 
         for (const file of files) {
@@ -467,37 +467,67 @@
             item.innerHTML = `<span>${file.name}</span> <span class="status uploading">Uploading...</span>`;
             progressEl.appendChild(item);
 
-            const formData = new FormData();
-            formData.append('file', file);
+            // Phase 1: NETWORK — do the upload, parse the response. Catch errors here only.
+            let uploadOk = false;
+            let docData = null;
+            let errStatus = null;
+            let errMsg = null;
             try {
+                const formData = new FormData();
+                formData.append('file', file);
                 const resp = await fetch(`/admin/api/tas/${TA_ID}/upload`, { method: 'POST', body: formData });
+                errStatus = resp.status;
                 console.log(`[upload] ${file.name}: status=${resp.status} ok=${resp.ok}`);
                 if (resp.ok) {
-                    const docData = await resp.json();
-                    item.querySelector('.status').textContent = 'Uploaded ✓';
-                    item.querySelector('.status').className = 'status done';
+                    try {
+                        docData = await resp.json();
+                        uploadOk = true;
+                    } catch (parseErr) {
+                        errMsg = 'Invalid JSON in response';
+                    }
+                } else {
+                    // Read body as text to handle non-JSON error responses (HTML 502/504, etc.)
+                    const bodyText = await resp.text().catch(() => '');
+                    try {
+                        const parsed = JSON.parse(bodyText);
+                        errMsg = parsed.error || (bodyText.slice(0, 1000) || 'Server error');
+                    } catch {
+                        errMsg = bodyText.slice(0, 1000) || 'Server error';
+                    }
+                }
+            } catch (networkErr) {
+                errMsg = (networkErr && networkErr.message) || 'Network error';
+            }
+
+            // Phase 2: POST-UPLOAD UI — DOM updates separated so a UI bug here can't taint
+            // the upload-status display. On failure, we fall back to a reload so the user
+            // at least sees the doc if it was saved.
+            if (uploadOk && docData) {
+                item.querySelector('.status').textContent = 'Uploaded ✓';
+                item.querySelector('.status').className = 'status done';
+                try {
                     if (tbody) {
                         appendDocRow(tbody, docData);
                         pollDocMetadata(docData.document_id);
                     } else {
-                        // First doc in an empty TA — reload to render the table properly
                         needsReload = true;
                     }
-                } else {
-                    const err = await resp.json().catch(() => ({}));
-                    console.error(`[upload] ${file.name} failed:`, err);
-                    item.querySelector('.status').textContent = err.error || 'Failed';
-                    item.querySelector('.status').className = 'status failed';
+                } catch (uiErr) {
+                    console.error(`[upload] ${file.name} post-upload UI failed, falling back to reload:`, uiErr);
+                    needsReload = true;
                 }
-            } catch (e) {
-                console.error(`[upload] ${file.name} threw:`, e);
-                item.querySelector('.status').textContent = 'Failed';
+            } else {
+                const statusText = errStatus
+                    ? `Failed (${errStatus})${errMsg ? ': ' + errMsg : ''}`
+                    : `Failed${errMsg ? ': ' + errMsg : ''}`;
+                item.querySelector('.status').textContent = statusText;
                 item.querySelector('.status').className = 'status failed';
+                console.error(`[upload] ${file.name} failed:`, { status: errStatus, error: errMsg });
             }
         }
 
-        if (isEmptyState && needsReload) {
-            // Brief pause so the user sees "Uploaded ✓" before the reload
+        if (needsReload) {
+            // Empty-state OR a post-upload UI fallback — reload so docs are visible
             setTimeout(() => window.location.reload(), 600);
         }
     }

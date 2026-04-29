@@ -744,25 +744,45 @@ def upload_document(ta_id):
     db.session.add(doc)
     db.session.flush()
 
-    # SYNCHRONOUS LIGHTWEIGHT METADATA — filename heuristic. Runs in microseconds,
-    # so the docs table immediately shows a sensible doc_type. The slow LLM-based
-    # extractor still runs in the background to refine.
-    from src.document_processor import infer_doc_metadata_from_filename
-    heuristic = infer_doc_metadata_from_filename(original_filename)
-    if heuristic.get("doc_type"):
-        doc.doc_type = heuristic["doc_type"]
-    if heuristic.get("assignment_number"):
-        doc.assignment_number = heuristic["assignment_number"]
-    if heuristic.get("instructional_unit_number"):
-        doc.instructional_unit_number = heuristic["instructional_unit_number"]
+    # SYNCHRONOUS LIGHTWEIGHT METADATA — filename heuristic. Best-effort enhancement,
+    # NEVER allowed to abort the upload. Wrapped in try/except so a regex glitch or
+    # weird unicode filename can't 500 the route.
+    try:
+        from src.document_processor import infer_doc_metadata_from_filename
+        heuristic = infer_doc_metadata_from_filename(original_filename) or {}
+        if heuristic.get("doc_type"):
+            doc.doc_type = heuristic["doc_type"]
+        if heuristic.get("assignment_number"):
+            doc.assignment_number = heuristic["assignment_number"]
+        if heuristic.get("instructional_unit_number"):
+            doc.instructional_unit_number = heuristic["instructional_unit_number"]
+    except Exception as heuristic_err:
+        logger.warning(f"Filename-heuristic metadata failed for {original_filename}: {heuristic_err}")
+        # Non-fatal — proceed with the upload regardless
 
     ta.document_count = Document.query.filter_by(ta_id=ta_id).count()
     ta.is_indexed = False
     ta.indexing_status = None
     ta.indexing_error = None
+
+    # Capture all response field values BEFORE commit. After commit, Flask-SQLAlchemy
+    # expires the session by default and accessing doc.* triggers a refresh query —
+    # if anything's off in the session state, that refresh can throw and 500 the route.
+    response_payload = {
+        "success": True,
+        "filename": original_filename,
+        "display_name": display_name,
+        "doc_type": doc.doc_type,
+        "assignment_number": doc.assignment_number,
+        "instructional_unit_number": doc.instructional_unit_number,
+        "metadata_extracted": bool(doc.metadata_extracted),
+    }
+
     db.session.commit()
 
+    # doc.id is safely available post-commit (autoincrement PK is set during flush)
     doc_id = doc.id
+    response_payload["document_id"] = doc_id
 
     # Extract metadata in background thread (text extraction + LLM can take 10-30s).
     # IMPORTANT: only overwrite a field when the LLM returns a non-null value, so we
@@ -790,25 +810,24 @@ def upload_document(ta_id):
             except Exception as e:
                 logger.error(f"Background metadata extraction failed for {original_filename}: {e}")
 
-    import threading
-    thread = threading.Thread(
-        target=extract_metadata_bg,
-        args=(app._get_current_object(), doc_id, file_content, file_ext, original_filename)
-    )
-    thread.daemon = True
-    thread.start()
+    # `app` is the real Flask instance (module-level), not a proxy — pass it directly.
+    # Older code used `app._get_current_object()` which exists on Flask's LocalProxy
+    # (e.g. `current_app`) but NOT on a Flask instance. Flask 3.x raises AttributeError
+    # rather than silently no-op'ing, which 500'd uploads after a successful commit.
+    # Defense-in-depth: any thread-launch failure is logged but never aborts the response —
+    # the doc is already committed and the LLM extractor is best-effort enrichment.
+    try:
+        import threading
+        thread = threading.Thread(
+            target=extract_metadata_bg,
+            args=(app, doc_id, file_content, file_ext, original_filename),
+        )
+        thread.daemon = True
+        thread.start()
+    except Exception as thread_err:
+        logger.warning(f"Could not launch metadata-extraction thread for {original_filename}: {thread_err}")
 
-    return jsonify({
-        "success": True,
-        "document_id": doc_id,
-        "filename": original_filename,
-        "display_name": display_name,
-        # Heuristic metadata so the frontend can render the row inline without polling
-        "doc_type": doc.doc_type,
-        "assignment_number": doc.assignment_number,
-        "instructional_unit_number": doc.instructional_unit_number,
-        "metadata_extracted": doc.metadata_extracted,  # Will become True once bg thread completes
-    })
+    return jsonify(response_payload)
 
 @app.route('/admin/api/tas/<ta_id>/documents/<int:doc_id>', methods=['DELETE'])
 @admin_api_required

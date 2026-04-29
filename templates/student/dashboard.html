@@ -619,9 +619,9 @@
                         list.innerHTML = stagedImages.map((img, idx) => `
                             <div class="staged-thumb" draggable="true" data-id="${img.id}" data-idx="${idx}"
                                  style="position: relative; cursor: grab; border: 1px solid #e0d8cc; border-radius: 6px; overflow: hidden; background: white; flex-shrink: 0;">
-                                <img src="${img.dataUrl}" alt="Staged image ${idx + 1}" style="display: block; height: 64px; width: 64px; object-fit: cover;">
-                                <span style="position: absolute; bottom: 2px; left: 2px; background: rgba(43, 31, 26, 0.78); color: white; font-size: 0.65rem; padding: 1px 4px; border-radius: 3px;">${idx + 1}</span>
-                                <button type="button" onclick="removeStagedImage('${img.id}')" title="Remove" style="position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; border-radius: 50%; border: none; background: rgba(43, 31, 26, 0.78); color: white; font-size: 0.7rem; line-height: 1; cursor: pointer; padding: 0;">✕</button>
+                                <img src="${img.dataUrl}" alt="Staged image ${idx + 1}" style="display: block; height: 110px; width: 110px; object-fit: cover;">
+                                <span style="position: absolute; bottom: 4px; left: 4px; background: rgba(43, 31, 26, 0.82); color: white; font-size: 0.75rem; font-weight: 600; padding: 2px 6px; border-radius: 4px;">${idx + 1}</span>
+                                <button type="button" onclick="removeStagedImage('${img.id}')" title="Remove" style="position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border-radius: 50%; border: none; background: rgba(43, 31, 26, 0.82); color: white; font-size: 0.85rem; line-height: 1; cursor: pointer; padding: 0;">✕</button>
                             </div>
                         `).join('');
                         attachThumbDragListeners();
