@@ -32,20 +32,25 @@ from config import Config
 logger = logging.getLogger(__name__)
 
 # Per-session cap on student image uploads — prevents cost runaway from a single user.
-# Counts user messages with image_data on the same chat session.
+# Counts ChatMessageImage rows on the same chat session.
 MAX_IMAGES_PER_SESSION = 20
+# Per-turn cap — limits a single message to a sane number of attached images.
+MAX_IMAGES_PER_TURN = 5
 
 # Per-upload size and format constraints (server-side; client also enforces).
-MAX_IMAGE_BYTES = 5 * 1024 * 1024  # 5 MB
+MAX_IMAGE_BYTES = 5 * 1024 * 1024  # 5 MB per image
 ALLOWED_IMAGE_MIMES = {"image/jpeg", "image/png", "image/heic", "image/heif"}
 
 
 def parse_chat_request(request):
     """
-    Pull (query, session_id, image_data, image_mime, error) from a chat-stream HTTP request.
-    Handles both JSON body (legacy text-only) and multipart/form-data (with optional image).
+    Pull (query, session_id, images, error) from a chat-stream HTTP request.
 
-    Returns a tuple. If `error` is non-None, callers should return a 400 with that message.
+    Handles both JSON body (legacy text-only) and multipart/form-data with one
+    or more `image` file parts. Multiple files preserve client-side upload order.
+
+    `images` is a list of {"data": bytes, "mime": str} dicts — empty if no images.
+    On any validation error, `error` is non-None and callers should return 400.
     """
     content_type = (request.content_type or "").lower()
     is_multipart = content_type.startswith("multipart/")
@@ -53,21 +58,28 @@ def parse_chat_request(request):
     if is_multipart:
         query = (request.form.get("query") or "").strip()
         session_id = request.form.get("session_id") or ""
-        image_file = request.files.get("image")
-        if image_file and image_file.filename:
-            mime = (image_file.mimetype or "").lower()
+        image_files = request.files.getlist("image")
+        # Filter out empty file slots (browsers sometimes submit empty FormData entries)
+        image_files = [f for f in image_files if f and f.filename]
+
+        if len(image_files) > MAX_IMAGES_PER_TURN:
+            return query, session_id, [], f"Too many images — max {MAX_IMAGES_PER_TURN} per message"
+
+        images = []
+        for f in image_files:
+            mime = (f.mimetype or "").lower()
             if mime not in ALLOWED_IMAGE_MIMES:
-                return query, session_id, None, None, f"Unsupported image format: {mime or 'unknown'}"
-            data = image_file.read()
+                return query, session_id, [], f"Unsupported image format: {mime or 'unknown'}"
+            data = f.read()
             if len(data) > MAX_IMAGE_BYTES:
-                return query, session_id, None, None, "Image exceeds 5 MB limit"
+                return query, session_id, [], f"Image '{f.filename}' exceeds 5 MB limit"
             if not data:
-                return query, session_id, None, None, "Empty image file"
-            return query, session_id, data, mime, None
-        return query, session_id, None, None, None
+                return query, session_id, [], f"Empty image file: {f.filename}"
+            images.append({"data": data, "mime": mime})
+        return query, session_id, images, None
 
     body = request.json or {}
-    return (body.get("query") or "").strip(), body.get("session_id") or "", None, None, None
+    return (body.get("query") or "").strip(), body.get("session_id") or "", [], None
 
 
 def _build_history_for_llm(messages, max_turns: int = 6) -> list:
@@ -75,28 +87,26 @@ def _build_history_for_llm(messages, max_turns: int = 6) -> list:
     Build a structured conversation-history list for the LLM, preserving images.
 
     Returns a list of OpenAI-compatible message dicts where any user message with
-    an attached image becomes a multimodal content list. Assistant messages stay
-    as plain strings.
+    one or more attached images becomes a multimodal content list with the text
+    part followed by image parts in display order. Assistant messages stay as
+    plain strings.
     """
     if not messages:
         return []
 
     out = []
     for msg in messages[-(max_turns):]:
-        if msg.role == "user" and getattr(msg, "image_data", None):
-            mime = msg.image_mime or "image/jpeg"
-            b64 = base64.b64encode(msg.image_data).decode("ascii")
+        attached = list(msg.images) if (msg.role == "user" and getattr(msg, "images", None)) else []
+        if attached:
             text_part = (msg.content or "")[:600]
-            out.append({
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": text_part},
-                    {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
-                ],
-            })
+            content = [{"type": "text", "text": text_part}]
+            for img in attached:
+                mime = img.image_mime or "image/jpeg"
+                b64 = base64.b64encode(img.image_data).decode("ascii")
+                content.append({"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}})
+            out.append({"role": "user", "content": content})
         else:
-            text = (msg.content or "")[:600]
-            out.append({"role": msg.role, "content": text})
+            out.append({"role": msg.role, "content": (msg.content or "")[:600]})
     return out
 
 
@@ -107,8 +117,7 @@ def stream_chat_response(
     session_id: str,
     user_id,
     is_anonymous: bool,
-    image_data: bytes = None,
-    image_mime: str = None,
+    images: list = None,
 ) -> Response:
     """
     Run the full chat streaming pipeline for a single user query.
@@ -121,24 +130,24 @@ def stream_chat_response(
         user_id: int (student or admin) or None (truly anonymous)
         is_anonymous: True for slug-based public route, False for enrolled-student route.
             Drives only the QA-log flag — does not change retrieval behavior.
-        image_data: optional raw image bytes co-submitted with the text query.
-            Only honored when ta.image_upload_enabled is True. Subject to per-session cap.
-        image_mime: MIME type for the image (e.g. 'image/png', 'image/jpeg'). Required when
-            image_data is provided.
+        images: optional list of {"data": bytes, "mime": str} dicts in display order.
+            Only honored when ta.image_upload_enabled is True. Subject to MAX_IMAGES_PER_TURN
+            and MAX_IMAGES_PER_SESSION caps.
 
     Returns:
         Flask streaming Response (SSE: text/event-stream)
     """
-    from models import db, ChatSession, ChatMessage
+    from models import db, ChatSession, ChatMessage, ChatMessageImage
+
+    images = images or []
 
     # IMAGE GUARD: reject silently-attached images for TAs that don't have the feature.
     # Frontend should hide the upload control, but this is the defense-in-depth check.
-    if image_data and not ta.image_upload_enabled:
+    if images and not ta.image_upload_enabled:
         logger.warning(
-            f"[{ta.id}] Image upload attempted but feature not enabled — dropping image bytes"
+            f"[{ta.id}] Image upload attempted but feature not enabled — dropping {len(images)} image(s)"
         )
-        image_data = None
-        image_mime = None
+        images = []
 
     # SESSION RESOLUTION
     # Either reuse the supplied session (with security check + retroactive admin binding),
@@ -162,27 +171,28 @@ def stream_chat_response(
             chat_session.user_id = user_id
             db.session.commit()
 
-    # PER-SESSION IMAGE CAP: enforce before persisting so we don't half-commit.
-    # Returns a streaming-style error response so the UX matches a normal chat error.
-    if image_data:
+    # PER-SESSION IMAGE CAP: count existing ChatMessageImage rows on this session,
+    # plus the new ones, against the cap. Reject before persisting if over.
+    if images:
         existing_image_count = (
-            ChatMessage.query
-            .filter_by(session_id=session_id, role="user")
-            .filter(ChatMessage.image_data.isnot(None))
+            db.session.query(ChatMessageImage)
+            .join(ChatMessage, ChatMessage.id == ChatMessageImage.message_id)
+            .filter(ChatMessage.session_id == session_id)
             .count()
         )
-        if existing_image_count >= MAX_IMAGES_PER_SESSION:
+        if existing_image_count + len(images) > MAX_IMAGES_PER_SESSION:
             logger.info(
-                f"[{ta.id}] Session {session_id} hit image cap "
-                f"({existing_image_count}/{MAX_IMAGES_PER_SESSION}) — rejecting upload"
+                f"[{ta.id}] Session {session_id} would exceed image cap "
+                f"({existing_image_count} + {len(images)} > {MAX_IMAGES_PER_SESSION})"
             )
             def cap_error():
+                remaining = max(0, MAX_IMAGES_PER_SESSION - existing_image_count)
                 yield (
                     "data: " + json.dumps({
                         "type": "error",
                         "message": (
-                            f"You've uploaded the maximum of {MAX_IMAGES_PER_SESSION} images "
-                            "in this session. Start a new conversation to upload more."
+                            f"You've reached the maximum of {MAX_IMAGES_PER_SESSION} images "
+                            f"in this session ({remaining} remaining). Start a new conversation to upload more."
                         ),
                     }) + "\n\n"
                 )
@@ -192,15 +202,21 @@ def stream_chat_response(
                 headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'},
             )
 
-    # USER MESSAGE PERSISTENCE — text + optional image, atomic single row
+    # USER MESSAGE PERSISTENCE — text first, then attached images as ChatMessageImage rows
     user_message = ChatMessage(
         session_id=session_id,
         role="user",
         content=query,
-        image_data=image_data,
-        image_mime=image_mime,
     )
     db.session.add(user_message)
+    db.session.flush()  # need the message id for FK on the image rows
+    for idx, img in enumerate(images):
+        db.session.add(ChatMessageImage(
+            message_id=user_message.id,
+            image_data=img["data"],
+            image_mime=img.get("mime"),
+            order=idx,
+        ))
     db.session.commit()
 
     # Capture TA fields BEFORE the generator. Flask streaming generators run after
@@ -247,13 +263,13 @@ def stream_chat_response(
                 history_text = "\n".join(history_parts)
 
             # Build a structured history list for the LLM. Used when ANY message
-            # in the recent window has an image, so multi-turn follow-ups ("what
-            # about the slope here?") can still see the prior drawing. When no
-            # images are involved, history_for_llm stays None and the LLM call
-            # uses the existing prose history_text.
+            # in the recent window has at least one attached image, so multi-turn
+            # follow-ups ("what about the slope here?") can still see prior drawings.
+            # When no images are involved at all, history_for_llm stays None and
+            # the LLM call uses the existing prose history_text.
             session_has_any_image = any(
-                getattr(m, "image_data", None) for m in conversation_history
-            ) or bool(image_data)
+                bool(getattr(m, "images", None)) for m in conversation_history
+            ) or bool(images)
             history_for_llm = (
                 _build_history_for_llm(conversation_history, max_turns=6)
                 if session_has_any_image
@@ -301,10 +317,11 @@ def stream_chat_response(
                 or total_chunks_in_ta <= 5
             ) and not supplementary_found
 
-            # LLM STREAMING (multimodal-aware)
-            current_image = None
-            if image_data:
-                current_image = {"data": image_data, "mime": image_mime or "image/jpeg"}
+            # LLM STREAMING (multimodal-aware) — pass the full list of current-turn images
+            current_images = [
+                {"data": img["data"], "mime": img.get("mime") or "image/jpeg"}
+                for img in images
+            ] if images else None
 
             generation_start = time.time()
             for token in generate_response_stream(
@@ -318,7 +335,7 @@ def stream_chat_response(
                 query_reference=query_reference,
                 attempt_count=attempt_count,
                 limited_context=limited_context,
-                current_image=current_image,
+                current_images=current_images,
                 history_for_llm=history_for_llm,
             ):
                 full_response += token

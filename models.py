@@ -209,8 +209,28 @@ class ChatMessage(db.Model):
     content = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     sources = db.Column(db.JSON, nullable=True)
-    image_data = db.Column(db.LargeBinary, nullable=True)  # Optional student-uploaded image attached to a user message
-    image_mime = db.Column(db.String(64), nullable=True)  # e.g. 'image/png', 'image/jpeg'
+
+    # Up to MAX_IMAGES_PER_TURN attached images per user message, in display order.
+    # See ChatMessageImage below. Replaces the old single-image image_data/image_mime columns
+    # (migrated 2026-04-28).
+    images = db.relationship(
+        'ChatMessageImage',
+        backref='message',
+        lazy='select',
+        order_by='ChatMessageImage.order',
+        cascade='all, delete-orphan',
+    )
+
+
+class ChatMessageImage(db.Model):
+    __tablename__ = 'chat_message_images'
+
+    id = db.Column(db.Integer, primary_key=True)
+    message_id = db.Column(db.Integer, db.ForeignKey('chat_messages.id'), nullable=False, index=True)
+    image_data = db.Column(db.LargeBinary, nullable=False)
+    image_mime = db.Column(db.String(64), nullable=True)
+    order = db.Column(db.Integer, nullable=False, default=0)  # 0-indexed display order within the message
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class DocumentChunk(db.Model):
     __tablename__ = 'document_chunks'

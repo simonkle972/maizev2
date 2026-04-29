@@ -191,7 +191,7 @@ def chat_stream(ta_id):
     if not ta.is_indexed:
         return jsonify({"error": "This teaching assistant is not ready yet. Please check back later."}), 400
 
-    query, session_id, image_data, image_mime, parse_error = parse_chat_request(request)
+    query, session_id, images, parse_error = parse_chat_request(request)
     if parse_error:
         return jsonify({"error": parse_error}), 400
     if not query:
@@ -203,6 +203,5 @@ def chat_stream(ta_id):
         session_id=session_id,
         user_id=current_student.id,
         is_anonymous=False,
-        image_data=image_data,
-        image_mime=image_mime,
+        images=images,
     )

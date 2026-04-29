@@ -516,10 +516,9 @@
                     <div class="chat-footer-embedded">
                         <form id="chat-form" onsubmit="sendMessage(event)">
                             {% if selected_ta.image_upload_enabled %}
-                            <div id="image-staging" style="display:none; padding: 8px 12px; border-radius: 8px; background: #faf5f0; border: 1px solid #e8e0d8; margin-bottom: 8px; align-items: center; gap: 12px;">
-                                <img id="image-staging-thumb" src="" alt="Staged image" style="max-height: 64px; max-width: 96px; object-fit: cover; border-radius: 4px; border: 1px solid #e0d8cc;">
-                                <span id="image-staging-name" style="font-size: 0.875rem; color: #4a3328; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
-                                <button type="button" onclick="clearStagedImage()" title="Remove image" style="background: transparent; border: none; cursor: pointer; color: #8b7355; font-size: 1.125rem; padding: 4px 8px;">✕</button>
+                            <div id="image-staging" style="display:none; padding: 8px 12px; border-radius: 8px; background: #faf5f0; border: 1px solid #e8e0d8; margin-bottom: 8px;">
+                                <div id="image-staging-list" style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;"></div>
+                                <p id="image-staging-hint" style="font-size: 0.75rem; color: #8b7355; margin: 6px 0 0;">Drag thumbnails to reorder.</p>
                             </div>
                             {% endif %}
                             <div class="input-group">
@@ -535,7 +534,7 @@
                                         <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
                                     </svg>
                                 </button>
-                                <input type="file" id="image-input" accept="image/jpeg,image/png,image/heic,image/heif" capture="environment" style="display:none" onchange="handleImageSelected(event)">
+                                <input type="file" id="image-input" accept="image/jpeg,image/png,image/heic,image/heif" capture="environment" multiple style="display:none" onchange="handleImageSelected(event)">
                                 {% endif %}
                                 <textarea
                                     id="query-input"
@@ -554,13 +553,12 @@
                     let sessionId = '';
                     const taId = '{{ selected_ta.id }}';
                     const imageUploadEnabled = {{ 'true' if selected_ta.image_upload_enabled else 'false' }};
-                    let stagedImageFile = null;
-                    let stagedImageDataUrl = null;
+                    let stagedImages = [];
 
                     const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+                    const MAX_IMAGES_PER_TURN = 5;
                     const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/heic', 'image/heif'];
 
-                    // Shared by click-to-upload AND drag-and-drop. Returns true if accepted.
                     function stageImageFile(file) {
                         if (!file) return false;
                         if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
@@ -571,32 +569,96 @@
                             alert(`Image is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Max 5 MB.`);
                             return false;
                         }
-                        stagedImageFile = file;
+                        if (stagedImages.length >= MAX_IMAGES_PER_TURN) {
+                            alert(`Max ${MAX_IMAGES_PER_TURN} images per message. Send these first, then attach more.`);
+                            return false;
+                        }
                         const reader = new FileReader();
+                        const id = 'img-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
                         reader.onload = function(e) {
-                            stagedImageDataUrl = e.target.result;
-                            document.getElementById('image-staging-thumb').src = stagedImageDataUrl;
-                            document.getElementById('image-staging-name').textContent = file.name;
-                            const staging = document.getElementById('image-staging');
-                            staging.style.display = 'flex';
+                            stagedImages.push({ id, file, dataUrl: e.target.result });
+                            renderStagedImages();
                         };
                         reader.readAsDataURL(file);
                         return true;
                     }
 
+                    function stageImageFiles(fileList) {
+                        for (const f of Array.from(fileList || [])) {
+                            if (!stageImageFile(f)) break;
+                        }
+                    }
+
                     function handleImageSelected(event) {
-                        const file = event.target.files && event.target.files[0];
-                        const accepted = stageImageFile(file);
-                        if (!accepted) event.target.value = '';
+                        stageImageFiles(event.target.files);
+                        event.target.value = '';
                     }
 
                     function clearStagedImage() {
-                        stagedImageFile = null;
-                        stagedImageDataUrl = null;
-                        const staging = document.getElementById('image-staging');
-                        if (staging) staging.style.display = 'none';
+                        stagedImages = [];
+                        renderStagedImages();
                         const fileInput = document.getElementById('image-input');
                         if (fileInput) fileInput.value = '';
+                    }
+
+                    function removeStagedImage(id) {
+                        stagedImages = stagedImages.filter(img => img.id !== id);
+                        renderStagedImages();
+                    }
+
+                    function renderStagedImages() {
+                        const staging = document.getElementById('image-staging');
+                        const list = document.getElementById('image-staging-list');
+                        if (!staging || !list) return;
+                        if (!stagedImages.length) {
+                            staging.style.display = 'none';
+                            list.innerHTML = '';
+                            return;
+                        }
+                        staging.style.display = 'block';
+                        list.innerHTML = stagedImages.map((img, idx) => `
+                            <div class="staged-thumb" draggable="true" data-id="${img.id}" data-idx="${idx}"
+                                 style="position: relative; cursor: grab; border: 1px solid #e0d8cc; border-radius: 6px; overflow: hidden; background: white; flex-shrink: 0;">
+                                <img src="${img.dataUrl}" alt="Staged image ${idx + 1}" style="display: block; height: 64px; width: 64px; object-fit: cover;">
+                                <span style="position: absolute; bottom: 2px; left: 2px; background: rgba(43, 31, 26, 0.78); color: white; font-size: 0.65rem; padding: 1px 4px; border-radius: 3px;">${idx + 1}</span>
+                                <button type="button" onclick="removeStagedImage('${img.id}')" title="Remove" style="position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; border-radius: 50%; border: none; background: rgba(43, 31, 26, 0.78); color: white; font-size: 0.7rem; line-height: 1; cursor: pointer; padding: 0;">✕</button>
+                            </div>
+                        `).join('');
+                        attachThumbDragListeners();
+                    }
+
+                    let draggedId = null;
+                    function attachThumbDragListeners() {
+                        const list = document.getElementById('image-staging-list');
+                        if (!list) return;
+                        list.querySelectorAll('.staged-thumb').forEach(el => {
+                            el.addEventListener('dragstart', (e) => {
+                                draggedId = el.dataset.id;
+                                el.style.opacity = '0.4';
+                                e.dataTransfer.effectAllowed = 'move';
+                                e.dataTransfer.setData('text/plain', el.dataset.id);
+                            });
+                            el.addEventListener('dragend', () => {
+                                el.style.opacity = '1';
+                                draggedId = null;
+                            });
+                            el.addEventListener('dragover', (e) => {
+                                if (!draggedId) return;
+                                e.preventDefault();
+                                e.dataTransfer.dropEffect = 'move';
+                            });
+                            el.addEventListener('drop', (e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (!draggedId || draggedId === el.dataset.id) return;
+                                const fromIdx = stagedImages.findIndex(i => i.id === draggedId);
+                                const toIdx = stagedImages.findIndex(i => i.id === el.dataset.id);
+                                if (fromIdx < 0 || toIdx < 0) return;
+                                const [moved] = stagedImages.splice(fromIdx, 1);
+                                stagedImages.splice(toIdx, 0, moved);
+                                renderStagedImages();
+                            });
+                        });
                     }
 
                     // Drag-and-drop wiring on the embedded chat container.
@@ -629,8 +691,7 @@
                             e.preventDefault();
                             dragDepth = 0;
                             if (dropOverlay) dropOverlay.style.display = 'none';
-                            const file = e.dataTransfer.files && e.dataTransfer.files[0];
-                            if (file) stageImageFile(file);
+                            stageImageFiles(e.dataTransfer.files);
                         });
                     }
 
@@ -678,14 +739,18 @@
                         autoResize(this);
                     });
 
-                    function addMessage(role, content, sources = [], imageDataUrl = null) {
+                    function addMessage(role, content, sources = [], imageDataUrls = null) {
                         const messagesEl = document.getElementById('messages');
                         const messageDiv = document.createElement('div');
                         messageDiv.className = `message ${role}`;
 
+                        const urls = Array.isArray(imageDataUrls)
+                            ? imageDataUrls
+                            : (imageDataUrls ? [imageDataUrls] : []);
                         let imageHtml = '';
-                        if (imageDataUrl) {
-                            imageHtml = `<div class="message-image" style="margin-bottom: 8px;"><img src="${imageDataUrl}" alt="Uploaded work" style="max-width: 100%; max-height: 320px; border-radius: 8px; border: 1px solid #e0d8cc; display: block;"></div>`;
+                        if (urls.length) {
+                            const items = urls.map((u, i) => `<img src="${u}" alt="Uploaded image ${i + 1}" style="max-width: 100%; max-height: 320px; border-radius: 8px; border: 1px solid #e0d8cc; display: block;">`).join('');
+                            imageHtml = `<div class="message-images" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px;">${items}</div>`;
                         }
 
                         let html = '';
@@ -930,10 +995,10 @@
 
                         if (!query) return;
 
-                        const submittingImageDataUrl = stagedImageDataUrl;
-                        const submittingImageFile = stagedImageFile;
+                        const submittingImages = stagedImages.slice();
+                        const submittingDataUrls = submittingImages.map(i => i.dataUrl);
 
-                        addMessage('user', query, [], submittingImageDataUrl);
+                        addMessage('user', query, [], submittingDataUrls);
                         input.value = '';
                         autoResize(input);
                         clearStagedImage();
@@ -946,11 +1011,13 @@
 
                         try {
                             let response;
-                            if (submittingImageFile) {
+                            if (submittingImages.length) {
                                 const formData = new FormData();
                                 formData.append('query', query);
                                 formData.append('session_id', sessionId);
-                                formData.append('image', submittingImageFile);
+                                for (const img of submittingImages) {
+                                    formData.append('image', img.file);
+                                }
                                 response = await fetch(`/student/ta/${taId}/api/chat/stream`, {
                                     method: 'POST',
                                     body: formData,

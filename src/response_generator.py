@@ -177,7 +177,7 @@ Use LaTeX formatting for all equations (e.g., $P = \\frac{X}{Y}$)
 5. For conceptual questions, explain concepts and methods without revealing problem-specific answers
 
 === STUDENT-UPLOADED IMAGES ===
-When the student uploads an image (a drawing, diagram, or photograph of handwritten work), first briefly describe what you see, then let the surrounding conversation guide your response. Three cases:
+When the student uploads one or more images (drawings, diagrams, or photographs of handwritten work — multi-page solutions are common), first briefly describe what you see, then let the surrounding conversation guide your response. **Treat the images as ordered:** the first image is page 1, the second is page 2, etc. — the student arranged them in narrative order. Read across them as a single solution, not as independent fragments. Three cases:
 - IN-CONTEXT HOMEWORK ATTEMPT — if a specific problem is being actively discussed, treat the image as the student's work and apply the same answer-validation rules as for typed solutions (patience escalation, no full-reveal of solutions).
 - COLD-START UPLOAD — if the image arrives without conversational context, describe what you see and ask the student what they'd like to discuss. Don't assume it's a homework attempt and don't volunteer evaluative feedback.
 - CONCEPT EXPLORATION — if the image illustrates an idea the student is trying to understand (rather than a graded attempt), engage with it as any teaching dialogue would; the homework-attempt rules don't apply.
@@ -284,7 +284,7 @@ def build_messages(
     query_reference: Optional[str] = None,
     attempt_count: int = 0,
     limited_context: bool = False,
-    current_image: Optional[dict] = None,
+    current_images: Optional[list] = None,
     history_for_llm: Optional[list] = None,
 ):
     """
@@ -293,12 +293,13 @@ def build_messages(
     Two modes:
     - TEXT-ONLY (default): conversation history is passed as a prose string in the user
       message; current user message is plain text. Same behavior as before.
-    - MULTIMODAL (when current_image OR history_for_llm provided): conversation history
+    - MULTIMODAL (when current_images OR history_for_llm provided): conversation history
       becomes a structured list of message dicts (with images preserved on prior turns),
-      and the current user message becomes a content list with both text and image parts.
+      and the current user message becomes a content list with text and image parts.
 
+    `current_images` is a list of {"data": bytes, "mime": str} dicts in display order.
     `history_for_llm`, when given, REPLACES the prose `conversation_history` for the
-    structured part of the message list. Already-formatted structured messages, one per turn.
+    structured part of the message list.
     """
     import base64 as _base64
 
@@ -352,14 +353,23 @@ Here is the limited course material available:"""
 """
     user_text += f"Student's question: {query}"
 
-    # Current-turn user content: multimodal list when an image is attached; otherwise plain string.
-    if current_image and current_image.get("data"):
-        mime = current_image.get("mime") or "image/jpeg"
-        b64 = _base64.b64encode(current_image["data"]).decode("ascii")
-        current_user_content = [
-            {"type": "text", "text": user_text},
-            {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
-        ]
+    # Current-turn user content: multimodal list when one or more images are attached;
+    # otherwise plain string. Images are appended in the order provided.
+    if current_images:
+        current_user_content = [{"type": "text", "text": user_text}]
+        for img in current_images:
+            data = img.get("data")
+            if not data:
+                continue
+            mime = img.get("mime") or "image/jpeg"
+            b64 = _base64.b64encode(data).decode("ascii")
+            current_user_content.append(
+                {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}}
+            )
+        # If somehow all images were empty, fall back to plain text rather than an
+        # otherwise-pointless multimodal wrapper.
+        if len(current_user_content) == 1:
+            current_user_content = user_text
     else:
         current_user_content = user_text
 
@@ -434,7 +444,7 @@ def generate_response_stream(
     query_reference: Optional[str] = None,
     attempt_count: int = 0,
     limited_context: bool = False,
-    current_image: Optional[dict] = None,
+    current_images: Optional[list] = None,
     history_for_llm: Optional[list] = None,
 ):
     client = OpenAI(api_key=Config.OPENAI_API_KEY)
@@ -443,7 +453,7 @@ def generate_response_stream(
         query, context, system_prompt, conversation_history, course_name,
         hybrid_mode=hybrid_mode, hybrid_doc_filename=hybrid_doc_filename, query_reference=query_reference,
         attempt_count=attempt_count, limited_context=limited_context,
-        current_image=current_image, history_for_llm=history_for_llm,
+        current_images=current_images, history_for_llm=history_for_llm,
     )
     
     try:
