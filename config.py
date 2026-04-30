@@ -93,6 +93,11 @@ class Config:
     CONTEXTUALIZER_MODEL = os.getenv('CONTEXTUALIZER_MODEL', 'gpt-4o-mini')
     CONTEXTUALIZER_MAX_HISTORY = 6
 
+    # Pre-retrieval adversarial / off-topic filter. When True, queries the contextualizer
+    # classifies as `off_topic` short-circuit before retrieval/generation and get a brief
+    # canned redirect. Easy kill switch if classification accuracy drops.
+    ADVERSARIAL_FILTER_ENABLED = os.getenv('ADVERSARIAL_FILTER_ENABLED', 'true').lower() == 'true'
+
     # Days to retain student-uploaded image_data on ChatMessage rows before the
     # `flask cleanup-images` CLI command zeroes them out. Keeps storage bounded
     # and limits the privacy footprint of student work.

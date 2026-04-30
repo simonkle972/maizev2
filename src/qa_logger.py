@@ -64,7 +64,8 @@ QA_LOG_HEADERS = [
     "rewritten_query",
     "intent",
     "current_focus",
-    "cache_action"
+    "cache_action",
+    "adversarial_short_circuit"
 ]
 
 INDEX_LOG_HEADERS = [
@@ -273,7 +274,8 @@ def log_qa_entry(
                 (diag.get("rewritten_query") or "")[:2000],
                 diag.get("intent") or "",
                 (diag.get("current_focus") or "")[:300],
-                diag.get("cache_action") or ""
+                diag.get("cache_action") or "",
+                str(diag.get("adversarial_short_circuit", False))
             ]
             
             service.spreadsheets().values().append(

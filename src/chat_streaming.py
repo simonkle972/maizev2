@@ -282,9 +282,64 @@ def stream_chat_response(
                 ta_id, query, top_k=8,
                 conversation_history=conversation_history,
                 session_id=session_id,
+                course_name=ta_course_name,
             )
             retrieval_latency_ms = int((time.time() - retrieval_start) * 1000)
             chunk_count = len(chunks)
+
+            # ADVERSARIAL / OFF-TOPIC SHORT-CIRCUIT
+            # The contextualizer flagged this query as off-topic (greeting, jailbreak,
+            # roleplay attack, answer-extraction trick). Skip retrieval/context/generation
+            # entirely and stream a brief canned redirect. Saves ~10-15s rerank + ~10-15s
+            # gpt-5.2 generation per dismissed query.
+            if retrieval_diagnostics.get("adversarial_short_circuit"):
+                # Prefer the LLM-tailored redirect produced by the contextualizer (varies by
+                # off-topic category — greeting / frustration / jailbreak / cheating). Falls
+                # back to the generic canned line if the contextualizer didn't produce one.
+                tailored = (retrieval_diagnostics.get("redirect_message") or "").strip()
+                canned_fallback = (
+                    f"Let's stay on track. I'm here to help with {ta_course_name} — "
+                    "what would you like help with from the course materials?"
+                )
+                full_response = tailored or canned_fallback
+                yield f"data: {json.dumps({'type': 'token', 'content': full_response})}\n\n"
+
+                # Persist assistant message
+                chat_session_update = ChatSession.query.get(session_id)
+                assistant_message = ChatMessage(
+                    session_id=session_id,
+                    role="assistant",
+                    content=full_response,
+                    sources=[],
+                )
+                db.session.add(assistant_message)
+                if chat_session_update:
+                    chat_session_update.last_activity = datetime.utcnow()
+                db.session.commit()
+
+                # Log the dismissed turn so we can measure detection rate + tune the prompt
+                total_latency_ms = int((time.time() - start_time) * 1000)
+                log_qa_entry(
+                    ta_id=str(ta_id),
+                    ta_slug=ta_slug,
+                    ta_name=ta_name,
+                    course_name=ta_course_name,
+                    session_id=session_id,
+                    query=query,
+                    answer=full_response,
+                    sources=[],
+                    chunk_count=0,
+                    latency_ms=total_latency_ms,
+                    retrieval_latency_ms=retrieval_latency_ms,
+                    generation_latency_ms=0,
+                    token_count=len(full_response.split()),
+                    retrieval_diagnostics=retrieval_diagnostics,
+                    llm_model=Config.LLM_MODEL,
+                    is_anonymous=is_anonymous,
+                )
+
+                yield f"data: {json.dumps({'type': 'done', 'session_id': session_id})}\n\n"
+                return  # Skip the rest of the pipeline
 
             yield f"data: {json.dumps({'type': 'status', 'message': 'Analyzing relevant content...'})}\n\n"
 
