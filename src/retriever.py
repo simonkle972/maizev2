@@ -1591,6 +1591,10 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         "current_focus": "",
         "cache_action": "none",
         "adversarial_short_circuit": False,
+        "moderation_latency_ms": 0,
+        "vector_search_latency_ms": 0,
+        "supplementary_latency_ms": 0,
+        "hybrid_fetch_latency_ms": 0,
     }
     
     # SESSION CONTEXT CACHE: Check if we have cached context from previous successful retrieval
@@ -1902,8 +1906,10 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         return [], diagnostics
     
     client = get_openai_client()
-    
+
     # Use the enriched query for embedding to get better semantic search results
+    import time as _t
+    _vector_t0 = _t.time()
     response = client.embeddings.create(
         model=Config.EMBEDDING_MODEL,
         input=effective_query
@@ -1923,18 +1929,23 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         
         if target_doc_ids:
             doc_id = target_doc_ids[0]
+            _hybrid_t0 = _t.time()
             full_text, filename, token_estimate = get_full_document_text(doc_id)
-            
+            diagnostics["hybrid_fetch_latency_ms"] = int((_t.time() - _hybrid_t0) * 1000)
+
             if full_text and token_estimate <= Config.HYBRID_MAX_DOC_TOKENS:
                 logger.info(f"[{ta_id}] Early hybrid: using full document '{filename}' ({token_estimate} tokens)")
-                
+
+                # Vector-phase ended at the embedding call; record what we have so far.
+                diagnostics["vector_search_latency_ms"] = int((_t.time() - _vector_t0) * 1000)
+
                 diagnostics["hybrid_fallback_triggered"] = True
                 diagnostics["hybrid_fallback_reason"] = f"early_routing_specific_ref_{problem_ref.get('full_ref')}"
                 diagnostics["hybrid_doc_filename"] = filename
                 diagnostics["hybrid_doc_tokens"] = token_estimate
                 diagnostics["retrieval_method"] = "early_hybrid_full_doc"
                 diagnostics["validation_expected_ref"] = problem_ref.get("full_ref")
-                
+
                 hybrid_chunks = [{
                     "text": full_text,
                     "score": 10.0,
@@ -1945,12 +1956,14 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                     "llm_relevance_score": 10.0,
                     "llm_reason": f"Early hybrid routing for specific reference '{problem_ref.get('full_ref')}'"
                 }]
-                
+
                 logger.info(f"[{ta_id}] Early hybrid complete | doc={filename} | tokens={token_estimate}")
 
                 # Supplementary teaching material retrieval (before cache so we can store it)
+                _supp_t0 = _t.time()
                 supp_chunks, supp_triggered = retrieve_supplementary_teaching_material(
                     ta_id, hybrid_chunks, query_analysis, diagnostics, original_chunks=[])
+                diagnostics["supplementary_latency_ms"] += int((_t.time() - _supp_t0) * 1000)
                 if supp_triggered:
                     hybrid_chunks.extend(supp_chunks)
                     diagnostics["supplementary_teaching_found"] = True
@@ -2063,7 +2076,9 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
             DocumentChunk.embedding.cosine_distance(query_embedding)
         ).limit(initial_k).all()
         used_fallback = True
-    
+
+    diagnostics["vector_search_latency_ms"] = int((_t.time() - _vector_t0) * 1000)
+
     if has_filters and not used_fallback:
         diagnostics["retrieval_method"] = "filtered"
     elif has_filters and used_fallback:
@@ -2213,17 +2228,19 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         
         if target_doc_ids:
             doc_id = target_doc_ids[0]
+            _hybrid_t0 = _t.time()
             full_text, filename, token_estimate = get_full_document_text(doc_id)
-            
+            diagnostics["hybrid_fetch_latency_ms"] += int((_t.time() - _hybrid_t0) * 1000)
+
             if full_text and token_estimate <= Config.HYBRID_MAX_DOC_TOKENS:
                 logger.info(f"[{ta_id}] Hybrid fallback: using full document '{filename}' ({token_estimate} tokens)")
-                
+
                 diagnostics["hybrid_fallback_triggered"] = True
                 diagnostics["hybrid_fallback_reason"] = trigger_reason
                 diagnostics["hybrid_doc_filename"] = filename
                 diagnostics["hybrid_doc_tokens"] = token_estimate
                 diagnostics["retrieval_method"] = "hybrid_full_doc"
-                
+
                 hybrid_chunks = [{
                     "text": full_text,
                     "score": 10.0,
@@ -2234,13 +2251,15 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                     "llm_relevance_score": 10.0,
                     "llm_reason": "Full document fallback due to low chunk confidence"
                 }]
-                
+
                 # CACHE THE DOCUMENT for follow-up queries
                 logger.info(f"[{ta_id}] Hybrid fallback complete | doc={filename} | tokens={token_estimate}")
 
                 # Supplementary teaching material retrieval (before cache so we can store it)
+                _supp_t0 = _t.time()
                 supp_chunks, supp_triggered = retrieve_supplementary_teaching_material(
                     ta_id, hybrid_chunks, query_analysis, diagnostics, original_chunks=chunks)
+                diagnostics["supplementary_latency_ms"] += int((_t.time() - _supp_t0) * 1000)
                 if supp_triggered:
                     hybrid_chunks.extend(supp_chunks)
                     diagnostics["supplementary_teaching_found"] = True
@@ -2296,8 +2315,10 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
     )
     
     # Supplementary teaching material retrieval (before cache so we can store it)
+    _supp_t0 = _t.time()
     supp_chunks, supp_triggered = retrieve_supplementary_teaching_material(
         ta_id, chunks, query_analysis, diagnostics)
+    diagnostics["supplementary_latency_ms"] += int((_t.time() - _supp_t0) * 1000)
     if supp_triggered:
         chunks.extend(supp_chunks)
         diagnostics["supplementary_teaching_found"] = True

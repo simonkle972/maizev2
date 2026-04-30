@@ -65,7 +65,14 @@ QA_LOG_HEADERS = [
     "intent",
     "current_focus",
     "cache_action",
-    "adversarial_short_circuit"
+    "adversarial_short_circuit",
+    "moderation_latency_ms",
+    "vector_search_latency_ms",
+    "supplementary_latency_ms",
+    "hybrid_fetch_latency_ms",
+    "generation_ttft_ms",
+    "prompt_tokens_total",
+    "prompt_tokens_cached"
 ]
 
 INDEX_LOG_HEADERS = [
@@ -275,7 +282,14 @@ def log_qa_entry(
                 diag.get("intent") or "",
                 (diag.get("current_focus") or "")[:300],
                 diag.get("cache_action") or "",
-                str(diag.get("adversarial_short_circuit", False))
+                str(diag.get("adversarial_short_circuit", False)),
+                str(diag.get("moderation_latency_ms", 0)),
+                str(diag.get("vector_search_latency_ms", 0)),
+                str(diag.get("supplementary_latency_ms", 0)),
+                str(diag.get("hybrid_fetch_latency_ms", 0)),
+                str(diag.get("generation_ttft_ms", 0)),
+                str(diag.get("prompt_tokens_total", 0)),
+                str(diag.get("prompt_tokens_cached", 0))
             ]
             
             service.spreadsheets().values().append(

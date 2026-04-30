@@ -379,6 +379,7 @@ def stream_chat_response(
             ] if images else None
 
             generation_start = time.time()
+            generation_ttft_ms = 0
             for token in generate_response_stream(
                 query=query,
                 context=context,
@@ -392,10 +393,14 @@ def stream_chat_response(
                 limited_context=limited_context,
                 current_images=current_images,
                 history_for_llm=history_for_llm,
+                usage_capture=retrieval_diagnostics,
             ):
+                if generation_ttft_ms == 0 and token:
+                    generation_ttft_ms = int((time.time() - generation_start) * 1000)
                 full_response += token
                 yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
             generation_latency_ms = int((time.time() - generation_start) * 1000)
+            retrieval_diagnostics["generation_ttft_ms"] = generation_ttft_ms
 
             full_response = escape_hash_in_latex(full_response)
 

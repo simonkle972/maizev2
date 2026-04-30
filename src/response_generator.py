@@ -446,6 +446,7 @@ def generate_response_stream(
     limited_context: bool = False,
     current_images: Optional[list] = None,
     history_for_llm: Optional[list] = None,
+    usage_capture: Optional[dict] = None,
 ):
     client = OpenAI(api_key=Config.OPENAI_API_KEY)
 
@@ -455,19 +456,29 @@ def generate_response_stream(
         attempt_count=attempt_count, limited_context=limited_context,
         current_images=current_images, history_for_llm=history_for_llm,
     )
-    
+
     try:
         stream = client.chat.completions.create(
             model=Config.LLM_MODEL,
             messages=messages,
             max_completion_tokens=Config.LLM_MAX_COMPLETION_TOKENS,
             stream=True,
-            reasoning_effort=Config.LLM_REASONING_HIGH
+            stream_options={"include_usage": True},
+            reasoning_effort=Config.LLM_REASONING_HIGH,
         )
-        
+
         has_content = False
         for chunk in stream:
-            if chunk.choices[0].delta.content:
+            # Final usage frame: choices is empty, only `usage` is populated.
+            usage = getattr(chunk, "usage", None)
+            if usage and usage_capture is not None:
+                usage_capture["prompt_tokens_total"] = getattr(usage, "prompt_tokens", 0) or 0
+                cached = 0
+                details = getattr(usage, "prompt_tokens_details", None)
+                if details is not None:
+                    cached = getattr(details, "cached_tokens", 0) or 0
+                usage_capture["prompt_tokens_cached"] = cached
+            if chunk.choices and chunk.choices[0].delta.content:
                 has_content = True
                 yield chunk.choices[0].delta.content
         
