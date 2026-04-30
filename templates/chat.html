@@ -256,11 +256,56 @@
             });
         }
         
-        const statusMessages = [
-            'Searching course materials...',
-            'Analyzing relevant content...',
-            'Generating response...'
-        ];
+        const statusPools = {
+            retrieval: [
+                'Searching the course shelf...',
+                'Pulling up your readings...',
+                'Cross-referencing the syllabus...',
+                'Schlepping through lecture notes...',
+                'Hunting down the right chapter...',
+                'Flipping through pages...',
+                'Tracking down sources...',
+                'Sifting through problem sets...',
+            ],
+            generation: [
+                'Connecting the dots...',
+                'Working through the logic...',
+                'Thinking it over...',
+                'Drafting a response...',
+                'Putting it together...',
+                'Reasoning through it...',
+                'Lining up the explanation...',
+                'Workshopping the steps...',
+            ],
+        };
+        let statusCyclerInterval = null;
+        let statusCyclerLastIndex = -1;
+        function pickFromPool(pool) {
+            if (!pool || pool.length === 0) return '';
+            if (pool.length === 1) return pool[0];
+            let idx;
+            do {
+                idx = Math.floor(Math.random() * pool.length);
+            } while (idx === statusCyclerLastIndex);
+            statusCyclerLastIndex = idx;
+            return pool[idx];
+        }
+        function stopStatusCycler() {
+            if (statusCyclerInterval) {
+                clearInterval(statusCyclerInterval);
+                statusCyclerInterval = null;
+            }
+            statusCyclerLastIndex = -1;
+        }
+        function startStatusCycler(pool) {
+            stopStatusCycler();
+            const setText = (msg) => {
+                const statusText = document.querySelector('#streaming-message .status-text');
+                if (statusText) statusText.textContent = msg;
+            };
+            setText(pickFromPool(pool));
+            statusCyclerInterval = setInterval(() => setText(pickFromPool(pool)), 2500);
+        }
         
         function handleKeydown(e) {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -561,13 +606,16 @@
         }
         
         function updateStreamingStatus(message) {
-            const statusText = document.querySelector('#streaming-message .status-text');
-            if (statusText) {
-                statusText.textContent = message;
-            }
+            // Use the server's status text as a phase signal — actual displayed
+            // text comes from the cycling pool so a single phase doesn't sit on
+            // one line for 10+ seconds.
+            const lower = (message || '').toLowerCase();
+            const pool = lower.includes('generat') ? statusPools.generation : statusPools.retrieval;
+            startStatusCycler(pool);
         }
-        
+
         function hideStreamingStatus() {
+            stopStatusCycler();
             const statusDiv = document.querySelector('#streaming-message .message-status');
             if (statusDiv) {
                 statusDiv.style.display = 'none';
@@ -726,6 +774,7 @@
                 }
                 addMessage('assistant', `I apologize, but I had trouble processing your request: ${err.message}`);
             } finally {
+                stopStatusCycler();
                 sendBtn.disabled = false;
                 input.focus();
             }
