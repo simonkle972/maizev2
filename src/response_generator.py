@@ -403,22 +403,22 @@ def generate_response(
             model=Config.LLM_MODEL,
             messages=messages,
             max_completion_tokens=Config.LLM_MAX_COMPLETION_TOKENS,
-            reasoning_effort=Config.LLM_REASONING_HIGH
+            reasoning_effort=Config.LLM_REASONING_MEDIUM
         )
-        
+
         content = response.choices[0].message.content
         finish_reason = response.choices[0].finish_reason
         usage = getattr(response, 'usage', None)
         if usage:
             logger.info(f"LLM usage: completion_tokens={usage.completion_tokens}, total_tokens={usage.total_tokens}, finish_reason={finish_reason}")
-        
+
         if not content or not content.strip():
-            logger.warning(f"Empty LLM response. finish_reason={finish_reason}, usage={usage}. Retrying with medium reasoning.")
+            logger.warning(f"Empty LLM response. finish_reason={finish_reason}, usage={usage}. Retrying with low reasoning.")
             response = client.chat.completions.create(
                 model=Config.LLM_MODEL,
                 messages=messages,
                 max_completion_tokens=Config.LLM_MAX_COMPLETION_TOKENS,
-                reasoning_effort=Config.LLM_REASONING_MEDIUM
+                reasoning_effort=Config.LLM_REASONING_LOW
             )
             content = response.choices[0].message.content
             if not content or not content.strip():
@@ -464,7 +464,7 @@ def generate_response_stream(
             max_completion_tokens=Config.LLM_MAX_COMPLETION_TOKENS,
             stream=True,
             stream_options={"include_usage": True},
-            reasoning_effort=Config.LLM_REASONING_HIGH,
+            reasoning_effort=Config.LLM_REASONING_MEDIUM,
         )
 
         has_content = False
@@ -483,12 +483,12 @@ def generate_response_stream(
                 yield chunk.choices[0].delta.content
         
         if not has_content:
-            logger.warning("Streaming produced zero content tokens. Falling back to non-streaming retry.")
+            logger.warning("Streaming produced zero content tokens. Falling back to non-streaming retry at low reasoning.")
             response = OpenAI(api_key=Config.OPENAI_API_KEY).chat.completions.create(
                 model=Config.LLM_MODEL,
                 messages=messages,
                 max_completion_tokens=Config.LLM_MAX_COMPLETION_TOKENS,
-                reasoning_effort=Config.LLM_REASONING_MEDIUM
+                reasoning_effort=Config.LLM_REASONING_LOW
             )
             fallback = response.choices[0].message.content
             if fallback and fallback.strip():

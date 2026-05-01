@@ -19,6 +19,7 @@ class Config:
     LLM_MODEL = "gpt-5.2"
     LLM_REASONING_HIGH = "high"
     LLM_REASONING_MEDIUM = "medium"
+    LLM_REASONING_LOW = "low"
     LLM_MAX_COMPLETION_TOKENS = 16000
     VISION_MODEL = "gpt-4o"  # Image description tasks — no reasoning needed, far cheaper than gpt-5.2
 
