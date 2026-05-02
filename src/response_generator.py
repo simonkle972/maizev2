@@ -310,23 +310,29 @@ def build_messages(
     """
     import base64 as _base64
 
-    full_system_prompt = f"{system_prompt}\n\n{BASE_INSTRUCTIONS}"
+    # STABLE PREFIX — identical across all turns for the same TA in a session.
+    # Kept as the first system message so OpenAI's prompt cache can hit it
+    # (cacheable at >=1024 tokens; BASE_INSTRUCTIONS alone clears that bar).
+    # Anything that varies per turn (attempt count, hybrid flag, limited
+    # context flag) goes in the SECOND system message below — adding it here
+    # would bust the cache prefix on every turn.
+    stable_system = ""
+    if course_name:
+        stable_system = f"You are a teaching assistant for {course_name}.\n\n"
+    stable_system += f"{system_prompt}\n\n{BASE_INSTRUCTIONS}"
 
-    # Add patience-level instructions for answer validation
+    # PER-TURN INSTRUCTIONS — separated out for cacheability. These are
+    # concatenated into a second system message so OpenAI still treats them
+    # as system context, but they sit AFTER the stable cacheable prefix.
+    dynamic_system_parts = []
     patience_instructions = get_patience_instructions(attempt_count)
     if patience_instructions:
-        full_system_prompt += f"\n{patience_instructions}"
-
+        dynamic_system_parts.append(patience_instructions)
     if hybrid_mode and not limited_context:
         ref = query_reference or query
-        hybrid_instructions = HYBRID_FULL_DOC_INSTRUCTIONS.format(query_reference=ref)
-        full_system_prompt += f"\n{hybrid_instructions}"
-
+        dynamic_system_parts.append(HYBRID_FULL_DOC_INSTRUCTIONS.format(query_reference=ref))
     if limited_context:
-        full_system_prompt += f"\n{LIMITED_CONTEXT_INSTRUCTIONS}"
-
-    if course_name:
-        full_system_prompt = f"You are a teaching assistant for {course_name}.\n\n{full_system_prompt}"
+        dynamic_system_parts.append(LIMITED_CONTEXT_INSTRUCTIONS)
 
     if limited_context:
         context_header = """WARNING — LIMITED MATERIAL: The retrieved content below is thin (e.g. a syllabus, course outline, or brief mention). It does NOT contain detailed explanations, formulas, or worked examples for this topic.
@@ -380,7 +386,9 @@ Here is the limited course material available:"""
     else:
         current_user_content = user_text
 
-    messages = [{"role": "system", "content": full_system_prompt}]
+    messages = [{"role": "system", "content": stable_system}]
+    if dynamic_system_parts:
+        messages.append({"role": "system", "content": "\n".join(dynamic_system_parts)})
     if use_structured_history:
         messages.extend(history_for_llm)
     messages.append({"role": "user", "content": current_user_content})
