@@ -978,6 +978,56 @@ def validate_chunks_contain_reference(chunks: list, problem_ref: dict) -> dict:
         }
 
 
+def detect_pasted_question(query: str, chunks: list, min_segment_length: int = 60):
+    """
+    Check if a substantive substring of `query` appears verbatim in any chunk's
+    text. Used to catch the case where a student pastes a homework/exam question
+    from an indexed document and embedding similarity drifts to a structurally
+    similar question in a different document.
+
+    Returns the best (longest) matching chunk metadata as a dict, or None.
+    """
+    if not query or not chunks:
+        return None
+
+    raw_lines = [line.strip() for line in query.split("\n") if line.strip()]
+    candidates = []
+    seen = set()
+
+    def _push(seg: str):
+        if seg and len(seg) >= min_segment_length and seg not in seen:
+            candidates.append(seg)
+            seen.add(seg)
+
+    for line in raw_lines:
+        _push(line)
+        for sentence in re.split(r"(?<=[.!?])\s+", line):
+            _push(sentence.strip())
+
+    if not candidates:
+        return None
+
+    candidates.sort(key=len, reverse=True)
+
+    def _normalize(text):
+        return re.sub(r"\s+", " ", text or "").strip().lower()
+
+    for cand in candidates:
+        cand_norm = _normalize(cand)
+        if not cand_norm:
+            continue
+        for idx, chunk in enumerate(chunks):
+            chunk_norm = _normalize(chunk.get("text", ""))
+            if cand_norm in chunk_norm:
+                return {
+                    "chunk_index": idx,
+                    "file_name": chunk.get("file_name", ""),
+                    "match_length": len(cand_norm),
+                    "matched_text": cand[:200],
+                }
+    return None
+
+
 def analyze_query(query: str, ta_id: str = "") -> dict:
     """
     Analyze a query to extract structured filters.
@@ -1595,6 +1645,9 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         "vector_search_latency_ms": 0,
         "supplementary_latency_ms": 0,
         "hybrid_fetch_latency_ms": 0,
+        "paste_detected": False,
+        "paste_doc": None,
+        "paste_match_length": 0,
     }
     
     # SESSION CONTEXT CACHE: Check if we have cached context from previous successful retrieval
@@ -2159,6 +2212,28 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                     injected_count += 1
             if injected_count:
                 logger.info(f"[{ta_id}] Injected {injected_count} structural chunks (deduplicated from {len(structural_results)})")
+
+    # PASTED-QUESTION DETECTION
+    # When a student pastes a verbatim T/F or homework question from an indexed
+    # document, embedding similarity can drift to a structurally similar question
+    # in another document. If we find the query (or a long enough substring) inside
+    # a candidate chunk's text, promote that chunk to the front so the rerank
+    # confirms it as #1 and the cache labels with the correct source document.
+    paste_match = detect_pasted_question(query, initial_chunks)
+    if paste_match:
+        diagnostics["paste_detected"] = True
+        diagnostics["paste_doc"] = paste_match["file_name"]
+        diagnostics["paste_match_length"] = paste_match["match_length"]
+        idx = paste_match["chunk_index"]
+        if idx < len(initial_chunks):
+            promoted = initial_chunks.pop(idx)
+            # Below structural injection's 10.0 so explicit slide/page refs still win.
+            promoted["score"] = max(promoted.get("score", 0.0), 9.5)
+            initial_chunks.insert(0, promoted)
+            logger.info(
+                f"[{ta_id}] Pasted-question match: '{paste_match['file_name']}' "
+                f"(match_length={paste_match['match_length']}); promoted to top before rerank."
+            )
 
     pre_rerank_candidates = []
     for i, chunk in enumerate(initial_chunks):
