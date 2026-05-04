@@ -365,12 +365,16 @@ def stream_chat_response(
             score_top1 = retrieval_diagnostics.get("score_top1", 0) or 0
             total_chunks_in_ta = retrieval_diagnostics.get("total_chunks_in_ta", 0) or 0
             supplementary_found = retrieval_diagnostics.get("supplementary_teaching_found", False)
+            # Session cache hits return a single combined chunk that bundles the prior
+            # turn's full reranked + supplementary content, so the chunk_count/score_top1
+            # heuristics below would mis-flag it as thin. Treat cache hits as substantive.
+            session_cache_used = retrieval_diagnostics.get("session_cache_used", False)
             limited_context = (
                 chunk_count == 0
                 or (chunk_count <= 2 and score_top1 < 0.5)
                 or (hybrid_mode and score_top1 < 0.6)
                 or total_chunks_in_ta <= 5
-            ) and not supplementary_found
+            ) and not supplementary_found and not session_cache_used
 
             # LLM STREAMING (multimodal-aware) — pass the full list of current-turn images
             current_images = [
