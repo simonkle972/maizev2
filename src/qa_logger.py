@@ -72,7 +72,10 @@ QA_LOG_HEADERS = [
     "hybrid_fetch_latency_ms",
     "generation_ttft_ms",
     "prompt_tokens_total",
-    "prompt_tokens_cached"
+    "prompt_tokens_cached",
+    "paste_detected",
+    "paste_doc",
+    "paste_match_length"
 ]
 
 INDEX_LOG_HEADERS = [
@@ -289,7 +292,10 @@ def log_qa_entry(
                 str(diag.get("hybrid_fetch_latency_ms", 0)),
                 str(diag.get("generation_ttft_ms", 0)),
                 str(diag.get("prompt_tokens_total", 0)),
-                str(diag.get("prompt_tokens_cached", 0))
+                str(diag.get("prompt_tokens_cached", 0)),
+                str(diag.get("paste_detected", False)),
+                diag.get("paste_doc") or "",
+                str(diag.get("paste_match_length", 0))
             ]
             
             service.spreadsheets().values().append(
