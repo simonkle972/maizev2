@@ -1,0 +1,71 @@
+{# Silktide cookie consent banner — included in <head> of every browser-rendered top-level template. #}
+<link rel="stylesheet" id="silktide-consent-manager-css" href="{{ url_for('static', filename='cookie-banner/silktide-consent-manager.css') }}">
+<script src="{{ url_for('static', filename='cookie-banner/silktide-consent-manager.js') }}"></script>
+<script>
+silktideCookieBannerManager.updateCookieBannerConfig({
+  background: { showBackground: false },
+  cookieIcon: { position: "bottomLeft" },
+  cookieTypes: [
+    {
+      id: "necessary",
+      name: "Necessary",
+      description: "<p>These cookies are necessary for the website to function properly and cannot be switched off. They help with things like logging in and setting your privacy preferences.</p>",
+      required: true
+    },
+    {
+      id: "analytics",
+      name: "Analytics",
+      description: "<p>These cookies help us improve the site by tracking which pages are most popular and how visitors move around the site.</p>",
+      defaultValue: true,
+      onAccept: function() {
+        if (typeof gtag === 'function') {
+          gtag('consent', 'update', { analytics_storage: 'granted' });
+        }
+        if (Array.isArray(window.dataLayer)) {
+          window.dataLayer.push({ 'event': 'consent_accepted_analytics' });
+        }
+      },
+      onReject: function() {
+        if (typeof gtag === 'function') {
+          gtag('consent', 'update', { analytics_storage: 'denied' });
+        }
+      }
+    },
+    {
+      id: "advertising",
+      name: "Advertising",
+      description: "<p>These cookies provide extra features and personalization to improve your experience. They may be set by us or by partners whose services we use.</p>",
+      onAccept: function() {
+        if (typeof gtag === 'function') {
+          gtag('consent', 'update', { ad_storage: 'granted', ad_user_data: 'granted', ad_personalization: 'granted' });
+        }
+        if (Array.isArray(window.dataLayer)) {
+          window.dataLayer.push({ 'event': 'consent_accepted_advertising' });
+        }
+      },
+      onReject: function() {
+        if (typeof gtag === 'function') {
+          gtag('consent', 'update', { ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' });
+        }
+      }
+    }
+  ],
+  text: {
+    banner: {
+      description: "<p>We use cookies on our site to enhance your user experience, provide personalized content, and analyze our traffic. <a href=\"https://getmaize.ai/privacy\" target=\"_blank\" rel=\"noopener noreferrer\">Cookie Policy.</a></p>",
+      acceptAllButtonText: "Accept all",
+      acceptAllButtonAccessibleLabel: "Accept all cookies",
+      rejectNonEssentialButtonText: "Reject non-essential",
+      rejectNonEssentialButtonAccessibleLabel: "Reject non-essential",
+      preferencesButtonText: "Preferences",
+      preferencesButtonAccessibleLabel: "Toggle preferences"
+    },
+    preferences: {
+      title: "Customize your cookie preferences",
+      description: "<p>We respect your right to privacy. You can choose not to allow some types of cookies. Your cookie preferences will apply across our website.</p>",
+      creditLinkText: "Get this banner for free",
+      creditLinkAccessibleLabel: "Get this banner for free"
+    }
+  }
+});
+</script>
