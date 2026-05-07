@@ -75,7 +75,9 @@ QA_LOG_HEADERS = [
     "prompt_tokens_cached",
     "paste_detected",
     "paste_doc",
-    "paste_match_length"
+    "paste_match_length",
+    "paste_containment",
+    "paste_longest_run"
 ]
 
 INDEX_LOG_HEADERS = [
@@ -295,7 +297,9 @@ def log_qa_entry(
                 str(diag.get("prompt_tokens_cached", 0)),
                 str(diag.get("paste_detected", False)),
                 diag.get("paste_doc") or "",
-                str(diag.get("paste_match_length", 0))
+                str(diag.get("paste_match_length", 0)),
+                str(diag.get("paste_containment", 0.0)),
+                str(diag.get("paste_longest_run", 0))
             ]
             
             service.spreadsheets().values().append(

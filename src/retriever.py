@@ -978,54 +978,133 @@ def validate_chunks_contain_reference(chunks: list, problem_ref: dict) -> dict:
         }
 
 
-def detect_pasted_question(query: str, chunks: list, min_segment_length: int = 60):
+def detect_pasted_question(
+    query: str,
+    chunks: list,
+    k: int = 5,
+    min_query_tokens: int = 10,
+    containment_threshold: float = 0.5,
+    run_threshold: int = 8,
+):
     """
-    Check if a substantive substring of `query` appears verbatim in any chunk's
-    text. Used to catch the case where a student pastes a homework/exam question
-    from an indexed document and embedding similarity drifts to a structurally
-    similar question in a different document.
+    K-gram detector for verbatim/near-verbatim pastes from indexed documents.
 
-    Returns the best (longest) matching chunk metadata as a dict, or None.
+    Two complementary signals (either passing flags a paste):
+      - **Containment**: |query_grams ∩ doc_grams| / |query_grams|. Catches the
+        spanning-chunk case where a question is split across two adjacent chunks
+        — we join the chunks before gram extraction so boundary grams survive.
+      - **Longest contiguous run**: longest sequence of consecutive query grams
+        that all appear in the doc. Catches the wrapper-prefix case ("True or
+        False: ..." or "i need some help with...") where the question only
+        occupies part of the query so the full-set ratio sags below the
+        containment threshold even though there's a clean unbroken match in
+        the middle.
+
+    Robust to: framing prefixes, question numbering, page markers, smart
+    quotes, minor whitespace noise — these contribute a small number of
+    unmatched grams without breaking the longest-run signal in the
+    question portion.
+
+    Returns dict with the matching chunk to promote and metadata, or None.
     """
     if not query or not chunks:
         return None
 
-    raw_lines = [line.strip() for line in query.split("\n") if line.strip()]
-    candidates = []
-    seen = set()
+    def _tokens(text):
+        return re.sub(r"\s+", " ", (text or "")).strip().lower().split(" ")
 
-    def _push(seg: str):
-        if seg and len(seg) >= min_segment_length and seg not in seen:
-            candidates.append(seg)
-            seen.add(seg)
+    def _kgrams_seq(tokens, k):
+        if len(tokens) < k:
+            return []
+        return [" ".join(tokens[i:i + k]) for i in range(len(tokens) - k + 1)]
 
-    for line in raw_lines:
-        _push(line)
-        for sentence in re.split(r"(?<=[.!?])\s+", line):
-            _push(sentence.strip())
-
-    if not candidates:
+    query_tokens = _tokens(query)
+    if len(query_tokens) < min_query_tokens:
         return None
 
-    candidates.sort(key=len, reverse=True)
+    query_gram_seq = _kgrams_seq(query_tokens, k)
+    query_grams = set(query_gram_seq)
+    if not query_grams:
+        return None
+    q_size = len(query_grams)
 
-    def _normalize(text):
-        return re.sub(r"\s+", " ", text or "").strip().lower()
+    # Per-chunk gram sets (used later for picking which chunk to promote) +
+    # per-doc gram sets (built from the JOIN of chunk texts so grams that span
+    # a chunk boundary survive).
+    chunk_grams_list = []
+    doc_texts = {}
+    for chunk in chunks:
+        chunk_grams_list.append(set(_kgrams_seq(_tokens(chunk.get("text", "")), k)))
+        fname = chunk.get("file_name") or ""
+        if fname:
+            doc_texts.setdefault(fname, []).append(chunk.get("text", ""))
 
-    for cand in candidates:
-        cand_norm = _normalize(cand)
-        if not cand_norm:
+    doc_grams = {
+        fname: set(_kgrams_seq(_tokens(" ".join(texts)), k))
+        for fname, texts in doc_texts.items()
+    }
+    if not doc_grams:
+        return None
+
+    def _longest_run(gram_seq, gram_set):
+        longest = current = 0
+        for g in gram_seq:
+            if g in gram_set:
+                current += 1
+                if current > longest:
+                    longest = current
+            else:
+                current = 0
+        return longest
+
+    # Score each doc by both metrics; pick the strongest.
+    best = None
+    best_score = (-1.0, -1)  # (containment, run) — lex compare
+    for fname, grams in doc_grams.items():
+        containment = len(query_grams & grams) / q_size
+        run = _longest_run(query_gram_seq, grams)
+        # A doc passes if EITHER signal clears its threshold.
+        passed = containment >= containment_threshold or run >= run_threshold
+        if not passed:
             continue
-        for idx, chunk in enumerate(chunks):
-            chunk_norm = _normalize(chunk.get("text", ""))
-            if cand_norm in chunk_norm:
-                return {
-                    "chunk_index": idx,
-                    "file_name": chunk.get("file_name", ""),
-                    "match_length": len(cand_norm),
-                    "matched_text": cand[:200],
-                }
-    return None
+        score = (containment, run)
+        if score > best_score:
+            best_score = score
+            best = (fname, containment, run)
+
+    if not best:
+        return None
+
+    best_doc, doc_containment, doc_run = best
+
+    # Among that doc's chunks in initial_chunks, pick the one with highest
+    # single-chunk containment as the representative to promote. (This is
+    # the chunk that best concentrates the matching grams; in the spanning
+    # case it'll be one of the two halves, which is fine — promoting it
+    # keeps the rerank focused on the right document.)
+    best_chunk_idx = -1
+    best_chunk_score = -1.0
+    for idx, chunk in enumerate(chunks):
+        if (chunk.get("file_name") or "") != best_doc:
+            continue
+        cg = chunk_grams_list[idx]
+        if not cg:
+            continue
+        cc = len(query_grams & cg) / q_size
+        if cc > best_chunk_score:
+            best_chunk_score = cc
+            best_chunk_idx = idx
+
+    if best_chunk_idx < 0:
+        return None
+
+    return {
+        "chunk_index": best_chunk_idx,
+        "file_name": best_doc,
+        "doc_containment": doc_containment,
+        "doc_longest_run": doc_run,
+        "chunk_containment": best_chunk_score,
+    }
 
 
 def analyze_query(query: str, ta_id: str = "") -> dict:
@@ -1648,6 +1727,8 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         "paste_detected": False,
         "paste_doc": None,
         "paste_match_length": 0,
+        "paste_containment": 0.0,
+        "paste_longest_run": 0,
     }
     
     # SESSION CONTEXT CACHE: Check if we have cached context from previous successful retrieval
@@ -2213,17 +2294,21 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
             if injected_count:
                 logger.info(f"[{ta_id}] Injected {injected_count} structural chunks (deduplicated from {len(structural_results)})")
 
-    # PASTED-QUESTION DETECTION
-    # When a student pastes a verbatim T/F or homework question from an indexed
+    # PASTED-QUESTION DETECTION (k-gram containment, doc-level aggregated)
+    # When a student pastes a verbatim or near-verbatim question from an indexed
     # document, embedding similarity can drift to a structurally similar question
-    # in another document. If we find the query (or a long enough substring) inside
-    # a candidate chunk's text, promote that chunk to the front so the rerank
-    # confirms it as #1 and the cache labels with the correct source document.
+    # in another document. We compute k-gram containment of the query against
+    # the union of grams across each document's chunks in the top-20, and if any
+    # doc clears the threshold, promote its best-containing chunk so the rerank
+    # confirms it as #1 and the cache labels with the correct source.
     paste_match = detect_pasted_question(query, initial_chunks)
     if paste_match:
         diagnostics["paste_detected"] = True
         diagnostics["paste_doc"] = paste_match["file_name"]
-        diagnostics["paste_match_length"] = paste_match["match_length"]
+        diagnostics["paste_containment"] = round(paste_match["doc_containment"], 4)
+        diagnostics["paste_longest_run"] = paste_match["doc_longest_run"]
+        # Keep the legacy column populated for log continuity (scaled 0-100).
+        diagnostics["paste_match_length"] = int(paste_match["doc_containment"] * 100)
         idx = paste_match["chunk_index"]
         if idx < len(initial_chunks):
             promoted = initial_chunks.pop(idx)
@@ -2232,7 +2317,10 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
             initial_chunks.insert(0, promoted)
             logger.info(
                 f"[{ta_id}] Pasted-question match: '{paste_match['file_name']}' "
-                f"(match_length={paste_match['match_length']}); promoted to top before rerank."
+                f"doc_containment={paste_match['doc_containment']:.2f} "
+                f"doc_longest_run={paste_match['doc_longest_run']} "
+                f"chunk_containment={paste_match['chunk_containment']:.2f}; "
+                f"promoted to top before rerank."
             )
 
     pre_rerank_candidates = []
