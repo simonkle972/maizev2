@@ -119,6 +119,25 @@
             font-size: 0.8rem; font-weight: 500;
         }
         .doc-table .delete-btn:hover { text-decoration: underline; }
+        .doc-status-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+            white-space: nowrap;
+            border: 1px solid transparent;
+        }
+        .doc-status-badge.indexed {
+            background: #dcfce7;
+            color: #166534;
+            border-color: #bbf7d0;
+        }
+        .doc-status-badge.pending {
+            background: #fef3c7;
+            color: #92400e;
+            border-color: #fde68a;
+        }
         .save-status { font-size: 0.75rem; margin-right: 0.5rem; }
         .doc-actions { display: flex; align-items: center; }
         .needs-reindex td:first-child { position: relative; }
@@ -276,6 +295,7 @@
                             <th>Display Name</th>
                             <th>Type</th>
                             <th>Unit #</th>
+                            <th>Status</th>
                             <th>Original File</th>
                             <th>Actions</th>
                         </tr>
@@ -298,6 +318,13 @@
                                 </select>
                             </td>
                             <td><input type="number" class="doc-unit-number" value="{{ doc.instructional_unit_number or '' }}" data-original="{{ doc.instructional_unit_number or '' }}" min="1" max="99" style="width:60px;"></td>
+                            <td>
+                                {% if doc.last_indexed_at %}
+                                    <span class="doc-status-badge indexed" title="Indexed at {{ doc.last_indexed_at.strftime('%Y-%m-%d %H:%M UTC') }}">&#10003; Indexed</span>
+                                {% else %}
+                                    <span class="doc-status-badge pending" title="Not yet indexed — click Re-index to process this document">&#9711; Pending</span>
+                                {% endif %}
+                            </td>
                             <td style="font-size: 0.8rem; color: #6b7280;">{{ doc.filename }}</td>
                             <td>
                                 <div class="doc-actions">

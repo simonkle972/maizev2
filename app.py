@@ -1196,10 +1196,17 @@ def get_indexing_status(ta_id):
         return jsonify({"error": "TA not found"}), 404
     
     total_docs = Document.query.filter_by(ta_id=ta_id).count()
+    # Source of truth for "docs already indexed": Document.last_indexed_at being set.
+    # The previous version returned ta.indexing_progress (a 0-100 percentage) here,
+    # which surfaced as nonsense like "76 of 22 documents processed" in the UI.
+    docs_indexed = Document.query.filter(
+        Document.ta_id == ta_id,
+        Document.last_indexed_at.isnot(None),
+    ).count()
     return jsonify({
         "status": ta.indexing_status,
         "progress": ta.indexing_progress,
-        "docs_processed": ta.indexing_progress or 0,
+        "docs_processed": docs_indexed,
         "total_docs": total_docs,
         "error": ta.indexing_error,
         "is_indexed": ta.is_indexed,
