@@ -1372,17 +1372,20 @@ def process_and_index_documents_resumable(ta_id: str, progress_callback=None, re
         raise ValueError("No documents found for this TA")
     
     if is_resume:
-        already_indexed_docs = db.session.query(Document.id, Document.last_indexed_at, Document.updated_at).filter(
-            Document.ta_id == ta_id,
-            Document.last_indexed_at.isnot(None)
-        ).all()
+        # Skip docs that already have chunks. `last_indexed_at IS NULL` is the
+        # trigger for "needs processing" — set when the doc is freshly uploaded
+        # and cleared on full-rebuild paths. (We deliberately don't compare
+        # against `updated_at` because metadata edits like display_name or
+        # doc_type bump it without invalidating the chunk content.)
         already_indexed_doc_ids = set(
-            d.id for d in already_indexed_docs 
-            if d.last_indexed_at and (d.updated_at is None or d.updated_at <= d.last_indexed_at)
+            d.id for d in db.session.query(Document.id).filter(
+                Document.ta_id == ta_id,
+                Document.last_indexed_at.isnot(None),
+            ).all()
         )
         doc_ids = [d for d in all_doc_ids if d not in already_indexed_doc_ids]
         docs_already_processed = len(already_indexed_doc_ids)
-        logger.info(f"[{ta_id}] Resuming: {docs_already_processed} docs already indexed (have chunks and not modified since), {len(doc_ids)} remaining")
+        logger.info(f"[{ta_id}] Incremental indexing: {docs_already_processed} docs already indexed, {len(doc_ids)} remaining")
     else:
         logger.info(f"[{ta_id}] Fresh indexing - clearing existing chunks and reset last_indexed_at...")
         DocumentChunk.query.filter_by(ta_id=ta_id).delete()

@@ -979,7 +979,9 @@ def upload_document(ta_id):
     db.session.flush()
 
     ta.document_count = Document.query.filter_by(ta_id=ta_id).count()
-    ta.is_indexed = False
+    # Don't reset ta.is_indexed on upload — the existing chunks for previously-indexed
+    # docs are still valid. The newly uploaded doc has last_indexed_at=NULL, so the
+    # next (incremental) reindex will pick it up without re-processing the others.
     db.session.commit()
 
     doc_id = doc.id
@@ -1073,9 +1075,13 @@ def delete_document(ta_id, doc_id):
     db.session.flush()
 
     ta.document_count = Document.query.filter_by(ta_id=ta_id).count()
-    ta.is_indexed = False
-    ta.indexing_status = None
-    ta.indexing_error = None
+    # Only flip is_indexed=False when no chunks remain anywhere in the TA — otherwise
+    # the chat keeps working with the surviving docs' chunks.
+    remaining_chunks = DocumentChunk.query.filter_by(ta_id=ta_id).count()
+    if remaining_chunks == 0:
+        ta.is_indexed = False
+        ta.indexing_status = None
+        ta.indexing_error = None
     db.session.commit()
 
     return jsonify({"success": True})

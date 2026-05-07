@@ -761,9 +761,9 @@ def upload_document(ta_id):
         # Non-fatal — proceed with the upload regardless
 
     ta.document_count = Document.query.filter_by(ta_id=ta_id).count()
-    ta.is_indexed = False
-    ta.indexing_status = None
-    ta.indexing_error = None
+    # Don't reset ta.is_indexed on upload — existing chunks for previously-indexed docs
+    # are still valid. The new doc has last_indexed_at=NULL, so the next (incremental)
+    # reindex will pick it up without re-processing the others.
 
     # Capture all response field values BEFORE commit. After commit, Flask-SQLAlchemy
     # expires the session by default and accessing doc.* triggers a refresh query —
@@ -842,16 +842,21 @@ def delete_document(ta_id, doc_id):
     ta = TeachingAssistant.query.get(ta_id)
     
     DocumentChunk.query.filter_by(document_id=doc_id).delete()
-    
+
     db.session.delete(doc)
     db.session.flush()
-    
+
     ta.document_count = Document.query.filter_by(ta_id=ta_id).count()
-    ta.is_indexed = False
-    ta.indexing_status = None
-    ta.indexing_error = None
+    # Only flip is_indexed=False when no chunks remain anywhere in the TA — otherwise
+    # the chat keeps working with the surviving docs' chunks. The previous unconditional
+    # reset broke the TA on every single-doc deletion.
+    remaining_chunks = DocumentChunk.query.filter_by(ta_id=ta_id).count()
+    if remaining_chunks == 0:
+        ta.is_indexed = False
+        ta.indexing_status = None
+        ta.indexing_error = None
     db.session.commit()
-    
+
     return jsonify({"success": True})
 
 
@@ -943,10 +948,20 @@ def update_indexing_progress(ta_id, progress, job_id=None, docs_processed=None, 
                 job.updated_at = datetime.utcnow()
                 db.session.commit()
 
-def run_indexing_task(ta_id, job_id=None, is_resume=False):
-    """Background task to run document indexing with job tracking for resumption."""
+def run_indexing_task(ta_id, job_id=None, is_resume=True):
+    """Background task to run document indexing with job tracking for resumption.
+
+    Default is incremental: only docs with `last_indexed_at IS NULL` get processed,
+    existing chunks are preserved, and `ta.is_indexed` stays True throughout the
+    run so the chat keeps working with the old corpus while the new docs get added.
+
+    Pass `is_resume=False` for an explicit full rebuild (wipe all chunks and
+    reset `last_indexed_at` on every doc, then re-process everything). That's
+    only needed if the extraction pipeline itself changed; user-triggered
+    reindex doesn't need it.
+    """
     import traceback
-    
+
     with app.app_context():
         logger.info(f"[{ta_id}] Background indexing task started (job_id={job_id}, is_resume={is_resume})")
         
@@ -1024,7 +1039,12 @@ def run_indexing_task(ta_id, job_id=None, is_resume=False):
                 if ta:
                     ta.indexing_status = 'failed'
                     ta.indexing_error = error_msg[:500]
-                    ta.is_indexed = False
+                    # Only flip is_indexed=False if there are actually no chunks left.
+                    # Otherwise the partial corpus from previous successful indexing is
+                    # still usable and the chat should keep working.
+                    remaining_chunks = DocumentChunk.query.filter_by(ta_id=ta_id).count()
+                    if remaining_chunks == 0:
+                        ta.is_indexed = False
                     db.session.commit()
                 
                 job = IndexingJob.query.get(job_id)
