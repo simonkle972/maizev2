@@ -145,6 +145,12 @@
             color: #92400e;
             border-color: #fde68a;
         }
+        .doc-status-badge.failed {
+            background: #fee2e2;
+            color: #991b1b;
+            border-color: #fecaca;
+            cursor: help;
+        }
         .metadata-hint {
             font-size: 13px;
             color: #6b7280;
@@ -482,6 +488,8 @@
                                             <td>
                                                 {% if doc.last_indexed_at %}
                                                     <span class="doc-status-badge indexed" title="Indexed at {{ doc.last_indexed_at.strftime('%Y-%m-%d %H:%M UTC') }}">&#10003; Indexed</span>
+                                                {% elif doc.extraction_metadata and doc.extraction_metadata.get('_indexing_status') == 'extraction_failed' %}
+                                                    <span class="doc-status-badge failed" title="{{ doc.extraction_metadata.get('_error', 'Extraction failed') }}">&#10005; Failed</span>
                                                 {% else %}
                                                     <span class="doc-status-badge pending" title="Not yet indexed — click Re-index to process this document">&#9711; Pending</span>
                                                 {% endif %}

@@ -1167,10 +1167,20 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
             text, page_count = extract_text_from_file(doc.storage_path)
         else:
             logger.warning(f"[{ta_id}] [{doc.id}] No file content available - document needs to be re-uploaded")
+            doc.extraction_metadata = {
+                "_indexing_status": "extraction_failed",
+                "_error": "No file content available — please re-upload this document.",
+            }
+            db_commit_with_retry(db)
             continue
-        
+
         if not text:
             logger.warning(f"[{ta_id}] [{doc.id}] No text extracted")
+            doc.extraction_metadata = {
+                "_indexing_status": "extraction_failed",
+                "_error": f"Text extraction returned empty for .{doc.file_type or 'unknown'} file. The file may be corrupt, image-only, password-protected, or in an unsupported variant.",
+            }
+            db_commit_with_retry(db)
             continue
         
         raw_text_length = len(text)
@@ -1431,10 +1441,20 @@ def process_and_index_documents_resumable(ta_id: str, progress_callback=None, re
             text, page_count = extract_text_from_file(doc.storage_path)
         else:
             logger.warning(f"[{ta_id}] [{doc.id}] No file content available - document needs to be re-uploaded")
+            doc.extraction_metadata = {
+                "_indexing_status": "extraction_failed",
+                "_error": "No file content available — please re-upload this document.",
+            }
+            db_commit_with_retry(db)
             continue
-        
+
         if not text:
             logger.warning(f"[{ta_id}] [{doc.id}] No text extracted")
+            doc.extraction_metadata = {
+                "_indexing_status": "extraction_failed",
+                "_error": f"Text extraction returned empty for .{doc.file_type or 'unknown'} file. The file may be corrupt, image-only, password-protected, or in an unsupported variant.",
+            }
+            db_commit_with_retry(db)
             continue
         
         raw_text_length = len(text)
