@@ -150,6 +150,37 @@
             color: #991b1b;
             border-color: #fecaca;
             cursor: help;
+            position: relative;
+        }
+        .doc-status-badge.failed[data-tooltip]:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            top: calc(100% + 6px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1f2937;
+            color: #f9fafb;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 500;
+            white-space: normal;
+            width: 280px;
+            line-height: 1.35;
+            z-index: 1000;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+            pointer-events: none;
+        }
+        .doc-status-badge.failed[data-tooltip]:hover::before {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 5px solid transparent;
+            border-bottom-color: #1f2937;
+            z-index: 1001;
+            pointer-events: none;
         }
         .metadata-hint {
             font-size: 13px;
@@ -489,7 +520,7 @@
                                                 {% if doc.last_indexed_at %}
                                                     <span class="doc-status-badge indexed" title="Indexed at {{ doc.last_indexed_at.strftime('%Y-%m-%d %H:%M UTC') }}">&#10003; Indexed</span>
                                                 {% elif doc.extraction_metadata and doc.extraction_metadata.get('_indexing_status') == 'extraction_failed' %}
-                                                    <span class="doc-status-badge failed" title="{{ doc.extraction_metadata.get('_error', 'Extraction failed') }}">&#10005; Failed</span>
+                                                    <span class="doc-status-badge failed" title="{{ doc.extraction_metadata.get('_error', 'Extraction failed') }}" data-tooltip="{{ doc.extraction_metadata.get('_error', 'Extraction failed') }}">&#10005; Failed</span>
                                                 {% else %}
                                                     <span class="doc-status-badge pending" title="Not yet indexed — click Re-index to process this document">&#9711; Pending</span>
                                                 {% endif %}
