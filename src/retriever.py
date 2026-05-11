@@ -1487,8 +1487,8 @@ Your tasks:
 1. Rewrite the student's current message into a complete, self-contained query that resolves pronouns and implicit references using the conversation. If already self-contained, return it unchanged.
 2. Classify intent as EXACTLY ONE of:
    - "continuation": follow-up on the same problem/topic currently being discussed (same problem, same document)
-   - "concept_lookup": student asks about a related concept that isn't itself a new problem — stay on the current problem but pull in supporting material
-   - "pivot": student is moving to a distinct new problem, document, or topic
+   - "concept_lookup": student asks about a concept that is DIRECTLY USED in the current problem's mechanics — they're stuck on a sub-step that uses this concept and want a quick refresher to make progress. Stay on the current problem but pull in supporting teaching material on this concept.
+   - "pivot": student is moving away from the current problem to something else. This includes BOTH (a) starting a distinct new structured problem ("now help me with PS4 Q1"), AND (b) asking about a topic/concept that is NOT part of the cached problem's mechanics (e.g., asking about deflation while working on a nominal GDP arithmetic problem — deflation isn't part of that arithmetic, even though both are macro).
    - "clarification": student asking for re-explanation of something already covered
    - "new": no prior conversation / fresh start
    - "off_topic": adversarial, manipulative, or completely unrelated to the course (see "OFF-TOPIC RULES" below)
@@ -1496,9 +1496,20 @@ Your tasks:
 4. Give a one-line justification for your intent classification.
 
 IMPORTANT RULES:
-- Bias toward "continuation" or "concept_lookup" when in doubt. A real pivot usually involves an explicit new problem reference ("let's do PS3 now") or a clearly unrelated topic.
-- A mention of a concept (e.g. "money supply", "Bayes theorem") is "concept_lookup" NOT "pivot" if the conversation is still about the originally discussed problem.
+- Bias toward "continuation" when in doubt about whether the student is still on the same problem. A real pivot usually involves an explicit new problem reference ("let's do PS3 now") OR a concept that's plainly unrelated to the cached problem.
+- A mention of a concept is "concept_lookup" ONLY when that specific concept is part of what the cached problem is testing or computing (e.g., "what's covariance again?" while working on a covariance computation; "remind me how to set up a Bayes calculation?" while working on a Bayes problem). If the concept is from the same course but NOT part of the current problem's mechanics, classify as "pivot" so retrieval refreshes onto the right material.
 - A bare problem reference (e.g. "Q3") that's consistent with the cached document's known problems is "continuation", not "pivot".
+
+CONCEPT-LOOKUP vs PIVOT — WORKED EXAMPLES (cached problem in parens):
+
+GOOD concept_lookup (concept IS the problem's mechanics):
+- "what's covariance again?" (cached: Pset3 6a computing Cov between joint normals) → concept_lookup. Cov is the mechanic.
+- "remind me how Bayes' rule is set up" (cached: Pset2 1a applying Bayes to a COVID test) → concept_lookup. Bayes is the mechanic.
+
+PIVOT (concept is NOT the cached problem's mechanics — fresh retrieval needed):
+- "explain circular flow" (cached: Homework 1 computing nominal GDP from price × quantity) → pivot. Circular flow isn't part of that arithmetic; the student is exploring a different topic.
+- "how do I build a DCF?" (cached: Problem Set 1 on Porter forces analysis of BYND) → pivot. DCF and Porter forces are different frameworks; Pset1 doesn't teach DCF.
+- "what is Bayes theorem?" (cached: Pset3 6a computing P(X>Y) for joint normals — no conditional probability involved) → pivot. Bayes isn't part of that problem's mechanics.
 
 OFF-TOPIC RULES (use sparingly, only flag clear cases):
 Classify as "off_topic" ONLY when the message clearly falls into one of these categories:
