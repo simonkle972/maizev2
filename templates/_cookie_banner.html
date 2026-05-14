@@ -1,3 +1,23 @@
+{# Google Analytics 4 (gtag.js) with Consent Mode v2 default-denied.
+   Must come BEFORE the Silktide banner so the gtag() function exists when
+   Silktide's onAccept/onReject handlers fire below. The defaults sit at
+   "denied" until the user accepts in the banner — no tracking happens
+   before consent, per GDPR / Consent Mode v2 guidance. #}
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-E0X8YB2H8C"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('consent', 'default', {
+    'analytics_storage': 'denied',
+    'ad_storage': 'denied',
+    'ad_user_data': 'denied',
+    'ad_personalization': 'denied',
+    'wait_for_update': 500
+  });
+  gtag('js', new Date());
+  gtag('config', 'G-E0X8YB2H8C');
+</script>
+
 {# Silktide cookie consent banner — included in <head> of every browser-rendered top-level template. #}
 <link rel="stylesheet" id="silktide-consent-manager-css" href="{{ url_for('static', filename='cookie-banner/silktide-consent-manager.css') }}">
 <script src="{{ url_for('static', filename='cookie-banner/silktide-consent-manager.js') }}"></script>
