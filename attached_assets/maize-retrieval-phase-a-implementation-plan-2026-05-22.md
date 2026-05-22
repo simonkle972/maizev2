@@ -292,9 +292,85 @@ The plumbing carries over even though the schema specifics change:
 
 ### Risks + rollback
 
-- **Risk:** Some existing docs may classify to "other" if their old `doc_role` value ("solution") doesn't map cleanly to any default seed entry. Mitigation: allow `doc_categories` to include "solutions" as a default seed entry too; professors can rename / remove later.
+- **Risk:** Some existing docs may classify to "other" if their old `doc_role` value doesn't map cleanly to any default seed entry. Mitigation: include "solutions" in the default seed list (and other commonly-needed values); professors can rename / remove later.
 - **Risk:** Per-TA categories add UX friction at TA creation (small new panel). Mitigation: defaults work out of the box; no new mandatory step.
-- **Rollback:** the old `doc_role` column data is retained until the rename migration runs. If anything goes wrong, `git revert` + downgrade restores. Worst case: `UPDATE documents SET doc_category = NULL` clears the new field.
+
+### Backwards compatibility strategy
+
+The schema rework is **additive, never rename**. This is critical for safe rollout + rollback.
+
+| Concern | Strategy |
+|---|---|
+| Schema migration | **ADD** `doc_categories` JSON on TA, `doc_category` String(64) on Document, `doc_category` String(64) on DocumentChunk. **KEEP** existing `doc_role`, `doc_role_provenance`, `doc_type` columns. Nothing dropped in this migration. |
+| Backfill at deploy | All existing TAs get default `doc_categories` seed. All existing docs get `doc_category` populated via new classifier using the TA's list (~1-2s per doc). Chunks get denormalized sync. |
+| Code reads | Prefer `doc_category`; fall back to `doc_role` if `doc_category` is NULL. Means code works cleanly during/after partial backfill. |
+| Code writes | Only `doc_category` going forward. `doc_role` column survives but isn't updated. |
+| PATCH routes | Accept `doc_category` (slug or label, normalize to slug, validate against TA's list). Drop `doc_role` from accepted payload. Tolerates docs that have only legacy `doc_role` set. |
+| UI | Show `doc_category` dropdown only. Hide both `doc_type` and `doc_role` from manage_ta. Defensive fallback: if `ta.doc_categories` is empty, render the default seed list inline. |
+| Rollback (code revert) | Old code reads `doc_role` — still populated for pre-v1 docs, still works. Loss: docs added during v2 period have only `doc_category` set; old code sees them as unclassified. Acceptable — retrieval still works without the hint. |
+| Rollback (migration downgrade) | Drops the three new columns (`doc_categories`, both `doc_category`). Standard. |
+| Future cleanup (v2 polish, NOT v1) | After 2+ weeks of stable v1, separate cleanup migration drops `doc_role`, `doc_role_provenance`, `doc_type` from all tables. Need confidence nothing still reads them. |
+
+### Slug ↔ label representation (Refinement #1 from research)
+
+Categories are stored as `{slug, label}` objects, not plain strings:
+
+```json
+[
+  {"slug": "lectures", "label": "Lectures"},
+  {"slug": "homeworks", "label": "Homeworks"},
+  {"slug": "problem_sets", "label": "Problem Sets"},
+  ...
+]
+```
+
+- **`Document.doc_category` persists the SLUG**, not the label.
+- Slugs are auto-generated from the label at creation: `"Problem Sets"` → `slug: "problem_sets"`. Lowercased, internal whitespace → underscores, non-alphanumeric chars stripped.
+- Renaming `"Problem Sets"` → `"PSets"` updates only the label; the slug stays `"problem_sets"`. All existing docs with `doc_category="problem_sets"` still point at the same category.
+- Adding a new category generates a fresh slug (case-insensitive uniqueness within the TA).
+
+This is the Library Drift (arXiv 2605.19576) mitigation: renames don't orphan classified documents.
+
+### Input normalization rules (Refinement #2 from research)
+
+At the API boundary (PATCH route + TA category-edit endpoint):
+- Trim leading/trailing whitespace
+- Collapse internal whitespace to single spaces
+- Reject empty strings
+- Max 64 chars (column constraint matches)
+- Allow letters, numbers, spaces, hyphens (CJK characters too — don't restrict to ASCII)
+- Case-preserved for display label; case-insensitive uniqueness for slug
+- Reject duplicate slugs within a TA (case-insensitive)
+
+### Default seed list at TA creation
+
+```json
+[
+  {"slug": "lectures", "label": "Lectures"},
+  {"slug": "readings", "label": "Readings"},
+  {"slug": "homeworks", "label": "Homeworks"},
+  {"slug": "problem_sets", "label": "Problem Sets"},
+  {"slug": "quizzes", "label": "Quizzes"},
+  {"slug": "labs", "label": "Labs"},
+  {"slug": "exams", "label": "Exams"},
+  {"slug": "solutions", "label": "Solutions"},
+  {"slug": "syllabus", "label": "Syllabus"},
+  {"slug": "reference_materials", "label": "Reference Materials"},
+  {"slug": "extra_problems", "label": "Extra Problems"},
+  {"slug": "other", "label": "Other"}
+]
+```
+
+12 entries (research flagged 11 might be too many for cognitive load — added "solutions" explicitly per the original gap analysis's solutions-handling concern, even though pedagogy stays in the prompt). Professor edits this list freely post-creation. If we see "Other" overuse in analytics, that's signal to reduce/tune defaults.
+
+### Audit trail update for refinements
+
+| Decision | Source |
+|---|---|
+| Slug + label representation (not plain strings) | Research finding Q5; Library Drift (arXiv 2605.19576) |
+| Input normalization rules | Research finding Q5; LLM Failure Modes (arXiv 2511.19933) |
+| Per-TA scoping (not global) | Research findings Q1 + Q5 |
+| Default 12-category seed | Research finding Q4 (defaults + JIT pattern); informed by gap analysis's failure type analysis |
 
 ### Updated audit trail (Stage 2 + Stage 2B together)
 

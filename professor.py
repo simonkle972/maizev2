@@ -124,6 +124,7 @@ def create_ta():
             return render_template('professor/create_ta.html')
 
         from utils.stripe_helpers import generate_slug
+        from src.document_processor import DEFAULT_DOC_CATEGORIES
         ta_id = secrets.token_urlsafe(12)
         slug = generate_slug(ta_name)
         system_prompt = "You are a helpful teaching assistant for this course. Help students understand course concepts by explaining clearly and guiding them through problems without giving direct answers."
@@ -139,6 +140,7 @@ def create_ta():
             status='draft',
             requires_billing=True,
             allow_anonymous_chat=False,
+            doc_categories=list(DEFAULT_DOC_CATEGORIES),
         )
         db.session.add(ta)
         db.session.commit()
@@ -1070,6 +1072,7 @@ def update_document_metadata(ta_id, doc_id):
     # Phase A retrieval refactor (gap analysis 2026-05-22). doc_role is the new
     # PRIMARY semantic axis for retrieval. Professor override marks provenance
     # as 'professor' so auto-classifier doesn't overwrite on subsequent reindexes.
+    # DEPRECATED post-Stage 2B; doc_category is the load-bearing axis now.
     if 'doc_role' in data:
         from src.document_processor import VALID_DOC_ROLES
         new_role = (data['doc_role'] or '').lower() or None
@@ -1081,6 +1084,19 @@ def update_document_metadata(ta_id, doc_id):
             "set_at": datetime.utcnow().isoformat() + "Z",
         }
 
+    # Phase A Stage 2B (research 2026-05-22). doc_category replaces doc_role.
+    # Slug must match one of the parent TA's configured doc_categories.
+    if 'doc_category' in data:
+        new_cat = (data['doc_category'] or '').strip().lower() or None
+        if new_cat is not None:
+            ta_categories = (doc.ta.doc_categories if doc.ta else None) or []
+            valid_slugs = {c.get('slug') for c in ta_categories if isinstance(c, dict)}
+            if new_cat not in valid_slugs:
+                return jsonify({
+                    "error": f"Invalid doc_category {new_cat!r}; must be one of {sorted(valid_slugs)}"
+                }), 400
+        doc.doc_category = new_cat
+
     db.session.commit()
 
     DocumentChunk.query.filter_by(ta_id=ta_id, document_id=doc.id).update({
@@ -1090,6 +1106,7 @@ def update_document_metadata(ta_id, doc_id):
         "instructional_unit_label": doc.instructional_unit_label or "",
         "file_name": doc.display_name or doc.original_filename,
         "doc_role": doc.doc_role,
+        "doc_category": doc.doc_category,
     }, synchronize_session=False)
     db.session.commit()
 

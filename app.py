@@ -512,6 +512,7 @@ def create_ta():
         if not inst:
             return jsonify({"error": "Institution not found"}), 400
     
+    from src.document_processor import DEFAULT_DOC_CATEGORIES
     ta = TeachingAssistant(
         id=ta_id,
         slug=slug,
@@ -519,7 +520,8 @@ def create_ta():
         course_name=data.get("course_name", ""),
         system_prompt=data.get("system_prompt", TeachingAssistant.system_prompt.default.arg),
         institution_id=institution_id if institution_id else None,
-        allow_anonymous_chat=True
+        allow_anonymous_chat=True,
+        doc_categories=list(DEFAULT_DOC_CATEGORIES),
     )
     
     db.session.add(ta)
@@ -549,6 +551,7 @@ def get_ta(ta_id):
         "display_name": doc.display_name or doc.original_filename,
         "file_type": doc.file_type,
         "doc_type": doc.doc_type,
+        "doc_category": doc.doc_category,
         "unit_number": doc.instructional_unit_number,
         "assignment_number": doc.assignment_number,
         "content_title": doc.content_title,
@@ -567,6 +570,7 @@ def get_ta(ta_id):
         "system_prompt": ta.system_prompt,
         "is_indexed": ta.is_indexed,
         "document_count": ta.document_count,
+        "doc_categories": ta.doc_categories or [],
         "documents": documents,
         "created_at": ta.created_at.isoformat() if ta.created_at else None,
         "indexed_at": ta.indexed_at.isoformat() if ta.indexed_at else None,
@@ -623,13 +627,46 @@ def update_ta(ta_id):
             if not inst:
                 return jsonify({"error": "Institution not found"}), 400
             ta.institution_id = institution_id
-    
+
+    # Phase A Stage 2B (research 2026-05-22). Per-TA configurable
+    # doc_categories. Accepts a list of {slug, label} dicts. Labels are taken
+    # from the input; slugs are re-normalized server-side regardless of what
+    # the client sent (slug-vs-label split per Library Drift mitigation —
+    # see attached_assets/maize-retrieval-doc-classification-research-2026-05-22.md).
+    # Duplicate slugs are rejected. Note: renaming a category by editing its
+    # label leaves all classified docs intact (they reference slug, not label).
+    if "doc_categories" in data:
+        from src.document_processor import normalize_category_slug
+        raw = data["doc_categories"] or []
+        if not isinstance(raw, list):
+            return jsonify({"error": "doc_categories must be a list"}), 400
+        normalized = []
+        seen_slugs = set()
+        for entry in raw:
+            if not isinstance(entry, dict):
+                return jsonify({"error": "Each doc_categories entry must be an object with slug + label"}), 400
+            label = (entry.get("label") or "").strip()
+            if not label:
+                return jsonify({"error": "Category label cannot be empty"}), 400
+            # Trust client slug if provided + valid; otherwise derive from label.
+            client_slug = (entry.get("slug") or "").strip().lower()
+            slug = client_slug if client_slug else normalize_category_slug(label)
+            slug = normalize_category_slug(slug)  # idempotent re-normalize
+            if not slug:
+                return jsonify({"error": f"Category label {label!r} produced empty slug after normalization"}), 400
+            if slug in seen_slugs:
+                return jsonify({"error": f"Duplicate category slug {slug!r}"}), 400
+            seen_slugs.add(slug)
+            normalized.append({"slug": slug, "label": label})
+        ta.doc_categories = normalized
+
     db.session.commit()
     return jsonify({
-        "success": True, 
+        "success": True,
         "slug": ta.slug,
         "institution_id": ta.institution_id,
-        "institution_name": ta.institution.name if ta.institution else None
+        "institution_name": ta.institution.name if ta.institution else None,
+        "doc_categories": ta.doc_categories or []
     })
 
 @app.route('/admin/api/tas/<ta_id>', methods=['DELETE'])
@@ -921,6 +958,7 @@ def update_document_metadata(ta_id, doc_id):
     # Phase A retrieval refactor (gap analysis 2026-05-22). doc_role is the new
     # PRIMARY semantic axis for retrieval. When set via this route, mark provenance
     # as 'professor' so the auto-classifier won't overwrite it on subsequent runs.
+    # DEPRECATED post-Stage 2B; doc_category is the load-bearing axis now.
     if "doc_role" in data:
         from src.document_processor import VALID_DOC_ROLES
         new_role = (data["doc_role"] or "").lower() or None
@@ -931,6 +969,20 @@ def update_document_metadata(ta_id, doc_id):
             "source": "professor",
             "set_at": datetime.utcnow().isoformat() + "Z",
         }
+
+    # Phase A Stage 2B (research 2026-05-22). doc_category replaces doc_role as
+    # PRIMARY retrieval axis. Slug must match one of the parent TA's
+    # configured doc_categories (or be cleared to None).
+    if "doc_category" in data:
+        new_cat = (data["doc_category"] or "").strip().lower() or None
+        if new_cat is not None:
+            ta_categories = (doc.ta.doc_categories if doc.ta else None) or []
+            valid_slugs = {c.get("slug") for c in ta_categories if isinstance(c, dict)}
+            if new_cat not in valid_slugs:
+                return jsonify({
+                    "error": f"Invalid doc_category {new_cat!r}; must be one of {sorted(valid_slugs)}"
+                }), 400
+        doc.doc_category = new_cat
 
     db.session.commit()
 
@@ -945,6 +997,7 @@ def update_document_metadata(ta_id, doc_id):
         "instructional_unit_label": doc.instructional_unit_label or "",
         "file_name": doc.display_name or doc.original_filename,
         "doc_role": doc.doc_role,
+        "doc_category": doc.doc_category,
     }, synchronize_session=False)
     db.session.commit()
     

@@ -323,6 +323,30 @@
                 <div id="upload-progress" class="upload-progress"></div>
             </div>
 
+            <!-- Categories management (Phase A Stage 2B) -->
+            <div class="card">
+                <details>
+                    <summary style="cursor: pointer; font-weight: 600; color: #2b1f1a; user-select: none;">
+                        Document Categories
+                        <span style="font-weight: 400; color: #8b7355; font-size: 0.85rem;">— used to classify uploaded documents for retrieval</span>
+                    </summary>
+                    <div style="margin-top: 1rem;">
+                        <p style="font-size: 0.85rem; color: #8b7355; margin: 0 0 0.75rem;">
+                            Edit a label to rename a category (existing classifications stay attached — the internal slug doesn't change). Add categories that match how this course organizes its materials. Use "Other" as a catch-all.
+                        </p>
+                        <div id="cat-rows" style="display: flex; flex-direction: column; gap: 0.5rem;"></div>
+                        <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem; align-items: center;">
+                            <input type="text" id="cat-new-label" placeholder="New category label (e.g., Recitations)" style="flex: 1; padding: 0.4rem 0.6rem; border: 1px solid #d1c8bb; border-radius: 4px;">
+                            <button class="btn" onclick="addCategoryRow()">Add</button>
+                        </div>
+                        <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem; align-items: center;">
+                            <button class="btn btn-primary" onclick="saveCategories()">Save Categories</button>
+                            <span id="cat-save-status" style="font-size: 0.85rem;"></span>
+                        </div>
+                    </div>
+                </details>
+            </div>
+
             <div class="card">
                 <h3>Documents</h3>
                 {% if documents %}
@@ -330,7 +354,7 @@
                     <thead>
                         <tr>
                             <th>Display Name</th>
-                            <th>Type</th>
+                            <th>Category</th>
                             <th>Unit #</th>
                             <th>Status</th>
                             <th>Original File</th>
@@ -344,14 +368,11 @@
                                 <input type="text" class="doc-display-name" value="{{ doc.display_name or doc.filename }}" data-original="{{ doc.display_name or doc.filename }}">
                             </td>
                             <td>
-                                <select class="doc-type-select" data-original="{{ doc.doc_type or '' }}">
-                                    <option value="" {{ 'selected' if not doc.doc_type }}>--</option>
-                                    <option value="homework" {{ 'selected' if doc.doc_type == 'homework' }}>Homework</option>
-                                    <option value="exam" {{ 'selected' if doc.doc_type == 'exam' }}>Exam</option>
-                                    <option value="lecture" {{ 'selected' if doc.doc_type == 'lecture' }}>Lecture</option>
-                                    <option value="reading" {{ 'selected' if doc.doc_type == 'reading' }}>Reading</option>
-                                    <option value="syllabus" {{ 'selected' if doc.doc_type == 'syllabus' }}>Syllabus</option>
-                                    <option value="other" {{ 'selected' if doc.doc_type == 'other' }}>Other</option>
+                                <select class="doc-category-select" data-original="{{ doc.doc_category or '' }}">
+                                    <option value="" {{ 'selected' if not doc.doc_category }}>--</option>
+                                    {% for cat in ta.doc_categories or [] %}
+                                    <option value="{{ cat.slug }}" {{ 'selected' if doc.doc_category == cat.slug }}>{{ cat.label }}</option>
+                                    {% endfor %}
                                 </select>
                             </td>
                             <td><input type="number" class="doc-unit-number" value="{{ doc.instructional_unit_number or '' }}" data-original="{{ doc.instructional_unit_number or '' }}" min="1" max="99" style="width:60px;"></td>
@@ -417,6 +438,9 @@
 
     <script>
     const TA_ID = "{{ ta.id }}";
+    // Per-TA configurable document categories (Phase A Stage 2B).
+    // Mutable: edited via the Categories panel; sent back via PUT /admin/api/tas/<ta_id>.
+    window.TA_DOC_CATEGORIES = {{ (ta.doc_categories or []) | tojson }};
 
     function showNotification(msg, type) {
         const bar = document.getElementById('notification');
@@ -604,21 +628,19 @@
     function appendDocRow(tbody, doc) {
         const tr = document.createElement('tr');
         tr.dataset.docId = doc.document_id;
-        const docType = doc.doc_type || '';
+        const docCategory = doc.doc_category || '';
         const unitNum = doc.instructional_unit_number || '';
         const displayName = (doc.display_name || doc.filename || '').replace(/"/g, '&quot;');
         const filename = (doc.filename || '').replace(/</g, '&lt;');
+        const categoryOptions = (window.TA_DOC_CATEGORIES || []).map(c =>
+            `<option value="${c.slug}"${docCategory === c.slug ? ' selected' : ''}>${(c.label || '').replace(/</g, '&lt;')}</option>`
+        ).join('');
         tr.innerHTML = `
             <td><input type="text" class="doc-display-name" value="${displayName}" data-original="${displayName}"></td>
             <td>
-                <select class="doc-type-select" data-original="${docType}">
-                    <option value=""${!docType ? ' selected' : ''}>--</option>
-                    <option value="homework"${docType === 'homework' ? ' selected' : ''}>Homework</option>
-                    <option value="exam"${docType === 'exam' ? ' selected' : ''}>Exam</option>
-                    <option value="lecture"${docType === 'lecture' ? ' selected' : ''}>Lecture</option>
-                    <option value="reading"${docType === 'reading' ? ' selected' : ''}>Reading</option>
-                    <option value="syllabus"${docType === 'syllabus' ? ' selected' : ''}>Syllabus</option>
-                    <option value="other"${docType === 'other' ? ' selected' : ''}>Other</option>
+                <select class="doc-category-select" data-original="${docCategory}">
+                    <option value=""${!docCategory ? ' selected' : ''}>--</option>
+                    ${categoryOptions}
                 </select>
             </td>
             <td><input type="number" class="doc-unit-number" value="${unitNum}" data-original="${unitNum}" min="1" max="99" style="width:60px;"></td>
@@ -653,9 +675,9 @@
                     const row = document.querySelector(`tr[data-doc-id="${docId}"]`);
                     if (row) {
                         // Refresh fields if the LLM produced more specific values
-                        const typeSelect = row.querySelector('.doc-type-select');
-                        if (typeSelect && data.doc_type && typeSelect.value !== data.doc_type) {
-                            typeSelect.value = data.doc_type;
+                        const catSelect = row.querySelector('.doc-category-select');
+                        if (catSelect && data.doc_category && catSelect.value !== data.doc_category) {
+                            catSelect.value = data.doc_category;
                         }
                         const unitInput = row.querySelector('.doc-unit-number');
                         if (unitInput && data.instructional_unit_number && !unitInput.value) {
@@ -682,7 +704,7 @@
 
     // --- Document auto-save listener (extracted so we can call it for new rows too) ---
     function attachDocRowListeners(row) {
-        row.querySelectorAll('.doc-display-name, .doc-type-select, .doc-unit-number').forEach(el => {
+        row.querySelectorAll('.doc-display-name, .doc-category-select, .doc-unit-number').forEach(el => {
             el.addEventListener('change', async () => {
                 const r = el.closest('tr');
                 const docId = r.dataset.docId;
@@ -694,7 +716,7 @@
                         method: 'PATCH',
                         body: JSON.stringify({
                             display_name: r.querySelector('.doc-display-name').value,
-                            doc_type: r.querySelector('.doc-type-select').value,
+                            doc_category: r.querySelector('.doc-category-select').value,
                             unit_number: r.querySelector('.doc-unit-number').value || null
                         })
                     });
@@ -765,6 +787,117 @@
     {% if ta.indexing_status == 'running' %}
     pollIndexing();
     {% endif %}
+
+    // --- Document Categories (Phase A Stage 2B) ---
+    function normalizeSlug(value) {
+        if (!value) return '';
+        return value.toString().trim().toLowerCase()
+            .replace(/\s+/g, '_')
+            .replace(/[^a-z0-9_\-]/g, '')
+            .slice(0, 64);
+    }
+
+    function escapeHtml(s) {
+        return (s || '').toString()
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function renderCategoryRows() {
+        const container = document.getElementById('cat-rows');
+        if (!container) return;
+        const cats = window.TA_DOC_CATEGORIES || [];
+        container.innerHTML = cats.map((c, idx) => `
+            <div class="cat-row" data-idx="${idx}" style="display: flex; gap: 0.5rem; align-items: center;">
+                <input type="text" class="cat-label" value="${escapeHtml(c.label)}" data-slug="${escapeHtml(c.slug)}" style="flex: 1; padding: 0.4rem 0.6rem; border: 1px solid #d1c8bb; border-radius: 4px;">
+                <code style="font-size: 0.75rem; color: #8b7355; min-width: 140px;">${escapeHtml(c.slug)}</code>
+                <button class="btn-danger" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;" onclick="removeCategoryRow(${idx})">Remove</button>
+            </div>
+        `).join('');
+    }
+
+    function readCategoryRowsFromUI() {
+        const rows = Array.from(document.querySelectorAll('#cat-rows .cat-row'));
+        const out = [];
+        const seen = new Set();
+        for (const r of rows) {
+            const label = (r.querySelector('.cat-label')?.value || '').trim();
+            if (!label) continue;
+            const existingSlug = r.querySelector('.cat-label')?.dataset.slug || '';
+            // Keep the existing slug if the label is unchanged enough to preserve;
+            // otherwise re-derive. Server re-normalizes regardless.
+            const slug = existingSlug || normalizeSlug(label);
+            if (!slug || seen.has(slug)) continue;
+            seen.add(slug);
+            out.push({ slug, label });
+        }
+        return out;
+    }
+
+    function addCategoryRow() {
+        const input = document.getElementById('cat-new-label');
+        const label = (input.value || '').trim();
+        if (!label) return;
+        const slug = normalizeSlug(label);
+        if (!slug) {
+            showNotification('Category label must contain letters or numbers', 'error');
+            return;
+        }
+        const cats = window.TA_DOC_CATEGORIES || [];
+        if (cats.some(c => c.slug === slug)) {
+            showNotification(`Category "${slug}" already exists`, 'error');
+            return;
+        }
+        cats.push({ slug, label });
+        window.TA_DOC_CATEGORIES = cats;
+        input.value = '';
+        renderCategoryRows();
+    }
+
+    function removeCategoryRow(idx) {
+        const cats = window.TA_DOC_CATEGORIES || [];
+        const removed = cats[idx];
+        if (!removed) return;
+        if (!confirm(`Remove category "${removed.label}"? Documents already classified as this category will keep the slug until you reclassify them.`)) return;
+        cats.splice(idx, 1);
+        window.TA_DOC_CATEGORIES = cats;
+        renderCategoryRows();
+    }
+
+    async function saveCategories() {
+        const cats = readCategoryRowsFromUI();
+        const status = document.getElementById('cat-save-status');
+        status.textContent = 'Saving...';
+        status.style.color = '#2563eb';
+        try {
+            const resp = await apiCall(`/admin/api/tas/${TA_ID}`, {
+                method: 'PUT',
+                body: JSON.stringify({ doc_categories: cats })
+            });
+            window.TA_DOC_CATEGORIES = resp.doc_categories || [];
+            renderCategoryRows();
+            // Refresh per-doc dropdowns so newly added/removed categories show up.
+            document.querySelectorAll('.doc-category-select').forEach(sel => {
+                const current = sel.value;
+                const opts = ['<option value=""' + (!current ? ' selected' : '') + '>--</option>']
+                    .concat((window.TA_DOC_CATEGORIES || []).map(c =>
+                        `<option value="${escapeHtml(c.slug)}"${current === c.slug ? ' selected' : ''}>${escapeHtml(c.label)}</option>`
+                    ));
+                sel.innerHTML = opts.join('');
+            });
+            status.textContent = 'Saved';
+            status.style.color = '#16a34a';
+            setTimeout(() => { status.textContent = ''; }, 2000);
+        } catch (e) {
+            status.textContent = 'Failed: ' + e.message;
+            status.style.color = '#dc2626';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', renderCategoryRows);
 
     // --- Delete TA ---
     async function deleteTA() {

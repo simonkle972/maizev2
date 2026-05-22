@@ -950,7 +950,147 @@ Return ONLY valid JSON, no other text."""
 # Valid values for Document.doc_role. PRIMARY semantic axis for retrieval as
 # of the Phase A refactor (gap analysis 2026-05-22). doc_type stays around
 # for backward compat / UI continuity but is no longer load-bearing.
+# DEPRECATED post-Stage 2B: superseded by Document.doc_category (per-TA
+# configurable). Column + classify_doc_role kept for rollback safety.
 VALID_DOC_ROLES = {"problem", "solution", "lecture", "syllabus", "reference", "other"}
+
+
+# Phase A Stage 2B (research 2026-05-22). Default per-TA category seed list,
+# applied at TA creation. Professor edits freely via the manage_ta UI.
+# Each entry is {slug, label}: the slug is the immutable internal identifier
+# (used in Document.doc_category + DocumentChunk.doc_category); the label is
+# the mutable display string (rename-safe — see Library Drift, arXiv 2605.19576).
+DEFAULT_DOC_CATEGORIES = [
+    {"slug": "lectures", "label": "Lectures"},
+    {"slug": "readings", "label": "Readings"},
+    {"slug": "homeworks", "label": "Homeworks"},
+    {"slug": "problem_sets", "label": "Problem Sets"},
+    {"slug": "quizzes", "label": "Quizzes"},
+    {"slug": "labs", "label": "Labs"},
+    {"slug": "exams", "label": "Exams"},
+    {"slug": "syllabus", "label": "Syllabus"},
+    {"slug": "reference_materials", "label": "Reference Materials"},
+    {"slug": "extra_problems", "label": "Extra Problems"},
+    {"slug": "solutions", "label": "Solutions"},
+    {"slug": "other", "label": "Other"},
+]
+
+
+def normalize_category_slug(value: str) -> str:
+    """Normalize a free-form category label into a stable internal slug.
+
+    Rules (research 2026-05-22, Q5 failure-mode mitigation):
+    - lowercase
+    - internal whitespace → underscores
+    - strip non-alphanumeric (keep hyphens + underscores)
+    - max 64 chars
+
+    Applied at the API boundary when a professor adds/renames a category so
+    "Problem Sets" + "problem sets" + "Problem-Sets" all collapse to
+    `problem_sets`. Prevents schema explosion from minor typing variance.
+    """
+    if not value:
+        return ""
+    s = value.strip().lower()
+    s = re.sub(r"\s+", "_", s)
+    s = re.sub(r"[^a-z0-9_\-]", "", s)
+    return s[:64]
+
+
+def classify_doc_category(text: str, filename: str, ta_categories: list) -> tuple:
+    """Classify a document into one of the TA's configurable categories.
+
+    Args:
+        text: full document text
+        filename: original filename
+        ta_categories: list of {slug, label} dicts from TeachingAssistant.doc_categories
+
+    Returns (slug, confidence, rationale) where:
+      - slug: one of the slugs from ta_categories (always valid — falls back to
+        the "other"-style category if no good match)
+      - confidence: float in [0, 1]
+      - rationale: short string explaining the choice
+
+    The classifier sees both slug AND label for each candidate (research
+    2026-05-22, Q2 — labels are user-meaningful, slugs are stable). The LLM
+    picks the SLUG, which is what we persist.
+
+    Replaces classify_doc_role for Stage 2B onward (per-TA configurable
+    vocabulary, not a hard-coded enum). See attached_assets/
+    maize-retrieval-doc-classification-research-2026-05-22.md.
+    """
+    from openai import OpenAI
+
+    if not ta_categories:
+        # No TA categories configured — degrade gracefully. Caller should seed
+        # defaults at TA creation, but we don't want to crash if they didn't.
+        return "other", 0.0, "TA has no doc_categories configured"
+
+    # Pick a fallback slug — prefer "other" if it exists, else the last entry.
+    fallback_slug = next(
+        (c["slug"] for c in ta_categories if c["slug"] == "other"),
+        ta_categories[-1]["slug"],
+    )
+    valid_slugs = {c["slug"] for c in ta_categories}
+
+    client = OpenAI(api_key=Config.OPENAI_API_KEY)
+    preview = text[:3000] if len(text) > 3000 else text
+
+    category_lines = "\n".join(
+        f'- slug: "{c["slug"]}" — label: "{c["label"]}"' for c in ta_categories
+    )
+
+    prompt = f"""You are classifying a course document into the professor's configured category list for this teaching assistant. Each category has a stable internal SLUG and a human-readable LABEL. You will return the SLUG.
+
+Filename: {filename}
+
+Document preview:
+{preview}
+
+Available categories for this course:
+{category_lines}
+
+Pick the ONE category whose label best describes this document's purpose. Use the label to understand each category's meaning (the slug is just a stable identifier).
+
+Examples of correct routing:
+- A document containing problems for students to solve, named like "Quiz 2.pdf" → pick the category whose label matches "Quizzes" (or the closest match: "Homeworks", "Problem Sets", "Labs"). NOT solutions, even if it contains some worked examples — primary purpose matters.
+- A solutions key like "Quiz 2 solutions.pdf" → pick the "Solutions" category if it exists, else the closest match.
+- Interactive lecture slides → pick "Lectures".
+- A course syllabus → pick "Syllabus".
+- A formula sheet → pick "Reference Materials".
+- If genuinely nothing fits → pick the catch-all (often "Other").
+
+Return ONLY JSON in this exact shape:
+{{"slug": "quizzes", "confidence": 0.92, "rationale": "Contains five problem statements consistent with a quiz; no worked answers shown."}}
+
+Confidence: 0.9+ = certain; 0.7-0.9 = likely; <0.7 = uncertain. The slug MUST match one from the available list above exactly."""
+
+    for attempt in range(3):
+        try:
+            response = client.chat.completions.create(
+                model=Config.VISION_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=200,
+                response_format={"type": "json_object"},
+            )
+            content = response.choices[0].message.content.strip()
+            data = json.loads(content)
+            slug = (data.get("slug") or fallback_slug).strip().lower()
+            if slug not in valid_slugs:
+                logger.warning(
+                    f"classify_doc_category: LLM returned slug {slug!r} not in TA's list; "
+                    f"falling back to {fallback_slug!r}"
+                )
+                slug = fallback_slug
+            confidence = float(data.get("confidence") or 0.0)
+            confidence = max(0.0, min(1.0, confidence))
+            rationale = str(data.get("rationale") or "")[:500]
+            return slug, confidence, rationale
+        except Exception as e:
+            logger.warning(f"classify_doc_category attempt {attempt+1} failed: {e}")
+            if attempt == 2:
+                logger.error("All classify_doc_category attempts failed; defaulting to fallback slug")
+                return fallback_slug, 0.0, f"classification failed: {type(e).__name__}"
 
 
 def classify_doc_role(text: str, filename: str) -> tuple:
@@ -1288,12 +1428,12 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
         doc.extraction_metadata = metadata
         doc.metadata_extracted = True
 
-        # Phase A retrieval refactor (gap analysis 2026-05-22): classify doc_role
-        # as the new PRIMARY semantic axis for retrieval. Skip if a human has
-        # overridden it (provenance.source == 'professor') — don't overwrite.
+        # Phase A retrieval refactor (gap analysis 2026-05-22): classify doc_role.
+        # DEPRECATED post-Stage 2B but kept for rollback safety until cleanup.
+        # Skip if a human overrode it (provenance.source == 'professor').
         existing_provenance = doc.doc_role_provenance or {}
         if existing_provenance.get("source") != "professor":
-            logger.info(f"[{ta_id}] [{doc.id}] Classifying doc_role...")
+            logger.info(f"[{ta_id}] [{doc.id}] Classifying doc_role (legacy)...")
             try:
                 role, confidence, rationale = classify_doc_role(text, doc.original_filename)
                 doc.doc_role = role
@@ -1306,6 +1446,24 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
                 logger.info(f"[{ta_id}] [{doc.id}] doc_role={role} (conf={confidence:.2f})")
             except Exception as role_err:
                 logger.warning(f"[{ta_id}] [{doc.id}] doc_role classification failed: {role_err}; leaving unset")
+
+        # Phase A Stage 2B (research 2026-05-22): classify doc_category using
+        # the parent TA's per-tenant configurable list. PRIMARY axis for
+        # retrieval. Skip if already set (the UI/PATCH route is the only
+        # other writer and we treat its value as authoritative).
+        ta_categories = (ta.doc_categories if ta else None) or []
+        if not doc.doc_category and ta_categories:
+            logger.info(f"[{ta_id}] [{doc.id}] Classifying doc_category against {len(ta_categories)} TA categories...")
+            try:
+                slug, cat_conf, cat_rationale = classify_doc_category(
+                    text, doc.original_filename, ta_categories
+                )
+                doc.doc_category = slug
+                logger.info(f"[{ta_id}] [{doc.id}] doc_category={slug} (conf={cat_conf:.2f})")
+            except Exception as cat_err:
+                logger.warning(f"[{ta_id}] [{doc.id}] doc_category classification failed: {cat_err}; leaving unset")
+        elif not ta_categories:
+            logger.warning(f"[{ta_id}] [{doc.id}] TA has no doc_categories — skipping classify_doc_category")
 
         # Phase A retrieval refactor: BM25 tsvector for hybrid Stage 1 retrieval.
         # Built from the already-extracted text via PostgreSQL's to_tsvector.
@@ -1337,6 +1495,7 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
                 "instructional_unit_label": doc.instructional_unit_label or "",
                 "file_name": doc.display_name or doc.original_filename,
                 "doc_role": doc.doc_role,  # Phase A — populated above; may be None on legacy paths
+                "doc_category": doc.doc_category,  # Phase A Stage 2B — populated above; may be None on legacy paths
             })
             
             index_log_entries.append({
@@ -1417,6 +1576,7 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
                     instructional_unit_label=chunk_data["instructional_unit_label"],
                     file_name=chunk_data["file_name"],
                     doc_role=chunk_data.get("doc_role"),  # Phase A — None on legacy paths is OK
+                    doc_category=chunk_data.get("doc_category"),  # Phase A Stage 2B
                     embedding=all_embeddings[j]
                 )
                 db.session.add(chunk_obj)
@@ -1600,12 +1760,12 @@ def process_and_index_documents_resumable(ta_id: str, progress_callback=None, re
         doc.extraction_metadata = metadata
         doc.metadata_extracted = True
 
-        # Phase A retrieval refactor (gap analysis 2026-05-22): classify doc_role
-        # as the new PRIMARY semantic axis for retrieval. Skip if a human has
-        # overridden it (provenance.source == 'professor') — don't overwrite.
+        # Phase A retrieval refactor (gap analysis 2026-05-22): classify doc_role.
+        # DEPRECATED post-Stage 2B but kept for rollback safety until cleanup.
+        # Skip if a human overrode it (provenance.source == 'professor').
         existing_provenance = doc.doc_role_provenance or {}
         if existing_provenance.get("source") != "professor":
-            logger.info(f"[{ta_id}] [{doc.id}] Classifying doc_role...")
+            logger.info(f"[{ta_id}] [{doc.id}] Classifying doc_role (legacy)...")
             try:
                 role, confidence, rationale = classify_doc_role(text, doc.original_filename)
                 doc.doc_role = role
@@ -1618,6 +1778,24 @@ def process_and_index_documents_resumable(ta_id: str, progress_callback=None, re
                 logger.info(f"[{ta_id}] [{doc.id}] doc_role={role} (conf={confidence:.2f})")
             except Exception as role_err:
                 logger.warning(f"[{ta_id}] [{doc.id}] doc_role classification failed: {role_err}; leaving unset")
+
+        # Phase A Stage 2B (research 2026-05-22): classify doc_category using
+        # the parent TA's per-tenant configurable list. PRIMARY axis for
+        # retrieval. Skip if already set (the UI/PATCH route is the only
+        # other writer and we treat its value as authoritative).
+        ta_categories = (ta.doc_categories if ta else None) or []
+        if not doc.doc_category and ta_categories:
+            logger.info(f"[{ta_id}] [{doc.id}] Classifying doc_category against {len(ta_categories)} TA categories...")
+            try:
+                slug, cat_conf, cat_rationale = classify_doc_category(
+                    text, doc.original_filename, ta_categories
+                )
+                doc.doc_category = slug
+                logger.info(f"[{ta_id}] [{doc.id}] doc_category={slug} (conf={cat_conf:.2f})")
+            except Exception as cat_err:
+                logger.warning(f"[{ta_id}] [{doc.id}] doc_category classification failed: {cat_err}; leaving unset")
+        elif not ta_categories:
+            logger.warning(f"[{ta_id}] [{doc.id}] TA has no doc_categories — skipping classify_doc_category")
 
         # Phase A retrieval refactor: BM25 tsvector for hybrid Stage 1 retrieval.
         # Built from the already-extracted text via PostgreSQL's to_tsvector.
@@ -1648,6 +1826,7 @@ def process_and_index_documents_resumable(ta_id: str, progress_callback=None, re
                 "instructional_unit_label": doc.instructional_unit_label or "",
                 "file_name": doc.display_name or doc.original_filename,
                 "doc_role": doc.doc_role,  # Phase A — populated above; may be None on legacy paths
+                "doc_category": doc.doc_category,  # Phase A Stage 2B — populated above; may be None on legacy paths
             })
             
             doc_log_entries.append({
@@ -1697,6 +1876,7 @@ def process_and_index_documents_resumable(ta_id: str, progress_callback=None, re
                     instructional_unit_label=chunk_item["instructional_unit_label"],
                     file_name=chunk_item["file_name"],
                     doc_role=chunk_item.get("doc_role"),  # Phase A — None on legacy paths is OK
+                    doc_category=chunk_item.get("doc_category"),  # Phase A Stage 2B
                     embedding=doc_embeddings[i]
                 )
                 db.session.add(chunk_obj)
