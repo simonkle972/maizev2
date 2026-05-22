@@ -947,6 +947,89 @@ Return ONLY valid JSON, no other text."""
                 }
 
 
+# Valid values for Document.doc_role. PRIMARY semantic axis for retrieval as
+# of the Phase A refactor (gap analysis 2026-05-22). doc_type stays around
+# for backward compat / UI continuity but is no longer load-bearing.
+VALID_DOC_ROLES = {"problem", "solution", "lecture", "syllabus", "reference", "other"}
+
+
+def classify_doc_role(text: str, filename: str) -> tuple:
+    """Classify a document's pedagogical role for retrieval routing.
+
+    Returns (role, confidence, rationale) where:
+      - role: one of VALID_DOC_ROLES
+      - confidence: float in [0, 1] (LLM's self-reported confidence)
+      - rationale: short string explaining the classification
+
+    Used by the retriever (post-refactor) to determine PRIMARY citation
+    eligibility and to tag solution chunks as supplementary reference in
+    the response_generator prompt. Distinct from doc_type, which was
+    structurally broken on our corpus (the LLM was labeling quizzes as
+    homework_with_assignment_number=N, causing Type A retrieval failures).
+
+    Grounded in: ACORD-style document-role typology (gap analysis decision
+    3 + 4). See attached_assets/maize-retrieval-gap-analysis-2026-05-22.md.
+    """
+    from openai import OpenAI
+
+    client = OpenAI(api_key=Config.OPENAI_API_KEY)
+    preview = text[:3000] if len(text) > 3000 else text
+
+    prompt = f"""You are classifying course documents for a teaching-assistant retrieval system. Read the document carefully and assign it to ONE of six pedagogical roles. The role drives RETRIEVAL behavior, not display labels — so think about what the student is asking when this doc would be the right answer.
+
+Filename: {filename}
+
+Document preview:
+{preview}
+
+Choose ONE role:
+- "problem": a document containing problems for students to SOLVE. Includes psets, homeworks, quizzes, labs, practice problems, extra problems, midterms, final exams (the EXAM ITSELF, not the answer key). Even if the doc contains *some* worked examples, classify as "problem" if its primary purpose is to present problems for the student to attempt.
+- "solution": a document containing ANSWERS / WORKED SOLUTIONS that students should NOT see directly. Solutions manuals, answer keys, "X solutions.pdf", solutions documents distributed only to instructors, sample solutions. Critical distinction: if the doc primarily shows complete worked-out answers (formulas, final numerical results), it's "solution".
+- "lecture": instructional content — lecture slides, recorded lecture transcripts, in-class notes, interactive lecture materials. Material the instructor uses to teach.
+- "syllabus": course-level admin documents — syllabus, calendar, grading policy, course overview.
+- "reference": cheat sheets, formula references, tables, glossaries — material students consult for facts without solving anything.
+- "other": doesn't fit cleanly into any of the above.
+
+Critical examples for this codebase:
+- "econometrics quiz 1.pdf" containing problems → role: "problem" (NOT "homework"; quizzes ARE problems students solve)
+- "Quiz 2 solutions.pdf" → role: "solution"
+- "econ117_pset03- 2025, solutions.pdf" → role: "solution"
+- "econ117_pset02_2025B_with_table.pdf" containing problems → role: "problem"
+- "Lab2.pdf" → role: "problem" (labs are problems students complete)
+- "Interactive Lecture 3.pdf" → role: "lecture"
+- "ECON 117 syllabus.pdf" → role: "syllabus"
+- "Cheat sheet for linear regressions.pdf" → role: "reference"
+
+Return ONLY JSON in this exact shape:
+{{"role": "problem", "confidence": 0.92, "rationale": "Contains five problem statements students must solve; no worked answers shown."}}
+
+Confidence: 0.9+ = certain; 0.7-0.9 = likely; <0.7 = uncertain (use only for genuinely ambiguous cases)."""
+
+    for attempt in range(3):
+        try:
+            response = client.chat.completions.create(
+                model=Config.VISION_MODEL,  # gpt-4o; cheap + fast for classification
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=200,
+                response_format={"type": "json_object"},
+            )
+            content = response.choices[0].message.content.strip()
+            data = json.loads(content)
+            role = (data.get("role") or "other").lower()
+            if role not in VALID_DOC_ROLES:
+                logger.warning(f"classify_doc_role: LLM returned invalid role {role!r}; defaulting to 'other'")
+                role = "other"
+            confidence = float(data.get("confidence") or 0.0)
+            confidence = max(0.0, min(1.0, confidence))  # clamp to [0, 1]
+            rationale = str(data.get("rationale") or "")[:500]
+            return role, confidence, rationale
+        except Exception as e:
+            logger.warning(f"classify_doc_role attempt {attempt+1} failed: {e}")
+            if attempt == 2:
+                logger.error("All classify_doc_role attempts failed; defaulting to 'other'")
+                return "other", 0.0, f"classification failed: {type(e).__name__}"
+
+
 def infer_doc_metadata_from_filename(filename: str) -> dict:
     """
     Synchronous lightweight metadata inference from a filename. Used at upload
@@ -1204,6 +1287,30 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
         # Always store full extraction metadata for reference
         doc.extraction_metadata = metadata
         doc.metadata_extracted = True
+
+        # Phase A retrieval refactor (gap analysis 2026-05-22): classify doc_role
+        # as the new PRIMARY semantic axis for retrieval. Skip if a human has
+        # overridden it (provenance.source == 'professor') — don't overwrite.
+        existing_provenance = doc.doc_role_provenance or {}
+        if existing_provenance.get("source") != "professor":
+            logger.info(f"[{ta_id}] [{doc.id}] Classifying doc_role...")
+            try:
+                role, confidence, rationale = classify_doc_role(text, doc.original_filename)
+                doc.doc_role = role
+                doc.doc_role_provenance = {
+                    "source": "auto",
+                    "confidence": confidence,
+                    "classified_at": datetime.utcnow().isoformat() + "Z",
+                    "rationale": rationale,
+                }
+                logger.info(f"[{ta_id}] [{doc.id}] doc_role={role} (conf={confidence:.2f})")
+            except Exception as role_err:
+                logger.warning(f"[{ta_id}] [{doc.id}] doc_role classification failed: {role_err}; leaving unset")
+
+        # Phase A retrieval refactor: BM25 tsvector for hybrid Stage 1 retrieval.
+        # Built from the already-extracted text via PostgreSQL's to_tsvector.
+        doc.bm25_tsvector = db.func.to_tsvector('english', sanitize_text(text))
+
         logger.info(f"[{ta_id}] [{doc.id}] Saving metadata (preserving human edits)...")
         db_commit_with_retry(db)
         logger.info(f"[{ta_id}] [{doc.id}] Metadata saved")
@@ -1228,7 +1335,8 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
                 "assignment_number": doc.assignment_number or "",
                 "instructional_unit_number": doc.instructional_unit_number or 0,
                 "instructional_unit_label": doc.instructional_unit_label or "",
-                "file_name": doc.display_name or doc.original_filename
+                "file_name": doc.display_name or doc.original_filename,
+                "doc_role": doc.doc_role,  # Phase A — populated above; may be None on legacy paths
             })
             
             index_log_entries.append({
@@ -1308,6 +1416,7 @@ def process_and_index_documents(ta_id: str, progress_callback=None) -> dict:
                     instructional_unit_number=chunk_data["instructional_unit_number"],
                     instructional_unit_label=chunk_data["instructional_unit_label"],
                     file_name=chunk_data["file_name"],
+                    doc_role=chunk_data.get("doc_role"),  # Phase A — None on legacy paths is OK
                     embedding=all_embeddings[j]
                 )
                 db.session.add(chunk_obj)
@@ -1490,6 +1599,30 @@ def process_and_index_documents_resumable(ta_id: str, progress_callback=None, re
         
         doc.extraction_metadata = metadata
         doc.metadata_extracted = True
+
+        # Phase A retrieval refactor (gap analysis 2026-05-22): classify doc_role
+        # as the new PRIMARY semantic axis for retrieval. Skip if a human has
+        # overridden it (provenance.source == 'professor') — don't overwrite.
+        existing_provenance = doc.doc_role_provenance or {}
+        if existing_provenance.get("source") != "professor":
+            logger.info(f"[{ta_id}] [{doc.id}] Classifying doc_role...")
+            try:
+                role, confidence, rationale = classify_doc_role(text, doc.original_filename)
+                doc.doc_role = role
+                doc.doc_role_provenance = {
+                    "source": "auto",
+                    "confidence": confidence,
+                    "classified_at": datetime.utcnow().isoformat() + "Z",
+                    "rationale": rationale,
+                }
+                logger.info(f"[{ta_id}] [{doc.id}] doc_role={role} (conf={confidence:.2f})")
+            except Exception as role_err:
+                logger.warning(f"[{ta_id}] [{doc.id}] doc_role classification failed: {role_err}; leaving unset")
+
+        # Phase A retrieval refactor: BM25 tsvector for hybrid Stage 1 retrieval.
+        # Built from the already-extracted text via PostgreSQL's to_tsvector.
+        doc.bm25_tsvector = db.func.to_tsvector('english', sanitize_text(text))
+
         logger.info(f"[{ta_id}] [{doc.id}] Saving metadata (preserving human edits)...")
         db_commit_with_retry(db)
         logger.info(f"[{ta_id}] [{doc.id}] Metadata saved")
@@ -1513,7 +1646,8 @@ def process_and_index_documents_resumable(ta_id: str, progress_callback=None, re
                 "assignment_number": doc.assignment_number or "",
                 "instructional_unit_number": doc.instructional_unit_number or 0,
                 "instructional_unit_label": doc.instructional_unit_label or "",
-                "file_name": doc.display_name or doc.original_filename
+                "file_name": doc.display_name or doc.original_filename,
+                "doc_role": doc.doc_role,  # Phase A — populated above; may be None on legacy paths
             })
             
             doc_log_entries.append({
@@ -1562,6 +1696,7 @@ def process_and_index_documents_resumable(ta_id: str, progress_callback=None, re
                     instructional_unit_number=chunk_item["instructional_unit_number"],
                     instructional_unit_label=chunk_item["instructional_unit_label"],
                     file_name=chunk_item["file_name"],
+                    doc_role=chunk_item.get("doc_role"),  # Phase A — None on legacy paths is OK
                     embedding=doc_embeddings[i]
                 )
                 db.session.add(chunk_obj)

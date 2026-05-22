@@ -1067,6 +1067,20 @@ def update_document_metadata(ta_id, doc_id):
         value = data['instructional_unit_number']
         doc.instructional_unit_number = int(value) if value and value != '' else None
 
+    # Phase A retrieval refactor (gap analysis 2026-05-22). doc_role is the new
+    # PRIMARY semantic axis for retrieval. Professor override marks provenance
+    # as 'professor' so auto-classifier doesn't overwrite on subsequent reindexes.
+    if 'doc_role' in data:
+        from src.document_processor import VALID_DOC_ROLES
+        new_role = (data['doc_role'] or '').lower() or None
+        if new_role is not None and new_role not in VALID_DOC_ROLES:
+            return jsonify({"error": f"Invalid doc_role; must be one of {sorted(VALID_DOC_ROLES)}"}), 400
+        doc.doc_role = new_role
+        doc.doc_role_provenance = {
+            "source": "professor",
+            "set_at": datetime.utcnow().isoformat() + "Z",
+        }
+
     db.session.commit()
 
     DocumentChunk.query.filter_by(ta_id=ta_id, document_id=doc.id).update({
@@ -1075,6 +1089,7 @@ def update_document_metadata(ta_id, doc_id):
         "instructional_unit_number": doc.instructional_unit_number or 0,
         "instructional_unit_label": doc.instructional_unit_label or "",
         "file_name": doc.display_name or doc.original_filename,
+        "doc_role": doc.doc_role,
     }, synchronize_session=False)
     db.session.commit()
 

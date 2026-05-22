@@ -918,6 +918,20 @@ def update_document_metadata(ta_id, doc_id):
     if "assignment_number" in data:
         doc.assignment_number = data["assignment_number"] if data["assignment_number"] else None
 
+    # Phase A retrieval refactor (gap analysis 2026-05-22). doc_role is the new
+    # PRIMARY semantic axis for retrieval. When set via this route, mark provenance
+    # as 'professor' so the auto-classifier won't overwrite it on subsequent runs.
+    if "doc_role" in data:
+        from src.document_processor import VALID_DOC_ROLES
+        new_role = (data["doc_role"] or "").lower() or None
+        if new_role is not None and new_role not in VALID_DOC_ROLES:
+            return jsonify({"error": f"Invalid doc_role; must be one of {sorted(VALID_DOC_ROLES)}"}), 400
+        doc.doc_role = new_role
+        doc.doc_role_provenance = {
+            "source": "professor",
+            "set_at": datetime.utcnow().isoformat() + "Z",
+        }
+
     db.session.commit()
 
     # Propagate metadata change to the chunk rows so retrieval / chat keep
@@ -930,6 +944,7 @@ def update_document_metadata(ta_id, doc_id):
         "instructional_unit_number": doc.instructional_unit_number or 0,
         "instructional_unit_label": doc.instructional_unit_label or "",
         "file_name": doc.display_name or doc.original_filename,
+        "doc_role": doc.doc_role,
     }, synchronize_session=False)
     db.session.commit()
     
