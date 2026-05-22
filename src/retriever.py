@@ -1107,13 +1107,192 @@ def detect_pasted_question(
     }
 
 
+def hybrid_doc_search(query: str, query_embedding: list, ta_id: str, top_k: int = None) -> tuple:
+    """Stage 1 hybrid document-level retrieval (Phase A Stage 3).
+
+    Fuses THREE independent rankings via Reciprocal Rank Fusion:
+      1. BM25 over Document.bm25_tsvector (PostgreSQL plainto_tsquery + ts_rank).
+      2. Dense: cosine similarity between query_embedding and each document's
+         top-N chunk embeddings, mean-pooled per document.
+      3. Filename: token-overlap between query and Document.original_filename
+         (carried over from the legacy fuzzy matcher, used as a SOFT signal
+         here — eval showed BM25+dense alone regressed cases where the
+         filename was the disambiguator, e.g. "Interactive Lecture 5" vs
+         "Lecture 6"). No hard filter; just one more weak signal that RRF
+         fuses with the other two.
+
+    RRF score per doc = sum over rankings of 1 / (RRF_K + rank). Top-k documents
+    by fused score are returned.
+
+    Replaces the regex + fuzzy filename matcher + hard SQL filter that
+    analyze_query() drives. doc_type / assignment_number are NOT used as
+    hard filters — they caused the Type A failure where "pset 2" matched
+    "econometrics quiz 2" because both were tagged doc_type='homework'.
+
+    Grounded in: VersionRAG (arXiv 2510.08109) + Serghei + OpenSearch RRF docs.
+    See attached_assets/maize-retrieval-phase-a-implementation-plan-2026-05-22.md
+    Stage 3.
+
+    Args:
+        query: the rewritten/decontextualized student query (BM25 input)
+        query_embedding: pre-computed query embedding (dense half input)
+        ta_id: scope the search to this TA's corpus
+        top_k: how many candidate document ids to return (default Config.STAGE_1_TOP_K_DOCS)
+
+    Returns:
+        tuple: (doc_ids, diagnostics) where doc_ids is a list of Document.id
+        ordered by fused RRF score (best first), and diagnostics is a dict
+        with per-side rankings + timing info for logs.
+    """
+    from models import db, Document, DocumentChunk
+    import time
+
+    if top_k is None:
+        top_k = Config.STAGE_1_TOP_K_DOCS
+    k = Config.RRF_K
+    # Per-side candidate pool size. RRF behaves better when each ranking
+    # surfaces more candidates than the final top_k: keeps low-rank-but-good
+    # docs in play if the OTHER side ranks them high.
+    PER_SIDE_K = max(top_k * 4, 20)
+
+    diagnostics = {
+        "stage_1_method": "hybrid_rrf_3signal",
+        "stage_1_top_k": top_k,
+        "rrf_k": k,
+        "bm25_latency_ms": 0,
+        "dense_latency_ms": 0,
+        "filename_latency_ms": 0,
+        "bm25_ranking": [],       # [(doc_id, rank)]
+        "dense_ranking": [],
+        "filename_ranking": [],
+        "fused_doc_ids": [],      # final ranking
+    }
+
+    # ---- BM25 ranking over Document.bm25_tsvector ----
+    # Using plainto_tsquery (sanitizes & ANDs the query terms) so we don't have to
+    # parse the student's query as tsquery syntax. ts_rank gives us a per-doc score.
+    bm25_t0 = time.time()
+    bm25_rows = []
+    try:
+        sql = text("""
+            SELECT id,
+                   ts_rank(bm25_tsvector, plainto_tsquery('english', :q)) AS rank
+            FROM documents
+            WHERE ta_id = :ta_id
+              AND bm25_tsvector IS NOT NULL
+              AND bm25_tsvector @@ plainto_tsquery('english', :q)
+            ORDER BY rank DESC
+            LIMIT :limit
+        """)
+        bm25_rows = db.session.execute(sql, {
+            "q": query, "ta_id": ta_id, "limit": PER_SIDE_K
+        }).fetchall()
+    except Exception as e:
+        logger.warning(f"[{ta_id}] hybrid_doc_search BM25 query failed: {e}; falling back to dense-only")
+    diagnostics["bm25_latency_ms"] = int((time.time() - bm25_t0) * 1000)
+    bm25_ranks = {row.id: rank_idx for rank_idx, row in enumerate(bm25_rows)}
+    diagnostics["bm25_ranking"] = [(row.id, idx) for idx, row in enumerate(bm25_rows)]
+
+    # ---- Dense ranking via mean-pooled chunk similarity ----
+    # For each doc, take its TOP-N best-matching chunks against the query,
+    # average their cosine similarities, treat that as the doc-level score.
+    # Cheaper than maintaining a separate doc_embedding column; pgvector
+    # computes cosine_distance at query time.
+    TOP_N_CHUNKS_PER_DOC = 5
+    dense_t0 = time.time()
+    dense_rows = []
+    try:
+        # Subquery: per chunk, compute cosine sim and rank within its document.
+        # Outer query: average top-N chunk similarities per doc, take top-K docs.
+        dense_sql = text("""
+            WITH ranked_chunks AS (
+                SELECT
+                    dc.document_id,
+                    (1 - (dc.embedding <=> CAST(:emb AS vector))) AS sim,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY dc.document_id
+                        ORDER BY dc.embedding <=> CAST(:emb AS vector)
+                    ) AS rn
+                FROM document_chunks dc
+                WHERE dc.ta_id = :ta_id
+            )
+            SELECT document_id, AVG(sim) AS doc_score
+            FROM ranked_chunks
+            WHERE rn <= :n
+            GROUP BY document_id
+            ORDER BY doc_score DESC
+            LIMIT :limit
+        """)
+        # pgvector wants the embedding as a string '[v1,v2,...]'.
+        emb_str = "[" + ",".join(f"{v:.7f}" for v in query_embedding) + "]"
+        dense_rows = db.session.execute(dense_sql, {
+            "emb": emb_str, "ta_id": ta_id,
+            "n": TOP_N_CHUNKS_PER_DOC, "limit": PER_SIDE_K
+        }).fetchall()
+    except Exception as e:
+        logger.warning(f"[{ta_id}] hybrid_doc_search dense query failed: {e}; falling back to BM25-only")
+    diagnostics["dense_latency_ms"] = int((time.time() - dense_t0) * 1000)
+    dense_ranks = {row.document_id: rank_idx for rank_idx, row in enumerate(dense_rows)}
+    diagnostics["dense_ranking"] = [(row.document_id, idx) for idx, row in enumerate(dense_rows)]
+
+    # ---- Filename ranking (token overlap, soft signal) ----
+    # Carried over from legacy fuzzy matcher (find_matching_documents). Used
+    # as a SOFT signal — no threshold cutoff for RRF participation. Avoids
+    # the regression V2-without-filename had on Type B + working cases
+    # where the filename was the only disambiguator within a doc family.
+    filename_t0 = time.time()
+    filename_rows = []
+    try:
+        query_tokens = tokenize_for_matching(query)
+        if query_tokens:
+            docs = Document.query.filter_by(ta_id=ta_id).all()
+            scored = []
+            for doc in docs:
+                fn = doc.original_filename or doc.display_name or ""
+                fn_tokens = tokenize_for_matching(fn)
+                if not fn_tokens:
+                    continue
+                overlap = query_tokens & fn_tokens
+                if not overlap:
+                    continue
+                score = len(overlap) / len(fn_tokens)
+                long_matches = sum(1 for t in overlap if len(t) >= 4)
+                if long_matches:
+                    score = min(1.0, score + 0.1 * long_matches)
+                scored.append((doc.id, score))
+            scored.sort(key=lambda x: x[1], reverse=True)
+            filename_rows = scored[:PER_SIDE_K]
+    except Exception as e:
+        logger.warning(f"[{ta_id}] hybrid_doc_search filename query failed: {e}; continuing with BM25+dense only")
+    diagnostics["filename_latency_ms"] = int((time.time() - filename_t0) * 1000)
+    filename_ranks = {doc_id: rank_idx for rank_idx, (doc_id, _) in enumerate(filename_rows)}
+    diagnostics["filename_ranking"] = [(doc_id, idx) for idx, (doc_id, _) in enumerate(filename_rows)]
+
+    # ---- Reciprocal Rank Fusion (3 signals) ----
+    all_doc_ids = set(bm25_ranks) | set(dense_ranks) | set(filename_ranks)
+    fused = []
+    for doc_id in all_doc_ids:
+        score = 0.0
+        if doc_id in bm25_ranks:
+            score += 1.0 / (k + bm25_ranks[doc_id])
+        if doc_id in dense_ranks:
+            score += 1.0 / (k + dense_ranks[doc_id])
+        if doc_id in filename_ranks:
+            score += 1.0 / (k + filename_ranks[doc_id])
+        fused.append((doc_id, score))
+    fused.sort(key=lambda x: x[1], reverse=True)
+    top_doc_ids = [doc_id for doc_id, _ in fused[:top_k]]
+    diagnostics["fused_doc_ids"] = top_doc_ids
+    return top_doc_ids, diagnostics
+
+
 def analyze_query(query: str, ta_id: str = "") -> dict:
     """
     Analyze a query to extract structured filters.
-    
+
     Uses regex patterns for common patterns, then falls back to
     document filename matching if no structured elements found.
-    
+
     When a specific problem reference with sub-part is detected (e.g., "section 1 question a"),
     sets requires_early_hybrid=True to route directly to full-document mode,
     bypassing the unreliable LLM reranker.
@@ -2156,80 +2335,129 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         DocumentChunk.instructional_unit_label,
         (1 - DocumentChunk.embedding.cosine_distance(query_embedding)).label('score')
     ).filter(DocumentChunk.ta_id == ta_id)
-    
-    filtered_query = base_query
+
+    used_fallback = False
     has_filters = False
     filter_description = []
-    
-    if query_analysis["doc_type_filter"] and query_analysis["assignment_filter"]:
-        filtered_query = base_query.filter(
-            DocumentChunk.doc_type == query_analysis["doc_type_filter"],
-            DocumentChunk.assignment_number == query_analysis["assignment_filter"]
+
+    if Config.RETRIEVAL_V2_ENABLED:
+        # Phase A Stage 3 — hybrid Stage 1 retrieval.
+        # Replaces the regex + doc_type / filename hard filters below. Uses
+        # BM25 over Document.bm25_tsvector + dense (mean-pooled chunk sim)
+        # fused via RRF to surface candidate document IDs, then constrains
+        # chunk vector search to those docs. The legacy filter cascade is
+        # NOT applied here — that's the load-bearing change. See
+        # attached_assets/maize-retrieval-phase-a-implementation-plan-2026-05-22.md
+        # Stage 3.
+        candidate_doc_ids, hybrid_diag = hybrid_doc_search(
+            effective_query, query_embedding, ta_id
         )
-        has_filters = True
-        filter_description = [f"doc_type={query_analysis['doc_type_filter']}", f"assignment={query_analysis['assignment_filter']}"]
-    elif query_analysis["doc_type_filter"] and query_analysis["unit_filter"]:
-        filtered_query = base_query.filter(
-            DocumentChunk.doc_type == query_analysis["doc_type_filter"],
-            DocumentChunk.instructional_unit_number == query_analysis["unit_filter"]
-        )
-        has_filters = True
-        filter_description = [f"doc_type={query_analysis['doc_type_filter']}", f"unit={query_analysis['unit_filter']}"]
-    elif query_analysis["doc_type_filter"]:
-        filtered_query = base_query.filter(
-            DocumentChunk.doc_type == query_analysis["doc_type_filter"]
-        )
-        has_filters = True
-        filter_description = [f"doc_type={query_analysis['doc_type_filter']}"]
-    elif query_analysis["filename_filter"]:
-        filtered_query = base_query.filter(
-            DocumentChunk.file_name == query_analysis["filename_filter"]
-        )
-        has_filters = True
-        filter_description = [f"filename={query_analysis['filename_filter']}", f"match_score={query_analysis.get('filename_match_score', 'N/A')}"]
-    
-    if query_analysis["year_filter"]:
-        year = query_analysis["year_filter"]
-        filtered_query = filtered_query.filter(
-            DocumentChunk.file_name.contains(year)
-        )
-        has_filters = True
-        filter_description.append(f"year={year}")
-        logger.info(f"[{ta_id}] Year filter applied: {year}")
-    
-    if has_filters:
-        diagnostics["filters_applied"] = ", ".join(filter_description)
-        filter_match_count = filtered_query.count()
-        diagnostics["filter_match_count"] = filter_match_count
-        logger.info(f"[{ta_id}] Filters applied: {diagnostics['filters_applied']}, matching chunks: {filter_match_count}")
-    
-    used_fallback = False
-    try:
-        results = filtered_query.order_by(
-            DocumentChunk.embedding.cosine_distance(query_embedding)
-        ).limit(initial_k).all()
-        
-        if not results and has_filters:
-            logger.info(f"[{ta_id}] No results with filter, falling back to unfiltered search")
+        diagnostics["hybrid_stage_1"] = hybrid_diag
+        if candidate_doc_ids:
+            filtered_query = base_query.filter(DocumentChunk.document_id.in_(candidate_doc_ids))
+            diagnostics["filters_applied"] = f"v2_hybrid_doc_ids={candidate_doc_ids}"
+            diagnostics["filter_match_count"] = len(candidate_doc_ids)
+            logger.info(f"[{ta_id}] V2 hybrid Stage 1: candidate docs={candidate_doc_ids} (bm25={hybrid_diag.get('bm25_latency_ms')}ms, dense={hybrid_diag.get('dense_latency_ms')}ms)")
+        else:
+            # Hybrid Stage 1 returned nothing (empty corpus or both BM25/dense
+            # failed). Fall through to unfiltered chunk search so we still
+            # produce some context.
+            filtered_query = base_query
+            logger.warning(f"[{ta_id}] V2 hybrid Stage 1 returned no candidate docs — falling back to unfiltered chunk search")
+        try:
+            results = filtered_query.order_by(
+                DocumentChunk.embedding.cosine_distance(query_embedding)
+            ).limit(initial_k).all()
+            if not results and candidate_doc_ids:
+                # Candidate docs gave us nothing — fall back to unfiltered.
+                logger.info(f"[{ta_id}] V2: candidate-doc chunk search empty, falling back to unfiltered")
+                results = base_query.order_by(
+                    DocumentChunk.embedding.cosine_distance(query_embedding)
+                ).limit(initial_k).all()
+                used_fallback = True
+        except Exception as e:
+            logger.error(f"V2 vector search failed: {e}")
             results = base_query.order_by(
                 DocumentChunk.embedding.cosine_distance(query_embedding)
             ).limit(initial_k).all()
             used_fallback = True
-    except Exception as e:
-        logger.error(f"Vector search failed: {e}")
-        results = base_query.order_by(
-            DocumentChunk.embedding.cosine_distance(query_embedding)
-        ).limit(initial_k).all()
-        used_fallback = True
 
-    diagnostics["vector_search_latency_ms"] = int((_t.time() - _vector_t0) * 1000)
-
-    if has_filters and not used_fallback:
-        diagnostics["retrieval_method"] = "filtered"
-    elif has_filters and used_fallback:
-        diagnostics["retrieval_method"] = "fallback_unfiltered"
+        diagnostics["vector_search_latency_ms"] = int((_t.time() - _vector_t0) * 1000)
+        diagnostics["retrieval_method"] = "v2_hybrid_rrf_fallback_unfiltered" if used_fallback else "v2_hybrid_rrf"
     else:
-        diagnostics["retrieval_method"] = "unfiltered"
+        # LEGACY path (default — gated by RETRIEVAL_V2_ENABLED=false).
+        # Hard-filter cascade on regex-extracted doc_type / assignment / unit / filename.
+        # Retained for safe rollback until V2 is validated by eval.
+        filtered_query = base_query
+
+        if query_analysis["doc_type_filter"] and query_analysis["assignment_filter"]:
+            filtered_query = base_query.filter(
+                DocumentChunk.doc_type == query_analysis["doc_type_filter"],
+                DocumentChunk.assignment_number == query_analysis["assignment_filter"]
+            )
+            has_filters = True
+            filter_description = [f"doc_type={query_analysis['doc_type_filter']}", f"assignment={query_analysis['assignment_filter']}"]
+        elif query_analysis["doc_type_filter"] and query_analysis["unit_filter"]:
+            filtered_query = base_query.filter(
+                DocumentChunk.doc_type == query_analysis["doc_type_filter"],
+                DocumentChunk.instructional_unit_number == query_analysis["unit_filter"]
+            )
+            has_filters = True
+            filter_description = [f"doc_type={query_analysis['doc_type_filter']}", f"unit={query_analysis['unit_filter']}"]
+        elif query_analysis["doc_type_filter"]:
+            filtered_query = base_query.filter(
+                DocumentChunk.doc_type == query_analysis["doc_type_filter"]
+            )
+            has_filters = True
+            filter_description = [f"doc_type={query_analysis['doc_type_filter']}"]
+        elif query_analysis["filename_filter"]:
+            filtered_query = base_query.filter(
+                DocumentChunk.file_name == query_analysis["filename_filter"]
+            )
+            has_filters = True
+            filter_description = [f"filename={query_analysis['filename_filter']}", f"match_score={query_analysis.get('filename_match_score', 'N/A')}"]
+
+        if query_analysis["year_filter"]:
+            year = query_analysis["year_filter"]
+            filtered_query = filtered_query.filter(
+                DocumentChunk.file_name.contains(year)
+            )
+            has_filters = True
+            filter_description.append(f"year={year}")
+            logger.info(f"[{ta_id}] Year filter applied: {year}")
+
+        if has_filters:
+            diagnostics["filters_applied"] = ", ".join(filter_description)
+            filter_match_count = filtered_query.count()
+            diagnostics["filter_match_count"] = filter_match_count
+            logger.info(f"[{ta_id}] Filters applied: {diagnostics['filters_applied']}, matching chunks: {filter_match_count}")
+
+        try:
+            results = filtered_query.order_by(
+                DocumentChunk.embedding.cosine_distance(query_embedding)
+            ).limit(initial_k).all()
+
+            if not results and has_filters:
+                logger.info(f"[{ta_id}] No results with filter, falling back to unfiltered search")
+                results = base_query.order_by(
+                    DocumentChunk.embedding.cosine_distance(query_embedding)
+                ).limit(initial_k).all()
+                used_fallback = True
+        except Exception as e:
+            logger.error(f"Vector search failed: {e}")
+            results = base_query.order_by(
+                DocumentChunk.embedding.cosine_distance(query_embedding)
+            ).limit(initial_k).all()
+            used_fallback = True
+
+        diagnostics["vector_search_latency_ms"] = int((_t.time() - _vector_t0) * 1000)
+
+        if has_filters and not used_fallback:
+            diagnostics["retrieval_method"] = "filtered"
+        elif has_filters and used_fallback:
+            diagnostics["retrieval_method"] = "fallback_unfiltered"
+        else:
+            diagnostics["retrieval_method"] = "unfiltered"
     
     initial_chunks = []
     
@@ -2396,8 +2624,15 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         else:
             trigger_reason = confidence["reason"]
             logger.info(f"[{ta_id}] Hybrid triggered by LOW CONFIDENCE: {confidence['reason']} (top_score={confidence['top_score']}, spread={confidence['score_spread']})")
-        
-        target_doc_ids, id_method = identify_target_documents(chunks, query_analysis, ta_id)
+
+        # Phase A Stage 3: in V2 mode, hide the regex-derived filters from
+        # identify_target_documents so it can't re-pick the wrong doc via
+        # doc_type='homework'+assignment='2' (the original Type A failure).
+        # The chunk-frequency fallback inside identify_target_documents will
+        # then pick whichever doc dominates the V2-filtered + reranked chunks,
+        # which is the answer we actually want.
+        id_query_analysis = {} if Config.RETRIEVAL_V2_ENABLED else query_analysis
+        target_doc_ids, id_method = identify_target_documents(chunks, id_query_analysis, ta_id)
         diagnostics["hybrid_doc_id_method"] = id_method
         
         if target_doc_ids:
