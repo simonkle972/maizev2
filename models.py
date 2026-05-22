@@ -127,6 +127,10 @@ class TeachingAssistant(db.Model):
     indexing_status = db.Column(db.String(32), default=None)
     indexing_error = db.Column(db.Text, nullable=True)
     indexing_progress = db.Column(db.Integer, default=0)
+    # Per-doc failures from the last indexing run — list of {doc_id, filename, error}.
+    # Distinct from `indexing_error` (which is a single TA-level error message for hard failures).
+    # Populated by run_indexing_task; consumed by the manage_ta UI to surface per-doc failures.
+    indexing_warnings = db.Column(db.JSON, nullable=True)
     institution_id = db.Column(db.Integer, db.ForeignKey('institutions.id'), nullable=True)
     last_activity_at = db.Column(db.DateTime, nullable=True)
 

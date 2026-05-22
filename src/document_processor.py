@@ -368,7 +368,7 @@ def _supplement_pdf_with_figures(file_path: str, text: str) -> str:
         from openai import OpenAI
 
         client = OpenAI(api_key=Config.OPENAI_API_KEY)
-        images = convert_from_path(file_path, dpi=200, fmt='jpeg', poppler_path="/usr/bin")
+        images = convert_from_path(file_path, dpi=200, fmt='jpeg', poppler_path=Config.POPPLER_PATH)
         logger.info(f"Figure supplement: rendering {len(images)} pages for {file_path}")
 
         supplemented = text
@@ -455,7 +455,7 @@ def _extract_pdf_vision(file_path: str) -> tuple:
 
         client = OpenAI(api_key=Config.OPENAI_API_KEY)
 
-        images = convert_from_path(file_path, dpi=200, fmt='jpeg', poppler_path="/usr/bin")
+        images = convert_from_path(file_path, dpi=200, fmt='jpeg', poppler_path=Config.POPPLER_PATH)
         page_count = len(images)
         logger.info(f"Vision extraction: converted {page_count} pages to images")
 
@@ -1410,24 +1410,31 @@ def process_and_index_documents_resumable(ta_id: str, progress_callback=None, re
     total_chunks_created = 0
     all_index_log_entries = []
     docs_with_content = 0
-    
+    docs_succeeded: list[dict] = []
+    docs_failed: list[dict] = []
+
     for doc_idx, doc_id in enumerate(doc_ids):
         absolute_doc_idx = docs_already_processed + doc_idx
-        
+
         doc = db.session.get(Document, doc_id)
         if not doc:
             logger.warning(f"[{ta_id}] Document {doc_id} not found, skipping")
+            docs_failed.append({
+                "doc_id": doc_id,
+                "filename": "<not found>",
+                "error": "Document row missing at index time — may have been deleted mid-run.",
+            })
             continue
-        
+
         logger.info(f"[{ta_id}] Processing document [{doc.id}]: {doc.original_filename} ({absolute_doc_idx + 1}/{total_docs})")
-        
+
         if progress_callback and total_docs > 0:
             progress = int((absolute_doc_idx / total_docs) * 80)
             progress_callback(ta_id, progress, docs_processed=absolute_doc_idx)
-        
+
         text = None
         page_count = 0
-        
+
         logger.info(f"[{ta_id}] [{doc.id}] Extracting text...")
         if doc.file_content:
             with tempfile.NamedTemporaryFile(delete=False, suffix=f".{doc.file_type}") as tmp_file:
@@ -1440,21 +1447,28 @@ def process_and_index_documents_resumable(ta_id: str, progress_callback=None, re
         elif os.path.exists(doc.storage_path):
             text, page_count = extract_text_from_file(doc.storage_path)
         else:
-            logger.warning(f"[{ta_id}] [{doc.id}] No file content available - document needs to be re-uploaded")
+            err = "No file content available — please re-upload this document."
+            logger.warning(f"[{ta_id}] [{doc.id}] {err}")
             doc.extraction_metadata = {
                 "_indexing_status": "extraction_failed",
-                "_error": "No file content available — please re-upload this document.",
+                "_error": err,
             }
             db_commit_with_retry(db)
+            docs_failed.append({"doc_id": doc.id, "filename": doc.original_filename, "error": err})
             continue
 
         if not text:
-            logger.warning(f"[{ta_id}] [{doc.id}] No text extracted")
+            err = (
+                f"Text extraction returned empty for .{doc.file_type or 'unknown'} file. "
+                f"The file may be corrupt, image-only, password-protected, or in an unsupported variant."
+            )
+            logger.warning(f"[{ta_id}] [{doc.id}] {err}")
             doc.extraction_metadata = {
                 "_indexing_status": "extraction_failed",
-                "_error": f"Text extraction returned empty for .{doc.file_type or 'unknown'} file. The file may be corrupt, image-only, password-protected, or in an unsupported variant.",
+                "_error": err,
             }
             db_commit_with_retry(db)
+            docs_failed.append({"doc_id": doc.id, "filename": doc.original_filename, "error": err})
             continue
         
         raw_text_length = len(text)
@@ -1556,16 +1570,21 @@ def process_and_index_documents_resumable(ta_id: str, progress_callback=None, re
             doc.last_indexed_at = now
             doc.updated_at = now
             db_commit_with_retry(db)
-            
+
             total_chunks_created += num_chunks
             docs_with_content += 1
+            docs_succeeded.append({
+                "doc_id": doc.id,
+                "filename": doc.original_filename,
+                "chunks": num_chunks,
+            })
             logger.info(f"[{ta_id}] [{doc.id}] Document fully indexed with {num_chunks} chunks")
-            
+
             for entry in doc_log_entries:
                 entry["has_embedding"] = True
                 entry["status"] = "success"
             all_index_log_entries.extend(doc_log_entries)
-                
+
         except Exception as doc_error:
             logger.error(f"[{ta_id}] [{doc.id}] Failed to embed/store chunks: {doc_error}")
             db.session.rollback()
@@ -1574,6 +1593,11 @@ def process_and_index_documents_resumable(ta_id: str, progress_callback=None, re
                 entry["status"] = "error"
                 entry["error_message"] = str(doc_error)[:500]
             all_index_log_entries.extend(doc_log_entries)
+            docs_failed.append({
+                "doc_id": doc.id,
+                "filename": doc.original_filename,
+                "error": f"Embedding/storage failed: {str(doc_error)[:300]}",
+            })
             raise
         
         if progress_callback:
@@ -1584,13 +1608,27 @@ def process_and_index_documents_resumable(ta_id: str, progress_callback=None, re
     if docs_with_content == 0:
         if is_resume:
             logger.info(f"[{ta_id}] No new documents to process - resumption complete")
-            return {"chunks_indexed": 0}
-        raise ValueError("No text content found in any documents")
-    
-    logger.info(f"[{ta_id}] Indexing complete! Total chunks: {total_chunks_created}")
-    
+            return {
+                "chunks_indexed": 0,
+                "docs_succeeded": docs_succeeded,
+                "docs_failed": docs_failed,
+            }
+        if not docs_failed:
+            raise ValueError("No text content found in any documents")
+        # All processed docs failed extraction; surface per-doc errors but don't crash the run.
+        logger.warning(f"[{ta_id}] All {len(docs_failed)} processed docs failed extraction")
+
+    logger.info(
+        f"[{ta_id}] Indexing complete! Total chunks: {total_chunks_created}, "
+        f"succeeded: {len(docs_succeeded)}, failed: {len(docs_failed)}"
+    )
+
     if all_index_log_entries:
         logger.info(f"[{ta_id}] Logging {len(all_index_log_entries)} index entries to Google Sheets...")
         log_index_batch(all_index_log_entries)
-    
-    return {"chunks_indexed": total_chunks_created}
+
+    return {
+        "chunks_indexed": total_chunks_created,
+        "docs_succeeded": docs_succeeded,
+        "docs_failed": docs_failed,
+    }

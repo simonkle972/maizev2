@@ -45,9 +45,13 @@ export FLASK_SKIP_DOTENV=1
 echo "🔄 Running database migrations..."
 flask db upgrade
 
-# Start Flask development server
+# Start Flask development server. Enable debug so app.py turns on auto-reload
+# (watches .py / template / static files; re-execs on change). Without this,
+# you'd have to manually kill + restart Flask after every code edit.
+export FLASK_DEBUG=true
+
 echo ""
-echo "🌐 Starting Flask dev server on http://localhost:5000"
+echo "🌐 Starting Flask dev server on http://localhost:5000 (auto-reload ON)"
 echo "   To create admin user, run: python seed_admin.py"
 echo "   Press Ctrl+C to stop"
 echo ""

@@ -174,6 +174,14 @@ def manage_ta(ta_id):
     today = datetime.utcnow().strftime('%Y-%m-%d')
     test_chat_used = session.get(f'tc_{ta_id}_{today}', 0)
 
+    # Re-index affordance: button styling + banner depend on whether anything
+    # actually needs indexing right now. Pending = docs uploaded but not yet
+    # indexed (`last_indexed_at IS NULL`). Warnings = prior run had per-doc
+    # failures that could be retried by a re-index.
+    pending_docs_count = sum(1 for d in documents if d.last_indexed_at is None)
+    indexing_warnings = ta.indexing_warnings or []
+    needs_reindex = pending_docs_count > 0 or len(indexing_warnings) > 0
+
     return render_template('professor/manage_ta.html',
                          ta=ta,
                          enrollment_url=enrollment_url,
@@ -182,7 +190,10 @@ def manage_ta(ta_id):
                          documents=documents,
                          tier_info=tier_info,
                          billing_tiers=Config.BILLING_TIERS,
-                         test_chat_used=test_chat_used)
+                         test_chat_used=test_chat_used,
+                         needs_reindex=needs_reindex,
+                         pending_docs_count=pending_docs_count,
+                         indexing_warnings=indexing_warnings)
 
 
 @professor_bp.route('/ta/<ta_id>/publish', methods=['GET', 'POST'])
@@ -1033,7 +1044,13 @@ def upload_document(ta_id):
 @professor_required
 @professor_owns_ta
 def update_document_metadata(ta_id, doc_id):
-    """Update document metadata (display_name, doc_type, unit_number)."""
+    """Update document metadata (display_name, doc_type, unit_number).
+
+    Also propagates the change to the denormalized copies on DocumentChunk rows
+    so the retriever sees the new metadata immediately without a re-index.
+    Chunk embeddings stay valid because they're built from chunk_text, not
+    metadata.
+    """
     doc = Document.query.filter_by(id=doc_id, ta_id=ta_id).first()
     if not doc:
         return jsonify({"error": "Document not found"}), 404
@@ -1050,6 +1067,15 @@ def update_document_metadata(ta_id, doc_id):
         value = data['instructional_unit_number']
         doc.instructional_unit_number = int(value) if value and value != '' else None
 
+    db.session.commit()
+
+    DocumentChunk.query.filter_by(ta_id=ta_id, document_id=doc.id).update({
+        "doc_type": doc.doc_type or "other",
+        "assignment_number": doc.assignment_number or "",
+        "instructional_unit_number": doc.instructional_unit_number or 0,
+        "instructional_unit_label": doc.instructional_unit_label or "",
+        "file_name": doc.display_name or doc.original_filename,
+    }, synchronize_session=False)
     db.session.commit()
 
     return jsonify({"success": True})
@@ -1090,8 +1116,15 @@ def delete_document(ta_id, doc_id):
 @professor_bp.route('/ta/<ta_id>/reindex', methods=['POST'])
 @professor_required
 @professor_owns_ta
+@limiter.limit("10 per hour")
 def reindex_ta(ta_id):
-    """Trigger indexing for TA."""
+    """Trigger indexing for TA.
+
+    Default is incremental — only docs with `last_indexed_at IS NULL` get
+    processed. Pass `?force=true` to wipe all chunks and rebuild from scratch
+    (useful as an escape hatch when the user suspects the corpus state is
+    out of sync with the indexed chunks).
+    """
     from app import run_indexing_task
 
     ta = TeachingAssistant.query.get(ta_id)
@@ -1104,6 +1137,8 @@ def reindex_ta(ta_id):
     if ta.indexing_status == 'running':
         return jsonify({"error": "Indexing is already in progress"}), 400
 
+    force = request.args.get('force', '').lower() in ('1', 'true', 'yes')
+
     # Cancel any existing jobs
     active_jobs = IndexingJob.query.filter(
         IndexingJob.ta_id == ta_id,
@@ -1114,29 +1149,57 @@ def reindex_ta(ta_id):
     if active_jobs:
         db.session.commit()
 
-    # Start indexing in background thread
-    thread = threading.Thread(target=run_indexing_task, args=(ta_id,))
+    # Clear stale warnings from the prior run so the UI doesn't show ghost failures.
+    ta.indexing_warnings = None
+    db.session.commit()
+
+    # Start indexing in background thread. is_resume=False triggers the full
+    # rebuild path (wipe chunks + reset last_indexed_at) inside the worker.
+    thread = threading.Thread(
+        target=run_indexing_task,
+        args=(ta_id,),
+        kwargs={"is_resume": not force},
+    )
     thread.daemon = True
     thread.start()
 
-    return jsonify({"success": True, "message": "Indexing started in the background"})
+    return jsonify({
+        "success": True,
+        "message": "Full re-index started in the background" if force else "Indexing started in the background",
+        "force": force,
+    })
 
 
 @professor_bp.route('/ta/<ta_id>/indexing-status', methods=['GET'])
 @professor_required
 @professor_owns_ta
 def indexing_status(ta_id):
-    """Get current indexing status for TA."""
+    """Get current indexing + UI state for TA.
+
+    Single source of truth for `refreshUIState()` in manage_ta.html. Returns
+    everything the front-end needs to render the banner / button / badge
+    without a full page reload after a state-changing action.
+    """
     ta = TeachingAssistant.query.get(ta_id)
     if not ta:
         return jsonify({"error": "TA not found"}), 404
+
+    pending_docs_count = Document.query.filter_by(
+        ta_id=ta_id
+    ).filter(Document.last_indexed_at.is_(None)).count()
+    warnings = ta.indexing_warnings or []
+    needs_reindex = pending_docs_count > 0 or len(warnings) > 0
 
     return jsonify({
         "status": ta.indexing_status,
         "progress": ta.indexing_progress or 0,
         "error": ta.indexing_error,
         "is_indexed": ta.is_indexed,
-        "indexed_at": ta.indexed_at.isoformat() if ta.indexed_at else None
+        "indexed_at": ta.indexed_at.isoformat() if ta.indexed_at else None,
+        "warnings": warnings,
+        "needs_reindex": needs_reindex,
+        "pending_docs_count": pending_docs_count,
+        "document_count": ta.document_count,
     })
 
 

@@ -400,13 +400,15 @@
                         <span style="color: #15803d;">Active</span>
                     {% endif %}
                 </p>
-                <p><strong>Documents:</strong> {{ documents|length }} uploaded</p>
+                <p><strong>Documents:</strong> <span id="ta-doc-count">{{ documents|length }}</span> uploaded</p>
                 <p><strong>Indexed:</strong>
+                    <span id="ta-indexed-badge">
                     {% if ta.is_indexed %}
                         <span style="color: #4caf50;">✓ Yes</span>
                     {% else %}
                         <span style="color: #ff9800;">✗ Not yet</span>
                     {% endif %}
+                    </span>
                 </p>
                 {% if ta.status != 'draft' %}
                 <p><strong>Enrolled:</strong> {{ ta.current_enrollment_count }} / {{ ta.max_students }} students</p>
@@ -542,10 +544,51 @@
                         {% endif %}
                     </div>
 
-                    <div style="margin-top: 24px;">
-                        <button type="button" id="reindex-btn" onclick="reindexTA()" class="btn btn-primary" {% if documents|length == 0 %}disabled{% endif %}>
-                            {% if ta.indexing_status == 'running' %}Indexing...{% elif ta.is_indexed %}Re-index Documents{% else %}Index Documents{% endif %}
-                        </button>
+                    {# Wrapper id="reindex-state-section": refreshUIState() re-renders this whole block from /indexing-status JSON after any state-changing action (metadata edit / upload / delete). The Jinja inside is the server-rendered initial state. #}
+                    <div id="reindex-state-section">
+                    {% if needs_reindex and ta.indexing_status != 'running' %}
+                        <div class="warning-banner" style="margin-top: 20px; background:#fef3c7; border-left:4px solid #d97706; padding: 12px 16px;">
+                            <strong>
+                                {% if pending_docs_count > 0 %}
+                                    {{ pending_docs_count }} document{{ 's' if pending_docs_count != 1 else '' }} pending indexing.
+                                {% endif %}
+                                {% if indexing_warnings|length > 0 %}
+                                    {{ indexing_warnings|length }} document{{ 's' if indexing_warnings|length != 1 else '' }} failed in the last run.
+                                {% endif %}
+                            </strong>
+                            <span style="color: #92400e;">Click <em>Re-index Documents</em> below to process.</span>
+                        </div>
+                    {% endif %}
+
+                    {% if indexing_warnings|length > 0 and ta.indexing_status != 'running' %}
+                        <details style="margin-top: 12px;">
+                            <summary style="cursor: pointer; color: #b91c1c; font-weight: 600;">View {{ indexing_warnings|length }} failed document{{ 's' if indexing_warnings|length != 1 else '' }}</summary>
+                            <ul style="margin: 8px 0 0 24px; color: #6b7280; font-size: 13px;">
+                                {% for w in indexing_warnings %}
+                                    <li><strong>{{ w.filename }}</strong> — {{ w.error }}</li>
+                                {% endfor %}
+                            </ul>
+                        </details>
+                    {% endif %}
+
+                    <div style="margin-top: 24px; display: flex; gap: 12px; align-items: center;">
+                        {% if ta.indexing_status == 'running' %}
+                            <button type="button" id="reindex-btn" class="btn btn-primary" disabled>Indexing…</button>
+                        {% elif needs_reindex %}
+                            <button type="button" id="reindex-btn" onclick="reindexTA(false)" class="btn btn-primary" {% if documents|length == 0 %}disabled{% endif %}>
+                                {% if not ta.is_indexed %}Index Documents{% else %}Re-index Documents{% if pending_docs_count > 0 %} ({{ pending_docs_count }} pending){% endif %}{% endif %}
+                            </button>
+                            <button type="button" id="force-reindex-btn" onclick="reindexTA(true)" class="btn btn-secondary" title="Wipe all indexed chunks and rebuild from scratch.">
+                                Force Full Re-index
+                            </button>
+                        {% else %}
+                            {# Nothing to re-index incrementally — only the force option remains. #}
+                            <button type="button" id="force-reindex-btn" onclick="reindexTA(true)" class="btn btn-secondary" {% if documents|length == 0 %}disabled{% endif %} title="Wipe all indexed chunks and rebuild from scratch. Use only if you suspect the index is corrupt or stale.">
+                                Force Full Re-index
+                            </button>
+                            <span style="color: #6b7280; font-size: 13px;">All documents are indexed. ✓</span>
+                        {% endif %}
+                    </div>
                     </div>
                 </div>
 
@@ -769,6 +812,12 @@
                 if (data.success) {
                     statusEl.textContent = '✓ Saved';
                     setTimeout(() => { statusEl.textContent = ''; }, 2000);
+                    // Refresh banner/button/badge state in-place. Metadata edits
+                    // shouldn't flip indexing state (per Bug 2 chunk-sync fix), so
+                    // visually nothing should change — but if SOMETHING does change
+                    // (e.g., we discover a hidden code path that flips is_indexed)
+                    // this surfaces it immediately, no manual reload required.
+                    refreshUIState();
                 } else {
                     statusEl.textContent = '✗ Error';
                 }
@@ -796,7 +845,15 @@
                 const data = await res.json();
 
                 if (data.success) {
-                    window.location.reload();
+                    // Remove the row from the table in-place, then refresh banner/badge state.
+                    // (Falls back to a reload if we somehow can't find the row.)
+                    const row = document.querySelector(`tr[data-doc-id="${docId}"]`);
+                    if (row) {
+                        row.remove();
+                        refreshUIState();
+                    } else {
+                        window.location.reload();
+                    }
                 } else {
                     alert('Error deleting document');
                 }
@@ -805,13 +862,121 @@
             }
         }
 
-        async function reindexTA() {
-            const btn = document.getElementById('reindex-btn');
-            btn.disabled = true;
-            btn.textContent = 'Starting indexing...';
+        // Single source of truth for "the user did something; re-render the
+        // indexing-related UI live." Called after every state-changing action
+        // (metadata edit, doc upload, doc delete) so the user doesn't need to
+        // manually reload to see fresh banner/button/badge state.
+        function escapeHtml(s) {
+            const div = document.createElement('div');
+            div.textContent = s == null ? '' : String(s);
+            return div.innerHTML;
+        }
+
+        function renderReindexStateSection(d) {
+            const docCount = d.document_count || 0;
+            const isRunning = d.status === 'running';
+            const warnings = d.warnings || [];
+            const needsReindex = !!d.needs_reindex;
+            const pending = d.pending_docs_count || 0;
+            const isIndexed = !!d.is_indexed;
+
+            let bannerHtml = '';
+            if (needsReindex && !isRunning) {
+                const pendingText = pending > 0
+                    ? `${pending} document${pending !== 1 ? 's' : ''} pending indexing. `
+                    : '';
+                const failedText = warnings.length > 0
+                    ? `${warnings.length} document${warnings.length !== 1 ? 's' : ''} failed in the last run. `
+                    : '';
+                bannerHtml = `
+                    <div class="warning-banner" style="margin-top: 20px; background:#fef3c7; border-left:4px solid #d97706; padding: 12px 16px;">
+                        <strong>${pendingText}${failedText}</strong>
+                        <span style="color: #92400e;">Click <em>Re-index Documents</em> below to process.</span>
+                    </div>
+                `;
+            }
+
+            let failedHtml = '';
+            if (warnings.length > 0 && !isRunning) {
+                const lis = warnings.map(w => `<li><strong>${escapeHtml(w.filename)}</strong> — ${escapeHtml(w.error)}</li>`).join('');
+                failedHtml = `
+                    <details style="margin-top: 12px;">
+                        <summary style="cursor: pointer; color: #b91c1c; font-weight: 600;">View ${warnings.length} failed document${warnings.length !== 1 ? 's' : ''}</summary>
+                        <ul style="margin: 8px 0 0 24px; color: #6b7280; font-size: 13px;">${lis}</ul>
+                    </details>
+                `;
+            }
+
+            let buttonsHtml;
+            if (isRunning) {
+                buttonsHtml = `<button type="button" id="reindex-btn" class="btn btn-primary" disabled>Indexing…</button>`;
+            } else if (needsReindex) {
+                const reindexLabel = !isIndexed
+                    ? 'Index Documents'
+                    : `Re-index Documents${pending > 0 ? ` (${pending} pending)` : ''}`;
+                const disabledAttr = docCount === 0 ? 'disabled' : '';
+                buttonsHtml = `
+                    <button type="button" id="reindex-btn" onclick="reindexTA(false)" class="btn btn-primary" ${disabledAttr}>${reindexLabel}</button>
+                    <button type="button" id="force-reindex-btn" onclick="reindexTA(true)" class="btn btn-secondary" title="Wipe all indexed chunks and rebuild from scratch.">Force Full Re-index</button>
+                `;
+            } else {
+                const disabledAttr = docCount === 0 ? 'disabled' : '';
+                buttonsHtml = `
+                    <button type="button" id="force-reindex-btn" onclick="reindexTA(true)" class="btn btn-secondary" ${disabledAttr} title="Wipe all indexed chunks and rebuild from scratch. Use only if you suspect the index is corrupt or stale.">Force Full Re-index</button>
+                    <span style="color: #6b7280; font-size: 13px;">All documents are indexed. ✓</span>
+                `;
+            }
+
+            return `${bannerHtml}${failedHtml}<div style="margin-top: 24px; display: flex; gap: 12px; align-items: center;">${buttonsHtml}</div>`;
+        }
+
+        async function refreshUIState() {
+            try {
+                const res = await fetch(`/professor/ta/${taId}/indexing-status`, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                if (!res.ok) return;
+                const d = await res.json();
+
+                // 1) TA-level Indexed badge in the info panel.
+                const badge = document.getElementById('ta-indexed-badge');
+                if (badge) {
+                    badge.innerHTML = d.is_indexed
+                        ? '<span style="color: #4caf50;">✓ Yes</span>'
+                        : '<span style="color: #ff9800;">✗ Not yet</span>';
+                }
+
+                // 2) Doc count text.
+                const docCountEl = document.getElementById('ta-doc-count');
+                if (docCountEl) docCountEl.textContent = String(d.document_count || 0);
+
+                // 3) Banner + buttons + failed-docs details (the whole reindex-state-section).
+                const section = document.getElementById('reindex-state-section');
+                if (section) section.innerHTML = renderReindexStateSection(d);
+            } catch (err) {
+                console.error('refreshUIState failed:', err);
+            }
+        }
+
+        async function reindexTA(force = false) {
+            if (force) {
+                const ok = confirm(
+                    'Force a full re-index?\n\nThis wipes all indexed chunks and rebuilds them from scratch. ' +
+                    'Use this if you suspect the index is corrupt or out-of-sync. The chat will continue to ' +
+                    'work during indexing.'
+                );
+                if (!ok) return;
+            }
+
+            const btn = document.getElementById(force ? 'force-reindex-btn' : 'reindex-btn');
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = force ? 'Starting force re-index…' : 'Starting indexing…';
+            }
 
             try {
-                const res = await fetch(`/professor/ta/${taId}/reindex`, {
+                const url = `/professor/ta/${taId}/reindex${force ? '?force=true' : ''}`;
+                const res = await fetch(url, {
                     method: 'POST',
                     headers: {
                         'X-Requested-With': 'XMLHttpRequest'
@@ -826,16 +991,20 @@
                 const data = await res.json();
 
                 if (data.success) {
-                    btn.textContent = 'Indexing...';
+                    if (btn) btn.textContent = 'Indexing…';
                     startPollingIndexingStatus();
                 } else {
-                    btn.textContent = 'Index Documents';
-                    btn.disabled = false;
+                    if (btn) {
+                        btn.textContent = force ? 'Force Full Re-index' : 'Index Documents';
+                        btn.disabled = false;
+                    }
                     alert('Error: ' + data.error);
                 }
             } catch (err) {
-                btn.textContent = 'Index Documents';
-                btn.disabled = false;
+                if (btn) {
+                    btn.textContent = force ? 'Force Full Re-index' : 'Index Documents';
+                    btn.disabled = false;
+                }
                 alert('Error: ' + err.message);
             }
         }
@@ -880,39 +1049,60 @@
 
         function updateIndexingStatus(data) {
             const container = document.getElementById('indexing-status-container');
-            const btn = document.getElementById('reindex-btn');
+            // Either button may not exist depending on TA state — only the one rendered for
+            // the current `needs_reindex` value is present. Guard each access.
+            const reindexBtn = document.getElementById('reindex-btn');
+            const forceBtn = document.getElementById('force-reindex-btn');
+            const setBtn = (text, disabled) => {
+                if (reindexBtn) { reindexBtn.textContent = text; reindexBtn.disabled = disabled; }
+                if (forceBtn) { forceBtn.disabled = disabled; }
+            };
+
+            const warnings = data.warnings || [];
+            const warningsHtml = warnings.length > 0 ? `
+                <details style="margin-top: 8px;">
+                    <summary style="cursor:pointer; color:#b91c1c; font-weight:600;">
+                        ${warnings.length} document${warnings.length !== 1 ? 's' : ''} failed
+                    </summary>
+                    <ul style="margin: 6px 0 0 24px; color:#6b7280; font-size:13px;">
+                        ${warnings.map(w => `<li><strong>${w.filename}</strong> — ${w.error}</li>`).join('')}
+                    </ul>
+                </details>
+            ` : '';
 
             if (data.status === 'running') {
                 container.innerHTML = `
                     <div class="indexing-status running">
-                        <strong>⏳ Indexing in progress...</strong>
+                        <strong>⏳ Indexing in progress…</strong>
                         <p>Progress: ${data.progress}%</p>
                     </div>
                 `;
-                btn.textContent = 'Indexing...';
-                btn.disabled = true;
+                setBtn('Indexing…', true);
             } else if (data.status === 'failed') {
                 container.innerHTML = `
                     <div class="indexing-status error">
                         <strong>✗ Indexing failed</strong>
                         <p>${data.error || 'Unknown error'}</p>
+                        ${warningsHtml}
                     </div>
                 `;
-                btn.textContent = 'Retry Indexing';
-                btn.disabled = false;
+                setBtn('Retry Indexing', false);
             } else if (data.is_indexed) {
+                const successMsg = warnings.length > 0
+                    ? `<strong>⚠️ Indexing completed with ${warnings.length} failure${warnings.length !== 1 ? 's' : ''}</strong>
+                       <p>Other documents were indexed successfully. Failed documents are listed below; the page will reload momentarily.</p>`
+                    : `<strong>✓ Indexing complete!</strong>
+                       <p>Your TA is ready to use. The enrollment link is now available.</p>`;
                 container.innerHTML = `
                     <div class="indexing-status">
-                        <strong>✓ Indexing complete!</strong>
-                        <p>Your TA is ready to use. The enrollment link is now available.</p>
+                        ${successMsg}
+                        ${warningsHtml}
                     </div>
                 `;
-                btn.textContent = 'Re-index Documents';
-                btn.disabled = false;
+                setBtn('Re-index Documents', false);
             } else {
                 container.innerHTML = '';
-                btn.textContent = 'Index Documents';
-                btn.disabled = false;
+                setBtn('Index Documents', false);
             }
         }
 

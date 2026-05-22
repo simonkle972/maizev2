@@ -23,6 +23,13 @@ class Config:
     LLM_MAX_COMPLETION_TOKENS = 16000
     VISION_MODEL = "gpt-4o"  # Image description tasks — no reasoning needed, far cheaper than gpt-5.2
 
+    # pdf2image needs to find `pdftoppm` from the poppler distribution. On the VPS,
+    # systemd restricts PATH so we must point at it explicitly (`POPPLER_PATH=/usr/bin`
+    # in the unit's Environment=). On macOS/Homebrew, leaving this unset makes
+    # pdf2image scan PATH and find /usr/local/bin/pdftoppm (Intel) or
+    # /opt/homebrew/bin/pdftoppm (Apple Silicon). Hardcoding /usr/bin broke local dev.
+    POPPLER_PATH = os.getenv("POPPLER_PATH") or None
+
     # Stripe Configuration
     USE_STRIPE_TEST_MODE = os.getenv('USE_STRIPE_TEST_MODE', 'True') == 'True'
 

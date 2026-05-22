@@ -884,21 +884,28 @@ def get_document_metadata(ta_id, doc_id):
 @app.route('/admin/api/tas/<ta_id>/documents/<int:doc_id>', methods=['PATCH'])
 @admin_api_required
 def update_document_metadata(ta_id, doc_id):
-    """Update document metadata (display_name, doc_type, unit_number) before indexing."""
+    """Update document metadata (display_name, doc_type, unit_number).
+
+    Also propagates the change to the denormalized copies on DocumentChunk rows
+    so the retriever sees the new metadata immediately without a re-index.
+    Chunk embeddings stay valid because they're built from chunk_text, not
+    metadata. This mirrors the equivalent fix on the professor route
+    (professor.update_document_metadata).
+    """
     doc = Document.query.filter_by(id=doc_id, ta_id=ta_id).first()
     if not doc:
         return jsonify({"error": "Document not found"}), 404
-    
+
     data = request.json
-    
+
     if "display_name" in data:
         doc.display_name = data["display_name"].strip() if data["display_name"] else doc.original_filename
-    
+
     if "doc_type" in data:
         valid_doc_types = ["homework", "exam", "lecture", "reading", "syllabus", "other"]
         if data["doc_type"] in valid_doc_types or data["doc_type"] is None:
             doc.doc_type = data["doc_type"]
-    
+
     if "unit_number" in data:
         if data["unit_number"] is None or data["unit_number"] == "":
             doc.instructional_unit_number = None
@@ -907,15 +914,23 @@ def update_document_metadata(ta_id, doc_id):
                 doc.instructional_unit_number = int(data["unit_number"])
             except (ValueError, TypeError):
                 pass
-    
+
     if "assignment_number" in data:
         doc.assignment_number = data["assignment_number"] if data["assignment_number"] else None
-    
-    ta = TeachingAssistant.query.get(ta_id)
-    if ta:
-        ta.is_indexed = False
-        ta.indexing_status = None
-    
+
+    db.session.commit()
+
+    # Propagate metadata change to the chunk rows so retrieval / chat keep
+    # working without forcing a re-index. (Previously this route flipped
+    # ta.is_indexed=False, which broke chat with a 400 until the user
+    # re-indexed — see app.py:1399 chat-stream gate.)
+    DocumentChunk.query.filter_by(ta_id=ta_id, document_id=doc.id).update({
+        "doc_type": doc.doc_type or "other",
+        "assignment_number": doc.assignment_number or "",
+        "instructional_unit_number": doc.instructional_unit_number or 0,
+        "instructional_unit_label": doc.instructional_unit_label or "",
+        "file_name": doc.display_name or doc.original_filename,
+    }, synchronize_session=False)
     db.session.commit()
     
     return jsonify({
@@ -1004,27 +1019,41 @@ def run_indexing_task(ta_id, job_id=None, is_resume=True):
                 update_indexing_progress(ta_id, progress, job_id, docs_processed, chunks_created)
             
             result = process_and_index_documents_resumable(
-                ta_id, 
+                ta_id,
                 progress_callback=progress_with_job,
                 resume_from_doc_id=is_resume  # Pass is_resume flag to trigger resume logic
             )
-            
+
             db.session.expire_all()
             ta = TeachingAssistant.query.get(ta_id)
-            ta.is_indexed = True
+            # `is_indexed` reflects whether the TA has any usable chunks at all.
+            # Force-rebuild that wipes chunks then has every doc fail extraction would
+            # otherwise leave is_indexed=True with zero chunks — misleading state.
+            from models import DocumentChunk
+            chunk_count = DocumentChunk.query.filter_by(ta_id=ta_id).count()
+            ta.is_indexed = chunk_count > 0
             ta.indexed_at = datetime.utcnow()
             ta.indexing_status = 'completed'
             ta.indexing_progress = 100
+            # Persist per-doc failure summary so the manage_ta UI can surface it.
+            # None = no failures (clear stale warnings from prior runs); list = current run's failures.
+            docs_failed = result.get('docs_failed') or []
+            ta.indexing_warnings = docs_failed if docs_failed else None
             db.session.commit()
-            
+
             job = IndexingJob.query.get(job_id)
             if job:
                 job.status = 'completed'
                 job.completed_at = datetime.utcnow()
                 job.chunks_created = result.get('chunks_indexed', 0)
                 db.session.commit()
-            
-            logger.info(f"[{ta_id}] Indexing completed successfully: {result.get('chunks_indexed', 0)} chunks")
+
+            n_ok = len(result.get('docs_succeeded') or [])
+            n_fail = len(docs_failed)
+            logger.info(
+                f"[{ta_id}] Indexing completed: {result.get('chunks_indexed', 0)} chunks, "
+                f"{n_ok} docs succeeded, {n_fail} docs failed"
+            )
             
         except Exception as e:
             error_msg = str(e)
