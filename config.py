@@ -30,6 +30,21 @@ class Config:
     # /opt/homebrew/bin/pdftoppm (Apple Silicon). Hardcoding /usr/bin broke local dev.
     POPPLER_PATH = os.getenv("POPPLER_PATH") or None
 
+    # Phase A retrieval refactor (gap analysis 2026-05-22). When True, retrieve_context
+    # uses the new pre-stage query rewriter + hybrid Stage 1 + intent classifier path.
+    # When False, falls back to the legacy analyze_query() regex + fuzzy filename matcher.
+    # Default False; flip to True after verifying via the eval harness.
+    RETRIEVAL_V2_ENABLED = os.getenv("RETRIEVAL_V2_ENABLED", "false").lower() == "true"
+
+    # Phase A retrieval refactor. RRF k constant for reciprocal rank fusion in hybrid
+    # Stage 1. Standard default is 60; lower values bias toward top-ranked items in
+    # each list. See https://blog.serghei.pl/posts/reciprocal-rank-fusion-explained/.
+    RRF_K = int(os.getenv("RRF_K", "60"))
+
+    # Phase A retrieval refactor. Top-K candidate documents Stage 1 returns. Stage 2
+    # (chunk retrieval) is constrained to chunks from these documents.
+    STAGE_1_TOP_K_DOCS = int(os.getenv("STAGE_1_TOP_K_DOCS", "5"))
+
     # Stripe Configuration
     USE_STRIPE_TEST_MODE = os.getenv('USE_STRIPE_TEST_MODE', 'True') == 'True'
 

@@ -1,6 +1,7 @@
 from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.dialects.postgresql import TSVECTOR
 from pgvector.sqlalchemy import Vector
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -189,6 +190,17 @@ class Document(db.Model):
     content_title = db.Column(db.String(512), nullable=True)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     last_indexed_at = db.Column(db.DateTime, nullable=True)
+    # Phase A retrieval refactor (gap analysis 2026-05-22). doc_role replaces
+    # doc_type as the PRIMARY semantic axis for retrieval. doc_type stays for
+    # backward-compat / UI continuity but is no longer load-bearing. One of:
+    # 'problem' | 'solution' | 'lecture' | 'syllabus' | 'reference' | 'other'.
+    doc_role = db.Column(db.String(32), nullable=True)
+    # {'source': 'auto'|'professor', 'confidence': float, 'classified_at': iso, 'rationale': str}
+    doc_role_provenance = db.Column(db.JSON, nullable=True)
+    # BM25 (full-text search) tsvector over the document's extracted text.
+    # Substrate for the hybrid Stage 1 retrieval (BM25 + dense + RRF).
+    # Indexed with GIN — see the migration. Populated by the indexing pipeline.
+    bm25_tsvector = db.Column(TSVECTOR, nullable=True)
 
 class ChatSession(db.Model):
     __tablename__ = 'chat_sessions'
@@ -250,6 +262,11 @@ class DocumentChunk(db.Model):
     instructional_unit_number = db.Column(db.Integer, nullable=True)
     instructional_unit_label = db.Column(db.String(64), nullable=True)
     file_name = db.Column(db.String(512), nullable=True)
+    # Phase A retrieval refactor (gap analysis 2026-05-22). Denormalized copy of
+    # Document.doc_role so retrieval can filter chunks without joining back to
+    # documents. Synced via the same metadata-edit paths as the other
+    # denormalized columns (display_name, doc_type, assignment_number, etc.).
+    doc_role = db.Column(db.String(32), nullable=True)
     embedding = db.Column(Vector(1536), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
