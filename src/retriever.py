@@ -693,14 +693,22 @@ def llm_rerank(query: str, chunks: list, top_k: int = FINAL_K) -> tuple:
     rerank_start = time.time()
     
     preview_len = 300 if len(chunks) > 15 else 400
-    
+
+    # Phase A Stage 4 (research 2026-05-22): each candidate includes its
+    # doc_category — the per-TA configurable classification slug (e.g.
+    # "quizzes", "problem_sets", "solutions"). The reranker uses this as
+    # text context, not a filter. When a student asks about "problem set 2",
+    # a chunk tagged [problem_sets] should win over one tagged [solutions]
+    # or [quizzes] even if dense similarity is comparable.
     chunk_summaries = []
     for i, chunk in enumerate(chunks):
         text_preview = chunk["text"][:preview_len].replace("\n", " ").strip()
-        chunk_summaries.append(f"[{i}] {chunk['file_name']}: {text_preview}...")
-    
+        cat = chunk.get("doc_category")
+        cat_tag = f"[category: {cat}] " if cat else ""
+        chunk_summaries.append(f"[{i}] {cat_tag}{chunk['file_name']}: {text_preview}...")
+
     chunks_text = "\n\n".join(chunk_summaries)
-    
+
     prompt = f"""You are a teaching assistant helping match student queries to course material chunks.
 
 STUDENT QUERY: "{query}"
@@ -708,14 +716,16 @@ STUDENT QUERY: "{query}"
 CANDIDATE CHUNKS (numbered 0 to {len(chunks)-1}):
 {chunks_text}
 
+Each chunk is annotated with [category: <slug>] indicating what kind of document it comes from — the professor configured these categories for this course (examples: "quizzes", "homeworks", "problem_sets", "exams", "lectures", "solutions", "syllabus", "readings"). Use the category alongside the filename and text content. When a student asks for help with "problem set 2", chunks tagged [category: problem_sets] are much more likely to be the right primary source than chunks tagged [category: quizzes] or [category: solutions] — even if they overlap in topic. The category is a strong signal but not a hard filter; combine it with the text content and filename.
+
 TASK: Score each chunk's relevance to the SPECIFIC query on a scale of 0-10.
 - Pay close attention to specific problem/question numbers (e.g., "problem 2f" means ONLY 2f, not 2d or 3f)
 - NUMBER FORMAT EQUIVALENCE: Treat Roman numerals and Arabic numbers as equivalent when matching:
   * "Section 1" = "Section I", "Part 2" = "Part II", "Question 3" = "Question III"
   * "a)" = "(a)" = "a." for sub-parts
   * Match content by meaning, not exact formatting
-- Score 10 = chunk directly contains the answer or exact problem referenced
-- Score 5 = chunk is related but doesn't have the specific content
+- Score 10 = chunk directly contains the answer or exact problem referenced AND the category matches the student's intent
+- Score 5 = chunk is related but doesn't have the specific content, OR the category is mismatched (e.g. solutions when student is solving)
 - Score 0 = chunk is irrelevant
 
 Return a JSON object with:
@@ -2330,6 +2340,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         DocumentChunk.chunk_text,
         DocumentChunk.file_name,
         DocumentChunk.doc_type,
+        DocumentChunk.doc_category,  # Phase A Stage 4 — surfaced to reranker as text context
         DocumentChunk.assignment_number,
         DocumentChunk.instructional_unit_number,
         DocumentChunk.instructional_unit_label,
@@ -2463,19 +2474,20 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
     
     for i, row in enumerate(results):
         score = float(row.score) if row.score else 0.0
-        
+
         initial_chunks.append({
             "text": row.chunk_text,
             "score": score,
             "file_name": row.file_name or "unknown",
             "doc_type": row.doc_type or "other",
+            "doc_category": row.doc_category,  # Phase A Stage 4
             "metadata": {
                 "assignment_number": row.assignment_number,
                 "instructional_unit_number": row.instructional_unit_number,
                 "instructional_unit_label": row.instructional_unit_label
             }
         })
-    
+
     # STRUCTURAL INJECTION: When query references a specific slide/page number,
     # directly fetch chunks by chunk_context metadata and inject them into results.
     # This ensures positional queries ("slide 11", "page 7") always find the right content,
@@ -2492,6 +2504,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
             DocumentChunk.chunk_text,
             DocumentChunk.file_name,
             DocumentChunk.doc_type,
+            DocumentChunk.doc_category,  # Phase A Stage 4
             DocumentChunk.assignment_number,
             DocumentChunk.instructional_unit_number,
             DocumentChunk.instructional_unit_label,
@@ -2522,6 +2535,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                         "score": 10.0,  # High score to survive reranking
                         "file_name": row.file_name or "unknown",
                         "doc_type": row.doc_type or "other",
+                        "doc_category": row.doc_category,  # Phase A Stage 4
                         "metadata": {
                             "assignment_number": row.assignment_number,
                             "instructional_unit_number": row.instructional_unit_number,
