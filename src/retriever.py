@@ -402,6 +402,57 @@ FINAL_K = 8
 SUPPLEMENTARY_K = 4
 ASSIGNMENT_DOC_TYPES = {"homework", "exam"}
 
+
+# Patterns that identify a SPECIFIC document by its number in the query.
+# Each entry is (regex_with_one_capture_group, category_hint_slug). Category
+# hints assume the default Stage 2B seed slugs (lectures, labs, quizzes,
+# problem_sets, extra_problems, homeworks, exams).
+#
+# Distinguishing principle: these patterns capture the DOC number ("lecture 4",
+# "quiz 3", "pset 2"), NOT sub-part references like "question 1" or "problem 2"
+# — those mean a chunk inside the doc, not the doc itself. Used by Stage 5
+# short-circuit (hybrid_doc_search) AND the cache-switch heuristic (B8).
+DOC_NUMBER_PATTERNS = [
+    (r'\b(?:interactive\s+|pre[- ]?recorded\s+)?lecture\s+(\d{1,3})\b', "lectures"),
+    (r'\blab\s+(\d{1,3})\b', "labs"),
+    (r'\bquiz\s+(\d{1,3})\b', "quizzes"),
+    (r'\bextra\s+(?:problem\s+set|problems?)\s+#?(\d{1,3})\b', "extra_problems"),
+    (r'\b(?:problem\s+set|pset)\s+#?(\d{1,3})\b', "problem_sets"),
+    (r'\b(?:homework|hw|assignment)\s+#?(\d{1,3})\b', "homeworks"),
+    (r'\b(20\d{2})\s+(?:final|midterm|exam)\b', "exams"),
+    (r'\b(?:final|midterm|exam)\s+(?:from|of)\s+(20\d{2})\b', "exams"),
+]
+
+
+def extract_doc_routing_hints(query: str) -> list:
+    """Extract all (doc_number, category_hint) pairs the query names.
+
+    Uses re.findall so multi-doc queries like "compare lecture 3 and lecture 4"
+    return BOTH numbers, not just the first. Used by:
+      - Stage 5 short-circuit (single-doc route when len==1)
+      - Cache-switch heuristic (force flush on multi-doc OR single-doc mismatch)
+
+    Returns a deduped list preserving first-occurrence order:
+      "what do lecture 3 and lecture 4 cover?" → [("3", "lectures"), ("4", "lectures")]
+      "now help me with quiz 3 and pset 2"     → [("3", "quizzes"), ("2", "problem_sets")]
+      "what is lecture 4 about?"               → [("4", "lectures")]
+      "is 3 a prime number?"                   → []  (no DOC pattern match — bare "3" doesn't count)
+      "explain question 2"                     → []  ("question N" is a sub-part, not a doc)
+    """
+    if not query:
+        return []
+    query_lower = query.lower()
+    seen = set()
+    hints = []
+    for pattern, category_hint in DOC_NUMBER_PATTERNS:
+        for m in re.finditer(pattern, query_lower):
+            number = m.group(1)
+            key = (number, category_hint)
+            if key not in seen:
+                seen.add(key)
+                hints.append(key)
+    return hints
+
 # Boilerplate phrases to strip from problem text before concept extraction
 _PROBLEM_BOILERPLATE = re.compile(
     r'\b(?:true\s+or\s+false|explain\s+your\s+(?:response|answer)|'
@@ -1263,42 +1314,31 @@ def hybrid_doc_search(query: str, query_embedding: list, ta_id: str, top_k: int 
     if filename_scored:
         threshold = Config.FILENAME_DIRECT_MATCH_THRESHOLD
 
-        # Extract (number, category_hint) from the query. The number is the
-        # DOC number (not a sub-part like "question 1"). The category_hint maps
-        # the query's doc noun ("lecture", "lab", "quiz", "problem set") to one
-        # of the TA's configured doc_category slugs from Stage 2B.
-        #
-        # Why both: filename token overlap alone can't distinguish "pset03"
-        # (one token) from query "problem set 3" (two tokens). But
-        # doc_category='problem_sets' + assignment_number=3 narrows the corpus
-        # to exactly one doc with a direct DB lookup. The category hint also
-        # disambiguates "quiz 3" → the quiz itself (category=quizzes), not
-        # the "Quiz 3 solutions" doc (category=solutions).
-        import re as _re
-        # Each pattern emits (number, category_hint). Category hints assume the
-        # default Stage 2B seed slugs (lectures, labs, quizzes, problem_sets,
-        # extra_problems, homeworks, exams). If a TA renamed these, the lookup
-        # still works through the slug equivalence — only the hint name needs
-        # to match what the TA chose.
-        DOC_NUMBER_PATTERNS = [
-            (r'\b(?:interactive\s+|pre[- ]?recorded\s+)?lecture\s+(\d{1,3})\b', "lectures"),
-            (r'\blab\s+(\d{1,3})\b', "labs"),
-            (r'\bquiz\s+(\d{1,3})\b', "quizzes"),
-            (r'\bextra\s+(?:problem\s+set|problems?)\s+#?(\d{1,3})\b', "extra_problems"),
-            (r'\b(?:problem\s+set|pset)\s+#?(\d{1,3})\b', "problem_sets"),
-            (r'\b(?:homework|hw|assignment)\s+#?(\d{1,3})\b', "homeworks"),
-            (r'\b(20\d{2})\s+(?:final|midterm|exam)\b', "exams"),
-            (r'\b(?:final|midterm|exam)\s+(?:from|of)\s+(20\d{2})\b', "exams"),
-        ]
-        query_lower = (query or "").lower()
-        query_number = None
-        category_hint = None
-        for pat, hint in DOC_NUMBER_PATTERNS:
-            m = _re.search(pat, query_lower)
-            if m:
-                query_number = m.group(1)
-                category_hint = hint
-                break
+        # Extract all (doc_number, category_hint) pairs the query names.
+        # See extract_doc_routing_hints() docstring for semantics — uses the
+        # shared DOC_NUMBER_PATTERNS, also consumed by the cache-switch
+        # heuristic (B8) so multi-doc detection is consistent across both.
+        all_hints = extract_doc_routing_hints(query)
+
+        # MULTI-DOC QUERIES SUPPRESS THE SHORT-CIRCUIT.
+        # When the student names 2+ distinct docs ("compare lecture 3 and
+        # lecture 4"), the short-circuit MUST NOT route to one of them —
+        # we want the full RRF + chunk vector search so chunks from BOTH
+        # docs reach the reranker. Skip Path A/B/C; let RRF run.
+        distinct_numbers = {n for n, _ in all_hints}
+        if len(distinct_numbers) >= 2:
+            diagnostics["short_circuit"] = {
+                "fired": False,
+                "reason": "multi_doc_query_suppressed",
+                "hints": all_hints,
+            }
+            # Fall through to RRF below.
+            query_number = None
+            category_hint = None
+        else:
+            # Single-doc (or no doc) path — preserve existing behavior.
+            query_number = all_hints[0][0] if all_hints else None
+            category_hint = all_hints[0][1] if all_hints else None
 
         # Fallback: year-only query
         if query_number is None and query_analysis:
@@ -1379,8 +1419,12 @@ def hybrid_doc_search(query: str, query_embedding: list, ta_id: str, top_k: int 
                     sc_doc_id = top_match[0]
                     sc_reason = "number_match_with_margin"
 
-        # ---- Path C: margin-only (when query has no number) ----
-        if sc_doc_id is None and query_number is None:
+        # ---- Path C: margin-only (when query has no number AND isn't multi-doc) ----
+        # Suppressed on multi-doc queries: we already set query_number=None above
+        # in that branch to skip Path A/B, but we DON'T want Path C to fire with
+        # a margin pick of one of the named docs and ignore the others. Check
+        # distinct_numbers length to skip cleanly.
+        if sc_doc_id is None and query_number is None and len(distinct_numbers) < 2:
             top_doc_id, top_score = filename_scored[0][0], filename_scored[0][1]
             runner_up = filename_scored[1][1] if len(filename_scored) > 1 else 0.0
             margin = top_score - runner_up
@@ -1401,12 +1445,18 @@ def hybrid_doc_search(query: str, query_embedding: list, ta_id: str, top_k: int 
             logger.info(f"[{ta_id}] hybrid_doc_search SHORT-CIRCUIT: doc_id={sc_doc_id} reason={sc_reason} query_number={query_number}")
             return [sc_doc_id], diagnostics
         else:
-            diagnostics["short_circuit"] = {
-                "fired": False,
-                "query_number": query_number,
-                "top_filename_score": round(filename_scored[0][1], 3),
-                "top_filename_doc_id": filename_scored[0][0],
-            }
+            # Preserve the multi_doc_query_suppressed reason if it was set earlier;
+            # otherwise record a generic miss.
+            existing = diagnostics.get("short_circuit") or {}
+            if existing.get("reason") == "multi_doc_query_suppressed":
+                pass  # keep the multi-doc reason
+            else:
+                diagnostics["short_circuit"] = {
+                    "fired": False,
+                    "query_number": query_number,
+                    "top_filename_score": round(filename_scored[0][1], 3),
+                    "top_filename_doc_id": filename_scored[0][0],
+                }
 
     # ---- BM25 ranking over Document.bm25_tsvector ----
     # Using plainto_tsquery (sanitizes & ANDs the query terms) so we don't have to
@@ -2276,6 +2326,58 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         cached_filename = (session_context.get("document_filename") or "").lower()
         cached_problem = (session_context.get("problem_reference") or "").lower()
 
+        # MULTI-DOC + EXPLICIT-DOC-NAMED SWITCH DETECTION (Stage 5 Step 2 — quick cache-stickiness fix).
+        # The contextualizer is biased toward "continuation" and routinely overrides
+        # the heuristic, preserving cache when the student named a different doc.
+        # Using the shared DOC_NUMBER_PATTERNS (also used by hybrid_doc_search Stage 5
+        # short-circuit), detect:
+        #   (a) Multi-doc query (≥2 distinct doc numbers named) → force switch always.
+        #       Cache is single-doc, so it can't serve a multi-doc query correctly.
+        #   (b) Single-doc query naming a number different from cached → force switch.
+        # When force_topic_switch is True, the contextualizer's "continuation" verdict
+        # cannot override the heuristic. The contextualizer can still flip from
+        # non-switch to switch via "pivot" intent (override is one-directional once
+        # force is on).
+        force_topic_switch = False
+        force_topic_switch_reason = None
+        cached_doc_num = None
+        cached_doc_category = None
+        try:
+            query_hints = extract_doc_routing_hints(query)
+            distinct_query_numbers = {n for n, _ in query_hints}
+            if len(distinct_query_numbers) >= 2:
+                force_topic_switch = True
+                force_topic_switch_reason = f"multi_doc_query: {sorted(distinct_query_numbers)}"
+            elif len(distinct_query_numbers) == 1:
+                # Compare against the cached doc — look up its number + category from the DB.
+                from models import Document as _Doc
+                cached_doc = _Doc.query.filter_by(
+                    ta_id=ta_id,
+                    original_filename=session_context.get("document_filename") or "",
+                ).first()
+                if not cached_doc:
+                    cached_doc = _Doc.query.filter_by(
+                        ta_id=ta_id,
+                        display_name=session_context.get("document_filename") or "",
+                    ).first()
+                if cached_doc:
+                    cached_doc_category = cached_doc.doc_category
+                    cached_doc_num = None
+                    if cached_doc.assignment_number is not None:
+                        cached_doc_num = str(cached_doc.assignment_number).lstrip("0") or "0"
+                    elif cached_doc.instructional_unit_number is not None:
+                        cached_doc_num = str(cached_doc.instructional_unit_number).lstrip("0") or "0"
+                    query_num = next(iter(distinct_query_numbers))
+                    query_num_normalized = str(query_num).lstrip("0") or "0"
+                    if cached_doc_num is not None and query_num_normalized != cached_doc_num:
+                        force_topic_switch = True
+                        force_topic_switch_reason = (
+                            f"single_doc_switch: query_number={query_num_normalized} "
+                            f"vs cached_number={cached_doc_num}"
+                        )
+        except Exception as e:
+            logger.warning(f"[{ta_id}] force_topic_switch detection failed: {e}; falling back to existing heuristic + contextualizer")
+
         query_doc_type = (query_analysis.get("doc_type_filter") or "").lower()
         query_filename = (query_analysis.get("filename_filter") or "").lower()
         query_problem = query_analysis.get("problem_reference", {})
@@ -2323,8 +2425,16 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         # CONTEXTUALIZER OVERRIDE: when the LLM-classified intent is available and confident,
         # it takes precedence over the above heuristics. This is what fixes the class of bugs
         # where concept mentions (e.g., "money supply") were triggering false topic switches.
+        # EXCEPTION (Stage 5 Step 2): when force_topic_switch is True (multi-doc query OR
+        # explicit doc-name mismatch via DOC_NUMBER_PATTERNS), the contextualizer cannot
+        # preserve cache. Override is one-directional: contextualizer can still escalate
+        # (continuation → pivot via heuristic), but can't de-escalate force.
         heuristic_decision = is_topic_switch
-        if contextualizer_worked:
+        if force_topic_switch:
+            is_topic_switch = True
+            diagnostics["cache_action"] = f"force_switch_{force_topic_switch_reason}"
+            logger.info(f"[{ta_id}] FORCE topic switch: {force_topic_switch_reason} (overrides contextualizer)")
+        elif contextualizer_worked:
             intent = ctx_result["intent"]
             if intent == "pivot":
                 if not heuristic_decision:
