@@ -1,6 +1,8 @@
 # Maize TA — Phase A Retrieval Refactor Implementation Plan
 
-**Created:** 2026-05-22 · **Last updated:** 2026-05-22 (Stage 2B added — design correction from enum to per-TA configurable categories) · **Grounded in:** [gap analysis 2026-05-22](maize-retrieval-gap-analysis-2026-05-22.md) which is grounded in [parked retrieval plan](maize-retrieval-redesign-plan.md). Read those first if you arrived here cold.
+**Created:** 2026-05-22 · **Last updated:** 2026-05-23 (architecture review in flight — see below) · **Grounded in:** [gap analysis 2026-05-22](maize-retrieval-gap-analysis-2026-05-22.md) which is grounded in [parked retrieval plan](maize-retrieval-redesign-plan.md). Read those first if you arrived here cold.
+
+> **Architecture review in flight as of 2026-05-23** — see [maize-architecture-review-2026-05-23.md](maize-architecture-review-2026-05-23.md). Findings may trigger changes that supersede or extend the Phase A stages below.
 
 ## Context
 
