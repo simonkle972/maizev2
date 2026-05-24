@@ -45,6 +45,14 @@ class Config:
     # (chunk retrieval) is constrained to chunks from these documents.
     STAGE_1_TOP_K_DOCS = int(os.getenv("STAGE_1_TOP_K_DOCS", "5"))
 
+    # Phase A Stage 5. Pre-fusion direct-match short-circuit in hybrid_doc_search.
+    # When the query has a high-confidence singular filename match (e.g. names
+    # a specific lecture or pset clearly), skip RRF and return that doc only.
+    # See attached_assets/maize-retrieval-residual-failures-research-2026-05-22.md
+    # for the design rationale (Q1+Q2 verdicts). Threshold + margin env-tunable.
+    FILENAME_DIRECT_MATCH_THRESHOLD = float(os.getenv("FILENAME_DIRECT_MATCH_THRESHOLD", "0.7"))
+    FILENAME_DIRECT_MATCH_MARGIN = float(os.getenv("FILENAME_DIRECT_MATCH_MARGIN", "0.15"))
+
     # Stripe Configuration
     USE_STRIPE_TEST_MODE = os.getenv('USE_STRIPE_TEST_MODE', 'True') == 'True'
 
@@ -104,7 +112,10 @@ class Config:
     import re as _re
     _sheet_match = _re.search(r'/spreadsheets/d/([a-zA-Z0-9_-]+)', _raw_sheet)
     QA_LOG_SHEET_ID = _sheet_match.group(1) if _sheet_match else _raw_sheet
-    QA_LOG_TAB_NAME = "qa_logs_v2"
+    # Tab name is env-configurable so local dev can write to a separate tab
+    # (e.g. "dev_logs") in the same shared sheet without polluting the prod
+    # qa_logs_v2 tab. Production leaves it unset → defaults to qa_logs_v2.
+    QA_LOG_TAB_NAME = os.getenv("qa_log_tab_name", "qa_logs_v2")
     INDEX_LOG_TAB_NAME = "index_logs_v2"
     
     HYBRID_RETRIEVAL_ENABLED = True

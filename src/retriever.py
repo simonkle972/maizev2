@@ -1117,22 +1117,28 @@ def detect_pasted_question(
     }
 
 
-def hybrid_doc_search(query: str, query_embedding: list, ta_id: str, top_k: int = None) -> tuple:
-    """Stage 1 hybrid document-level retrieval (Phase A Stage 3).
+def hybrid_doc_search(query: str, query_embedding: list, ta_id: str, top_k: int = None, query_analysis: dict = None) -> tuple:
+    """Stage 1 hybrid document-level retrieval (Phase A Stage 3 + Stage 5).
 
-    Fuses THREE independent rankings via Reciprocal Rank Fusion:
-      1. BM25 over Document.bm25_tsvector (PostgreSQL plainto_tsquery + ts_rank).
-      2. Dense: cosine similarity between query_embedding and each document's
-         top-N chunk embeddings, mean-pooled per document.
-      3. Filename: token-overlap between query and Document.original_filename
-         (carried over from the legacy fuzzy matcher, used as a SOFT signal
-         here — eval showed BM25+dense alone regressed cases where the
-         filename was the disambiguator, e.g. "Interactive Lecture 5" vs
-         "Lecture 6"). No hard filter; just one more weak signal that RRF
-         fuses with the other two.
+    Two-phase routing:
+      0. DIRECT-MATCH SHORT-CIRCUIT (Stage 5, added 2026-05-23). When a query has a
+         confident singular filename match, skip RRF and return that single doc.
+         All guards must hold: top filename-overlap score ≥ Config.FILENAME_DIRECT_MATCH_THRESHOLD,
+         margin over runner-up ≥ Config.FILENAME_DIRECT_MATCH_MARGIN, AND (if the query
+         contains a number) it matches the top doc's assignment_number or
+         instructional_unit_number. Recovers the high-precision routing the legacy
+         hard-filter cascade gave us, without the doc_type/assignment cross-coupling
+         that caused Type A failures. See attached_assets/maize-retrieval-residual-failures-research-2026-05-22.md
+         (Q1+Q2 verdicts) and maize-retrieval-top-of-funnel-research-2026-05-23.md.
 
-    RRF score per doc = sum over rankings of 1 / (RRF_K + rank). Top-k documents
-    by fused score are returned.
+      1. RRF FUSION (Stage 3 default). Three independent rankings fused via RRF:
+         a. BM25 over Document.bm25_tsvector (plainto_tsquery + ts_rank).
+         b. Dense: cosine similarity between query_embedding and each document's
+            top-N chunk embeddings, mean-pooled per document.
+         c. Filename: token-overlap between query and Document.original_filename.
+
+         RRF score per doc = sum over rankings of 1 / (RRF_K + rank). Top-k documents
+         by fused score are returned.
 
     Replaces the regex + fuzzy filename matcher + hard SQL filter that
     analyze_query() drives. doc_type / assignment_number are NOT used as
@@ -1140,19 +1146,22 @@ def hybrid_doc_search(query: str, query_embedding: list, ta_id: str, top_k: int 
     "econometrics quiz 2" because both were tagged doc_type='homework'.
 
     Grounded in: VersionRAG (arXiv 2510.08109) + Serghei + OpenSearch RRF docs.
-    See attached_assets/maize-retrieval-phase-a-implementation-plan-2026-05-22.md
-    Stage 3.
 
     Args:
         query: the rewritten/decontextualized student query (BM25 input)
         query_embedding: pre-computed query embedding (dense half input)
         ta_id: scope the search to this TA's corpus
         top_k: how many candidate document ids to return (default Config.STAGE_1_TOP_K_DOCS)
+        query_analysis: optional dict from analyze_query() — used for the
+            number-must-match guard on the short-circuit. If absent, the guard
+            falls back to inline regex on the raw query.
 
     Returns:
         tuple: (doc_ids, diagnostics) where doc_ids is a list of Document.id
         ordered by fused RRF score (best first), and diagnostics is a dict
-        with per-side rankings + timing info for logs.
+        with per-side rankings + timing info for logs. When the short-circuit
+        fires, doc_ids is a single-element list and diagnostics["short_circuit"]
+        is set.
     """
     from models import db, Document, DocumentChunk
     import time
@@ -1176,7 +1185,228 @@ def hybrid_doc_search(query: str, query_embedding: list, ta_id: str, top_k: int 
         "dense_ranking": [],
         "filename_ranking": [],
         "fused_doc_ids": [],      # final ranking
+        "short_circuit": None,    # set when direct-match short-circuit fires
     }
+
+    # ---- Step 0: compute filename overlap once (reused for short-circuit + RRF) ----
+    # Single Python loop over all docs in the TA. We do this up front so the
+    # short-circuit decision is cheap (~50-900ms depending on corpus size) and
+    # the result is reused for the RRF signal below if we fall through.
+    #
+    # IMPORTANT: we use a local number-aware tokenizer here, NOT the shared
+    # tokenize_for_matching(), because the shared one strips single-digit numbers.
+    # That's fatal for disambiguating "lecture 4" vs "lecture 6" — both queries
+    # would overlap identically with every lecture's filename. The local version
+    # keeps 1+ char numeric tokens AND strips leading zeros so "lecture 04" in
+    # a filename matches "lecture 4" in a query.
+    def _tokenize_number_aware(text: str) -> set:
+        text_lower = (text or "").lower()
+        tokens = re.findall(r'[a-z0-9]+', text_lower)
+        # Same stop words as tokenize_for_matching, kept in sync so the RRF
+        # signal stays comparable.
+        stop = {
+            'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+            'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
+            'should', 'may', 'might', 'can', 'of', 'in', 'on', 'at', 'to', 'for',
+            'with', 'by', 'from', 'as', 'this', 'that', 'these', 'those', 'it',
+            'i', 'me', 'my', 'we', 'our', 'you', 'your', 'he', 'she', 'they',
+            'help', 'please', 'understand', 'explain', 'how', 'what', 'why',
+            'problem', 'question', 'answer', 'pdf', 'docx', 'xlsx', 'pptx', 'txt'
+        }
+        out = set()
+        for t in tokens:
+            if t in stop:
+                continue
+            if t.isdigit():
+                # Normalize numeric tokens: strip leading zeros so "04" == "4".
+                # Drop bare empty after strip.
+                normalized = t.lstrip("0") or "0"
+                out.add(normalized)
+            elif len(t) > 1:
+                out.add(t)
+        return out
+
+    filename_t0 = time.time()
+    filename_scored: list[tuple] = []  # [(doc_id, score, assignment_number, unit_number)]
+    try:
+        query_tokens = _tokenize_number_aware(query)
+        if query_tokens:
+            docs = Document.query.filter_by(ta_id=ta_id).all()
+            for doc in docs:
+                fn = doc.original_filename or doc.display_name or ""
+                fn_tokens = _tokenize_number_aware(fn)
+                if not fn_tokens:
+                    continue
+                overlap = query_tokens & fn_tokens
+                if not overlap:
+                    continue
+                score = len(overlap) / len(fn_tokens)
+                long_matches = sum(1 for t in overlap if len(t) >= 4)
+                if long_matches:
+                    score = min(1.0, score + 0.1 * long_matches)
+                filename_scored.append((doc.id, score, doc.assignment_number, doc.instructional_unit_number))
+            filename_scored.sort(key=lambda x: x[1], reverse=True)
+    except Exception as e:
+        logger.warning(f"[{ta_id}] hybrid_doc_search filename overlap failed: {e}; continuing with BM25+dense only")
+    diagnostics["filename_latency_ms"] = int((time.time() - filename_t0) * 1000)
+
+    # ---- Direct-match short-circuit (Stage 5) ----
+    # Two paths:
+    #   (A) Query has a number → number-aware path. Find the unique doc whose
+    #       filename overlap is ≥ threshold AND whose assignment/unit number
+    #       matches the query number. If exactly one such doc exists, route to
+    #       it. The number IS the disambiguator, so the margin guard is relaxed.
+    #   (B) Query has no number → margin path. Top filename-overlap must beat
+    #       runner-up by ≥ FILENAME_DIRECT_MATCH_MARGIN. Catches cases like
+    #       "syllabus" or "interactive lecture stock prices" where filename
+    #       overlap alone is decisive.
+    if filename_scored:
+        threshold = Config.FILENAME_DIRECT_MATCH_THRESHOLD
+
+        # Extract (number, category_hint) from the query. The number is the
+        # DOC number (not a sub-part like "question 1"). The category_hint maps
+        # the query's doc noun ("lecture", "lab", "quiz", "problem set") to one
+        # of the TA's configured doc_category slugs from Stage 2B.
+        #
+        # Why both: filename token overlap alone can't distinguish "pset03"
+        # (one token) from query "problem set 3" (two tokens). But
+        # doc_category='problem_sets' + assignment_number=3 narrows the corpus
+        # to exactly one doc with a direct DB lookup. The category hint also
+        # disambiguates "quiz 3" → the quiz itself (category=quizzes), not
+        # the "Quiz 3 solutions" doc (category=solutions).
+        import re as _re
+        # Each pattern emits (number, category_hint). Category hints assume the
+        # default Stage 2B seed slugs (lectures, labs, quizzes, problem_sets,
+        # extra_problems, homeworks, exams). If a TA renamed these, the lookup
+        # still works through the slug equivalence — only the hint name needs
+        # to match what the TA chose.
+        DOC_NUMBER_PATTERNS = [
+            (r'\b(?:interactive\s+|pre[- ]?recorded\s+)?lecture\s+(\d{1,3})\b', "lectures"),
+            (r'\blab\s+(\d{1,3})\b', "labs"),
+            (r'\bquiz\s+(\d{1,3})\b', "quizzes"),
+            (r'\bextra\s+(?:problem\s+set|problems?)\s+#?(\d{1,3})\b', "extra_problems"),
+            (r'\b(?:problem\s+set|pset)\s+#?(\d{1,3})\b', "problem_sets"),
+            (r'\b(?:homework|hw|assignment)\s+#?(\d{1,3})\b', "homeworks"),
+            (r'\b(20\d{2})\s+(?:final|midterm|exam)\b', "exams"),
+            (r'\b(?:final|midterm|exam)\s+(?:from|of)\s+(20\d{2})\b', "exams"),
+        ]
+        query_lower = (query or "").lower()
+        query_number = None
+        category_hint = None
+        for pat, hint in DOC_NUMBER_PATTERNS:
+            m = _re.search(pat, query_lower)
+            if m:
+                query_number = m.group(1)
+                category_hint = hint
+                break
+
+        # Fallback: year-only query
+        if query_number is None and query_analysis:
+            query_number = query_analysis.get("year_filter")
+
+        sc_doc_id = None
+        sc_reason = None
+
+        # ---- Path A: category + number DB lookup (Stage 2B doc_category) ----
+        # When we know both the category hint AND the doc number, we can query
+        # the DB directly for (doc_category=X AND number=Y). This catches cases
+        # where filename token overlap can't reach the threshold because the
+        # filename mashes prefix+number together (e.g. "pset03" is one token).
+        if query_number is not None and category_hint is not None:
+            from sqlalchemy import or_
+            qn_str = str(query_number).lstrip("0") or "0"
+            # Match assignment_number stored as string, or unit_number stored as int.
+            try:
+                qn_int = int(qn_str)
+            except ValueError:
+                qn_int = None
+            number_clauses = [Document.assignment_number == qn_str]
+            if qn_int is not None:
+                number_clauses.append(Document.instructional_unit_number == qn_int)
+            cat_matches = Document.query.filter(
+                Document.ta_id == ta_id,
+                Document.doc_category == category_hint,
+                or_(*number_clauses),
+            ).all()
+            if len(cat_matches) == 1:
+                sc_doc_id = cat_matches[0].id
+                sc_reason = "category_plus_number_unique"
+            elif len(cat_matches) > 1:
+                # Multiple docs in this category share the number — disambiguate
+                # by filename overlap if one clearly leads (margin guard).
+                cat_ids = {d.id for d in cat_matches}
+                cat_filename_scores = [s for s in filename_scored if s[0] in cat_ids]
+                if cat_filename_scores:
+                    top = cat_filename_scores[0]
+                    runner_up = cat_filename_scores[1][1] if len(cat_filename_scores) > 1 else 0.0
+                    if top[1] - runner_up >= Config.FILENAME_DIRECT_MATCH_MARGIN:
+                        sc_doc_id = top[0]
+                        sc_reason = "category_plus_number_disambiguated_by_filename"
+            elif len(cat_matches) == 0:
+                # No doc in the hinted category with this number. Fall back to
+                # number-only search across ALL categories. This catches cases
+                # like pset03 being categorized as "solutions" (because the file
+                # itself is the solutions doc), where the user asking about
+                # "problem set 3" still wants that doc returned.
+                num_only_matches = Document.query.filter(
+                    Document.ta_id == ta_id,
+                    or_(*number_clauses),
+                ).all()
+                if len(num_only_matches) == 1:
+                    sc_doc_id = num_only_matches[0].id
+                    sc_reason = "number_only_unique_fallback"
+
+        # ---- Path B: filename-overlap + number when Path A didn't fire (or category hint missing) ----
+        if sc_doc_id is None and query_number is not None:
+            qn_str = str(query_number).lstrip("0") or "0"
+            matches = []
+            for did, score, assignment, unit in filename_scored:
+                if score < threshold:
+                    break  # filename_scored is sorted desc
+                doc_nums = []
+                if assignment is not None:
+                    doc_nums.append(str(assignment).lstrip("0") or "0")
+                if unit is not None:
+                    doc_nums.append(str(unit).lstrip("0") or "0")
+                if qn_str in doc_nums:
+                    matches.append((did, score))
+            if len(matches) == 1:
+                sc_doc_id = matches[0][0]
+                sc_reason = "number_match_unique"
+            elif len(matches) > 1:
+                top_match, second_match = matches[0], matches[1]
+                if top_match[1] - second_match[1] >= Config.FILENAME_DIRECT_MATCH_MARGIN:
+                    sc_doc_id = top_match[0]
+                    sc_reason = "number_match_with_margin"
+
+        # ---- Path C: margin-only (when query has no number) ----
+        if sc_doc_id is None and query_number is None:
+            top_doc_id, top_score = filename_scored[0][0], filename_scored[0][1]
+            runner_up = filename_scored[1][1] if len(filename_scored) > 1 else 0.0
+            margin = top_score - runner_up
+            if top_score >= threshold and margin >= Config.FILENAME_DIRECT_MATCH_MARGIN:
+                sc_doc_id = top_doc_id
+                sc_reason = "margin_only_no_number"
+
+        if sc_doc_id is not None:
+            diagnostics["short_circuit"] = {
+                "fired": True,
+                "doc_id": sc_doc_id,
+                "reason": sc_reason,
+                "query_number": query_number,
+                "top_filename_score": round(filename_scored[0][1], 3),
+            }
+            diagnostics["stage_1_method"] = "filename_direct_match"
+            diagnostics["fused_doc_ids"] = [sc_doc_id]
+            logger.info(f"[{ta_id}] hybrid_doc_search SHORT-CIRCUIT: doc_id={sc_doc_id} reason={sc_reason} query_number={query_number}")
+            return [sc_doc_id], diagnostics
+        else:
+            diagnostics["short_circuit"] = {
+                "fired": False,
+                "query_number": query_number,
+                "top_filename_score": round(filename_scored[0][1], 3),
+                "top_filename_doc_id": filename_scored[0][0],
+            }
 
     # ---- BM25 ranking over Document.bm25_tsvector ----
     # Using plainto_tsquery (sanitizes & ANDs the query terms) so we don't have to
@@ -1246,35 +1476,9 @@ def hybrid_doc_search(query: str, query_embedding: list, ta_id: str, top_k: int 
     diagnostics["dense_ranking"] = [(row.document_id, idx) for idx, row in enumerate(dense_rows)]
 
     # ---- Filename ranking (token overlap, soft signal) ----
-    # Carried over from legacy fuzzy matcher (find_matching_documents). Used
-    # as a SOFT signal — no threshold cutoff for RRF participation. Avoids
-    # the regression V2-without-filename had on Type B + working cases
-    # where the filename was the only disambiguator within a doc family.
-    filename_t0 = time.time()
-    filename_rows = []
-    try:
-        query_tokens = tokenize_for_matching(query)
-        if query_tokens:
-            docs = Document.query.filter_by(ta_id=ta_id).all()
-            scored = []
-            for doc in docs:
-                fn = doc.original_filename or doc.display_name or ""
-                fn_tokens = tokenize_for_matching(fn)
-                if not fn_tokens:
-                    continue
-                overlap = query_tokens & fn_tokens
-                if not overlap:
-                    continue
-                score = len(overlap) / len(fn_tokens)
-                long_matches = sum(1 for t in overlap if len(t) >= 4)
-                if long_matches:
-                    score = min(1.0, score + 0.1 * long_matches)
-                scored.append((doc.id, score))
-            scored.sort(key=lambda x: x[1], reverse=True)
-            filename_rows = scored[:PER_SIDE_K]
-    except Exception as e:
-        logger.warning(f"[{ta_id}] hybrid_doc_search filename query failed: {e}; continuing with BM25+dense only")
-    diagnostics["filename_latency_ms"] = int((time.time() - filename_t0) * 1000)
+    # Reuses the scores computed at Step 0 for the short-circuit. No second
+    # loop over docs — saves ~50-900ms on each query depending on corpus size.
+    filename_rows = [(doc_id, score) for doc_id, score, _, _ in filename_scored[:PER_SIDE_K]]
     filename_ranks = {doc_id: rank_idx for rank_idx, (doc_id, _) in enumerate(filename_rows)}
     diagnostics["filename_ranking"] = [(doc_id, idx) for idx, (doc_id, _) in enumerate(filename_rows)]
 
@@ -2350,6 +2554,9 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
     used_fallback = False
     has_filters = False
     filter_description = []
+    # Lifted out of the V2 branch so the structural-injection block below can
+    # see it (Phase A Stage 5: scope slide/page injection to candidate docs).
+    candidate_doc_ids: list = []
 
     if Config.RETRIEVAL_V2_ENABLED:
         # Phase A Stage 3 — hybrid Stage 1 retrieval.
@@ -2361,7 +2568,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         # attached_assets/maize-retrieval-phase-a-implementation-plan-2026-05-22.md
         # Stage 3.
         candidate_doc_ids, hybrid_diag = hybrid_doc_search(
-            effective_query, query_embedding, ta_id
+            effective_query, query_embedding, ta_id, query_analysis=query_analysis
         )
         diagnostics["hybrid_stage_1"] = hybrid_diag
         if candidate_doc_ids:
@@ -2513,8 +2720,16 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
             db.or_(*[DocumentChunk.chunk_context.like(p) for p in context_patterns])
         )
 
-        # Apply same doc_type/unit filters if present to narrow to the right document
-        if has_filters:
+        # Phase A Stage 5: in V2 mode, scope to candidate doc IDs from hybrid_doc_search
+        # so slide-N injection doesn't pull "Slide N:" chunks from every doc in the TA.
+        # Without this scope the unfiltered injection inflates chunk_frequency on
+        # docs with many page markers (e.g. Midterm 2022A solutions hijacking all
+        # slide-N queries — see eval rows 1/12/13/14 in the 2026-05-23 CSV battery).
+        if Config.RETRIEVAL_V2_ENABLED and candidate_doc_ids:
+            structural_query = structural_query.filter(DocumentChunk.document_id.in_(candidate_doc_ids))
+            logger.info(f"[{ta_id}] Structural injection scoped to V2 candidate docs: {candidate_doc_ids}")
+        elif has_filters:
+            # Legacy path: apply doc_type/unit filters if present to narrow to the right document
             if query_analysis["doc_type_filter"]:
                 structural_query = structural_query.filter(DocumentChunk.doc_type == query_analysis["doc_type_filter"])
             if query_analysis.get("unit_filter"):
