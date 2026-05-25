@@ -9,58 +9,119 @@ from sqlalchemy.exc import OperationalError, DBAPIError
 
 logger = logging.getLogger(__name__)
 
+# Phase B Stage B8 (2026-05-25). Hierarchy levels for structural headers.
+# Used by extract_section_headers + get_section_path_at_position to build a
+# multi-level section_path for each chunk (e.g. ["Section II", "Part b"]
+# instead of just "Section II:"). Lower-numbered levels are OUTER:
+#
+#   level 0: positional markers (Page N, Slide N) — never popped by other headers
+#   level 1: Section (Roman or numeric)
+#   level 2: Part (A-Z)
+#   level 3: Problem / Question / Exercise — innermost
+#
+# When a new header at level L is opened, all entries at level >= L are popped
+# from the stack (we're starting a new section AT that level). Level-0 markers
+# are an exception: they only pop other level-0 markers, since a new Page or
+# Slide doesn't reset the doc's outline.
+_HEADER_PATTERNS = [
+    # (regex_with_one_capture_group, level, display_normalizer)
+    (r'(?:^|\n)(---\s*Page\s+\d+\s*---)', 0, lambda m: m.strip(' -').strip()),
+    (r'(?:^|\n)(Slide\s+\d+)[:\s]?[^\n]{0,60}', 0, lambda m: m.strip()),
+    (r'(?:^|\n)(Section\s+(?:\d+|[IVX]+))[:\s\-][^\n]{0,60}', 1, lambda m: m.strip()),
+    (r'(?:^|\n)(Part\s+[A-Z])[:\s][^\n]{0,60}', 2, lambda m: m.strip()),
+    (r'(?:^|\n)(Problem\s+\d+)[:\s][^\n]{0,60}', 3, lambda m: m.strip()),
+    (r'(?:^|\n)(Question\s+\d+)[:\s][^\n]{0,60}', 3, lambda m: m.strip()),
+    (r'(?:^|\n)(Exercise\s+\d+)[:\s][^\n]{0,60}', 3, lambda m: m.strip()),
+]
+
+
 def extract_section_headers(text: str) -> list:
     """
-    Extract problem/section headers from document text with their positions.
-    Returns list of (header_content_start, header_text) tuples, sorted by position.
-    
-    The position returned is the start of the actual header content (group 1),
-    not the newline/start anchor, so boundary splitting includes the header.
-    
+    Extract structural headers from text with their positions + hierarchy levels.
+
+    Returns list of (header_content_start, header_text, level) tuples, sorted by
+    position. The `level` is a small integer used by `get_section_path_at_position`
+    to maintain a stack of open sections — see `_HEADER_PATTERNS` for the level
+    assignments.
+
+    Backwards-compat: callers that only care about (position, header_text) can
+    unpack the first two elements and ignore level.
+
     Matches patterns like:
-    - "Problem 1: Title"
-    - "Problem 2 (5 points)"
-    - "Question 3:"
-    - "Section I - Title"
-    - "Part A:"
+    - "Problem 1: Title"               → level 3
+    - "Question 3:"                    → level 3
+    - "Section I - Title"              → level 1
+    - "Part A:"                        → level 2
+    - "Slide 7: Title"                 → level 0
+    - "--- Page 5 ---"                 → level 0
     """
     headers = []
-    
-    patterns = [
-        r'(?:^|\n)(Problem\s+\d+[:\s][^\n]{0,60})',
-        r'(?:^|\n)(Question\s+\d+[:\s][^\n]{0,60})',
-        r'(?:^|\n)(Section\s+(?:\d+|[IVX]+)[:\s\-][^\n]{0,60})',
-        r'(?:^|\n)(Part\s+[A-Z][:\s][^\n]{0,60})',
-        r'(?:^|\n)(Exercise\s+\d+[:\s][^\n]{0,60})',
-        r'(?:^|\n)(Slide\s+\d+[:\s]?[^\n]{0,60})',
-        r'(?:^|\n)(---\s*Page\s+\d+\s*---)',
-    ]
-    
-    for pattern in patterns:
+    for pattern, level, normalizer in _HEADER_PATTERNS:
         for match in re.finditer(pattern, text, re.IGNORECASE):
-            header_text = match.group(1).strip()
+            header_text = normalizer(match.group(1))
             header_text = re.sub(r'\s+', ' ', header_text)
             if len(header_text) > 80:
                 header_text = header_text[:77] + "..."
-            # Use start of group 1 (actual header content), not match.start() (which includes newline)
             header_content_start = match.start(1)
-            headers.append((header_content_start, header_text))
-    
+            headers.append((header_content_start, header_text, level))
     headers.sort(key=lambda x: x[0])
     return headers
 
+
 def get_context_for_position(headers: list, position: int) -> str:
-    """
-    Get the most recent header that appears before the given position.
-    Returns the header text or empty string if no header precedes this position.
+    """Backwards-compat: returns the most recent single header text before the given position.
+
+    Kept so B15 structural injection + the chunk_context String column keep
+    working during the B8 transition. New code should call
+    `get_section_path_at_position()` instead — it returns the full multi-level
+    path (e.g. ["Section II", "Part b"]) which is the load-bearing structural
+    signal post-B8.
     """
     context = ""
-    for header_pos, header_text in headers:
+    for h in headers:
+        # Accept both 2-tuple (legacy callers) and 3-tuple (B8 callers).
+        header_pos, header_text = h[0], h[1]
         if header_pos <= position:
             context = header_text
         else:
             break
     return context
+
+
+def get_section_path_at_position(headers: list, position: int) -> list:
+    """Walk the headers up to `position` and return the current stack as a path.
+
+    Examples:
+        Section II opens → ["Section II"]
+        Part b opens     → ["Section II", "Part b"]
+        Question 3 opens → ["Section II", "Part b", "Question 3"]
+        Part c opens     → ["Section II", "Part c"]  (pops level >= 2)
+        Section III opens→ ["Section III"]            (pops level >= 1)
+
+    Level-0 markers (Page N, Slide N) are an exception: they only pop other
+    level-0 markers, not the outline (Section/Part/etc.) above them. So a Page 5
+    appearing after Section II opens results in the path ["Section II", "Page 5"]
+    — preserving the doc-outline context the chunk sits within.
+
+    Returns an empty list when no headers precede the position.
+    """
+    stack = []  # list of (text, level)
+    for h in headers:
+        if len(h) < 3:
+            # Legacy 2-tuple — treat as level 1.
+            header_pos, header_text, level = h[0], h[1], 1
+        else:
+            header_pos, header_text, level = h
+        if header_pos > position:
+            break
+        # Pop entries that are at-or-below this level. Exception: level-0
+        # markers only pop other level-0 markers.
+        if level == 0:
+            stack = [(t, l) for (t, l) in stack if l != 0]
+        else:
+            stack = [(t, l) for (t, l) in stack if l < level]
+        stack.append((header_text, level))
+    return [t for (t, _) in stack]
 
 def chunk_text_with_context(text: str, chunk_size: int = 800, overlap: int = 200, doc_filename: str = "") -> list:
     """
@@ -70,14 +131,16 @@ def chunk_text_with_context(text: str, chunk_size: int = 800, overlap: int = 200
     Returns list of dicts with 'text' (enriched) and 'original_text' (raw).
     """
     headers = extract_section_headers(text)
-    
-    # Cache sorted header positions once
-    sorted_header_positions = sorted(pos for pos, _ in headers)
-    
+
+    # Cache sorted header positions once. Headers are now 3-tuples
+    # (position, text, level); we only care about the position for boundary detection.
+    sorted_header_positions = sorted(h[0] for h in headers)
+
     if len(text) <= chunk_size:
         context = get_context_for_position(headers, 0)
+        section_path = get_section_path_at_position(headers, 0)
         enriched = f"[{doc_filename} > {context}] {text}" if context else f"[{doc_filename}] {text}"
-        return [{"text": enriched, "original_text": text, "context": context}]
+        return [{"text": enriched, "original_text": text, "context": context, "section_path": section_path}]
     
     chunks = []
     start = 0
@@ -120,8 +183,9 @@ def chunk_text_with_context(text: str, chunk_size: int = 800, overlap: int = 200
         chunk_text = text[start:end].strip()
         
         if chunk_text:
-            # Get context for this chunk position
+            # Get context + multi-level section_path for this chunk position
             context = get_context_for_position(headers, start)
+            section_path = get_section_path_at_position(headers, start)
             if context:
                 enriched = f"[{doc_filename} > {context}] {chunk_text}"
             else:
@@ -129,7 +193,8 @@ def chunk_text_with_context(text: str, chunk_size: int = 800, overlap: int = 200
             chunks.append({
                 "text": enriched,
                 "original_text": chunk_text,
-                "context": context
+                "context": context,
+                "section_path": section_path,
             })
             
             # Move to next position
@@ -1426,6 +1491,7 @@ def process_and_index_documents_resumable(ta_id: str, progress_callback=None, re
                 "chunk_text": chunk_data["original_text"],
                 "chunk_text_enriched": chunk_data["text"],
                 "context": chunk_data.get("context", ""),
+                "section_path": chunk_data.get("section_path") or [],  # Phase B B8
                 "doc_type": doc.doc_type or "other",
                 "assignment_number": doc.assignment_number or "",
                 "instructional_unit_number": doc.instructional_unit_number or 0,
@@ -1476,6 +1542,7 @@ def process_and_index_documents_resumable(ta_id: str, progress_callback=None, re
                     chunk_index=chunk_item["chunk_index"],
                     chunk_text=sanitize_text(chunk_item["chunk_text"]),
                     chunk_context=chunk_item.get("context", "")[:256] if chunk_item.get("context") else None,
+                    section_path=chunk_item.get("section_path") or [],  # Phase B B8
                     doc_type=chunk_item["doc_type"],
                     assignment_number=chunk_item["assignment_number"],
                     instructional_unit_number=chunk_item["instructional_unit_number"],

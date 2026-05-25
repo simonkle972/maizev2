@@ -2693,10 +2693,52 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
             # produce some context.
             filtered_query = base_query
             logger.warning(f"[{ta_id}] V2 hybrid Stage 1 returned no candidate docs — falling back to unfiltered chunk search")
+
+        # Phase B B8 (2026-05-25): when the query carries a structural reference
+        # (slide N, page N), narrow the chunk search to chunks whose section_path
+        # contains that element. Additive — sits on top of the candidate-doc
+        # filter. If this filter returns zero chunks we drop it (Stage 1's
+        # ranking remains the source of truth). This is the mechanism that
+        # eventually replaces B15 structural injection — B15 still runs below
+        # for backwards-compat until a follow-up cleanup commit deletes it.
+        struct_ref = query_analysis.get("structural_reference")
+        section_path_element = None
+        if struct_ref:
+            ref_type = struct_ref.get("type")
+            ref_num = struct_ref.get("number")
+            if ref_type == "slide" and ref_num is not None:
+                section_path_element = f"Slide {ref_num}"
+            elif ref_type == "page" and ref_num is not None:
+                section_path_element = f"Page {ref_num}"
+        section_path_query = filtered_query
+        if section_path_element is not None:
+            from sqlalchemy import cast
+            from sqlalchemy.dialects.postgresql import JSONB
+            section_path_query = filtered_query.filter(
+                cast(DocumentChunk.section_path, JSONB).op('@>')(cast(f'["{section_path_element}"]', JSONB))
+            )
+            diagnostics["section_path_filter"] = section_path_element
+
         try:
-            results = filtered_query.order_by(
-                DocumentChunk.embedding.cosine_distance(query_embedding)
-            ).limit(initial_k).all()
+            if section_path_element is not None:
+                results = section_path_query.order_by(
+                    DocumentChunk.embedding.cosine_distance(query_embedding)
+                ).limit(initial_k).all()
+                if not results:
+                    # section_path narrowed to nothing — drop the filter, keep
+                    # candidate-doc constraint.
+                    logger.info(f"[{ta_id}] V2 section_path={section_path_element!r} matched 0 chunks; falling back to candidate-doc-only")
+                    diagnostics["section_path_filter_status"] = "fell_back_no_match"
+                    results = filtered_query.order_by(
+                        DocumentChunk.embedding.cosine_distance(query_embedding)
+                    ).limit(initial_k).all()
+                else:
+                    diagnostics["section_path_filter_status"] = "applied"
+                    logger.info(f"[{ta_id}] V2 section_path={section_path_element!r} narrowed to {len(results)} chunks")
+            else:
+                results = filtered_query.order_by(
+                    DocumentChunk.embedding.cosine_distance(query_embedding)
+                ).limit(initial_k).all()
             if not results and candidate_doc_ids:
                 # Candidate docs gave us nothing — fall back to unfiltered.
                 logger.info(f"[{ta_id}] V2: candidate-doc chunk search empty, falling back to unfiltered")

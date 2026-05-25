@@ -271,6 +271,12 @@ class DocumentChunk(db.Model):
     chunk_index = db.Column(db.Integer, nullable=False)
     chunk_text = db.Column(db.Text, nullable=False)
     chunk_context = db.Column(db.String(256), nullable=True)
+    # Phase B Stage B8 (2026-05-25). Multi-level structural path for the chunk
+    # within its parent doc: ["Section II", "Part b"] / ["Slide 3"] / ["Page 5"] / [].
+    # Replaces single-header chunk_context as the load-bearing structural-navigation
+    # signal. chunk_context kept for backwards-compat with B15 structural injection
+    # until B15 is deleted in a follow-up cleanup commit.
+    section_path = db.Column(db.JSON, nullable=True)
     doc_type = db.Column(db.String(64), nullable=True)
     assignment_number = db.Column(db.String(32), nullable=True)
     instructional_unit_number = db.Column(db.Integer, nullable=True)

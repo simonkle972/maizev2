@@ -767,12 +767,30 @@ These are the calls 3.3 will need to make based on the user's risk tolerance, th
 
 **Dependency declaration (unchanged):** NO Group B or Group C work begins until per-TA eval coverage exists for the affected TAs. The `--ta-id` flag is the infrastructure; the rows themselves get added per `eval/bootstrap_new_ta.md` when a Phase B/C change is about to touch a given TA.
 
+### B8 — indexing-only ship landed 2026-05-25
+
+Indexing-side B8 shipped (schema, multi-level header-hierarchy extractor, updated chunker, backfill, benign retrieval filter). **Type B win NOT yet materialized.** User pushback during implementation: V2's current structural-query performance is strong; extending query-side detection (even via a small contextualize_query additive) is exactly the kind of change that needs flag-gating + A/B testing across dimensions, not casual deployment. So:
+
+**Deferred to a focused future session (Option B / B8-completion):**
+1. Extend the single top-of-funnel LLM call to emit `structural_target: list[str] | null` — the LLM, not regex, recognizes Section/Part/Problem/Question patterns.
+2. B8 filter consumes the LLM-emitted target (replaces the slide/page regex-driven path).
+3. Slide↔Page query equivalence (when target says "Slide N", also try "Page N" against PDF chunks).
+4. Behind `Config.SECTION_PATH_FILTER_ENABLED` (default off). A/B test against the existing 27-query battery + eval harness + manual structural-query sample. Only flip default-on after dimensional comparison clearly favors the new path.
+5. After A/B win confirmed: delete B15 structural injection + drop `chunk_context` column.
+
+**Eval dimensions for the future A/B test:**
+- Type B hit@5 (the headline win)
+- Slide-N query hit@5 (must not regress from today's strong performance)
+- Slide-N query latency (filter adds a small DB-query cost)
+- Top-1 source quality on structural queries
+- Cache-anchored switch behavior (Type E rows) since contextualize_query is involved
+
 ### What's NOT decided yet (Phase 2 + Phase 3 work)
 
 The following remain open for dedicated next sessions, gated on D12:
 
-- **Group C — Option B top-of-funnel redesign** (single routing tool call replacing B4 + B6 + B7 + B8). The largest single retrieval-side change in the audit. Decision needs to weigh effort (~1-2 sessions of code + eval) against the architectural cleanup it enables.
-- **Group B — indexing changes** (B8 section_path, B9 Contextual Retrieval, B10 per-doc summary). Each ships independently and compounds. Per the staged-deploy section above, B9 is the heaviest (requires full re-index, ~$5-10).
+- **Group C — Option B top-of-funnel redesign** (single routing tool call replacing B4 + B6 + B7 + B8). The largest single retrieval-side change in the audit. Decision needs to weigh effort (~1-2 sessions of code + eval) against the architectural cleanup it enables. NOTE: structural_target emission (deferred from B8 above) is a natural fit here — Option B's single tool call should produce it.
+- **Group B — indexing changes** (B8 section_path — landed; B9 Contextual Retrieval; B10 per-doc summary). B8 indexing-only is shipped; query-side activation deferred (see above). B9 still ahead. Per the staged-deploy section above, B9 is the heaviest (requires full re-index, ~$5-10).
 - **Reranker decision** (gpt-5.2 vs no-rerank vs Cohere) — parked above, gated on multi-TA prod qa_logs + Cohere implementation effort.
 
 ## Status + audit trail
@@ -785,7 +803,8 @@ The following remain open for dedicated next sessions, gated on D12:
 | 2026-05-23 | 3.2 staged-deploy pattern sub-section added | commit `88777b9` |
 | 2026-05-24 | 3.3 Phase 1 decisions logged: A1+A2+A4 to ship, A5 parked pending Cohere comparison, D12 scoped | commit `f3f86c8` |
 | 2026-05-24 | A1+A2+A4 cleanup shipped to prod | commit `67aedb8` |
-| 2026-05-25 | D12 shipped in revised scope: `--ta-id` eval flag + bootstrap doc + chunks API + qa_logs enrichment (no frontend page) | _this commit_ |
+| 2026-05-25 | D12 shipped in revised scope: `--ta-id` eval flag + bootstrap doc + chunks API + qa_logs enrichment (no frontend page) | commit `577392b` |
+| 2026-05-25 | B8 indexing-only ship: schema + chunker + backfill + benign retrieval filter. Query-side activation deferred behind a flag for future A/B. | _this commit_ |
 | _TBD_ | Multi-TA prod qa_logs gathered (1-2 weeks post-V2-deploy) | _TBD_ |
 | _TBD_ | Rerank decision (Cohere/no-rerank/keep) made with multi-TA data + Cohere implementation | _TBD_ |
 | _TBD_ | Group B and Group C work begins (gated on D12) | _TBD_ |
