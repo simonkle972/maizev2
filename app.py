@@ -821,48 +821,14 @@ def upload_document(ta_id):
     doc_id = doc.id
     response_payload["document_id"] = doc_id
 
-    # Extract metadata in background thread (text extraction + LLM can take 10-30s).
-    # IMPORTANT: only overwrite a field when the LLM returns a non-null value, so we
-    # don't clobber the synchronous filename-heuristic guess if the LLM came up empty.
-    def extract_metadata_bg(app_obj, doc_id, file_content, file_ext, original_filename):
-        with app_obj.app_context():
-            from src.document_processor import extract_metadata_from_file_content
-            try:
-                metadata = extract_metadata_from_file_content(file_content, file_ext, original_filename)
-                doc = Document.query.get(doc_id)
-                if doc:
-                    if metadata.get("doc_type"):
-                        doc.doc_type = metadata["doc_type"]
-                    if metadata.get("assignment_number"):
-                        doc.assignment_number = metadata["assignment_number"]
-                    if metadata.get("instructional_unit_number"):
-                        doc.instructional_unit_number = metadata["instructional_unit_number"]
-                    if metadata.get("instructional_unit_label"):
-                        doc.instructional_unit_label = metadata["instructional_unit_label"]
-                    if metadata.get("content_title"):
-                        doc.content_title = metadata["content_title"]
-                    doc.metadata_extracted = metadata.get("extraction_success", False)
-                    doc.extraction_metadata = metadata
-                    db.session.commit()
-            except Exception as e:
-                logger.error(f"Background metadata extraction failed for {original_filename}: {e}")
-
-    # `app` is the real Flask instance (module-level), not a proxy — pass it directly.
-    # Older code used `app._get_current_object()` which exists on Flask's LocalProxy
-    # (e.g. `current_app`) but NOT on a Flask instance. Flask 3.x raises AttributeError
-    # rather than silently no-op'ing, which 500'd uploads after a successful commit.
-    # Defense-in-depth: any thread-launch failure is logged but never aborts the response —
-    # the doc is already committed and the LLM extractor is best-effort enrichment.
-    try:
-        import threading
-        thread = threading.Thread(
-            target=extract_metadata_bg,
-            args=(app, doc_id, file_content, file_ext, original_filename),
-        )
-        thread.daemon = True
-        thread.start()
-    except Exception as thread_err:
-        logger.warning(f"Could not launch metadata-extraction thread for {original_filename}: {thread_err}")
+    # Metadata enrichment (LLM-based extract_metadata_with_llm) runs once during
+    # the indexing pipeline (process_and_index_documents_resumable), not here.
+    # Previously this route launched an extract_metadata_bg thread that called
+    # extract_metadata_from_file_content on the same content — that was the
+    # second-of-two LLM calls per doc per re-index, surfaced as a Phase 1
+    # cleanup item by the architecture audit (2026-05-23) and removed here.
+    # Admin UI polls /documents/<id> for metadata_extracted=True; indexing flips
+    # it true once the indexing pass completes for the doc.
 
     return jsonify(response_payload)
 
@@ -955,24 +921,15 @@ def update_document_metadata(ta_id, doc_id):
     if "assignment_number" in data:
         doc.assignment_number = data["assignment_number"] if data["assignment_number"] else None
 
-    # Phase A retrieval refactor (gap analysis 2026-05-22). doc_role is the new
-    # PRIMARY semantic axis for retrieval. When set via this route, mark provenance
-    # as 'professor' so the auto-classifier won't overwrite it on subsequent runs.
-    # DEPRECATED post-Stage 2B; doc_category is the load-bearing axis now.
-    if "doc_role" in data:
-        from src.document_processor import VALID_DOC_ROLES
-        new_role = (data["doc_role"] or "").lower() or None
-        if new_role is not None and new_role not in VALID_DOC_ROLES:
-            return jsonify({"error": f"Invalid doc_role; must be one of {sorted(VALID_DOC_ROLES)}"}), 400
-        doc.doc_role = new_role
-        doc.doc_role_provenance = {
-            "source": "professor",
-            "set_at": datetime.utcnow().isoformat() + "Z",
-        }
+    # NOTE: a previous incarnation of this route accepted a "doc_role" field
+    # backed by the VALID_DOC_ROLES enum from the Stage 2 design. That field
+    # had zero readers in retrieval and was removed in Phase 1 cleanup
+    # (architecture audit, 2026-05-23). doc_category replaces it. Clients
+    # that still send doc_role will see it silently ignored.
 
-    # Phase A Stage 2B (research 2026-05-22). doc_category replaces doc_role as
-    # PRIMARY retrieval axis. Slug must match one of the parent TA's
-    # configured doc_categories (or be cleared to None).
+    # Phase A Stage 2B (research 2026-05-22). doc_category is the load-bearing
+    # retrieval axis. Slug must match one of the parent TA's configured
+    # doc_categories (or be cleared to None).
     if "doc_category" in data:
         new_cat = (data["doc_category"] or "").strip().lower() or None
         if new_cat is not None:

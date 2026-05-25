@@ -999,34 +999,14 @@ def upload_document(ta_id):
 
     doc_id = doc.id
 
-    # Extract metadata in background thread (text extraction + LLM can take 10-30s)
-    def extract_metadata_bg(app_obj, doc_id, file_content, file_ext, original_filename):
-        with app_obj.app_context():
-            from src.document_processor import extract_metadata_from_file_content
-            try:
-                metadata = extract_metadata_from_file_content(file_content, file_ext, original_filename)
-                doc = Document.query.get(doc_id)
-                if doc:
-                    doc.doc_type = metadata.get("doc_type")
-                    doc.assignment_number = metadata.get("assignment_number")
-                    doc.instructional_unit_number = metadata.get("instructional_unit_number")
-                    doc.instructional_unit_label = metadata.get("instructional_unit_label")
-                    doc.content_title = metadata.get("content_title")
-                    doc.metadata_extracted = metadata.get("extraction_success", False)
-                    doc.extraction_metadata = metadata
-                    db.session.commit()
-            except Exception as e:
-                import logging
-                logging.getLogger(__name__).error(f"Background metadata extraction failed for {original_filename}: {e}")
-
-    import threading
-    from flask import current_app
-    thread = threading.Thread(
-        target=extract_metadata_bg,
-        args=(current_app._get_current_object(), doc_id, file_content, file_ext, original_filename)
-    )
-    thread.daemon = True
-    thread.start()
+    # Metadata enrichment (LLM-based extract_metadata_with_llm) runs once during
+    # the indexing pipeline (process_and_index_documents_resumable), not here.
+    # Previously this route launched an extract_metadata_bg thread that called
+    # extract_metadata_from_file_content on the same content — that was the
+    # second-of-two LLM calls per doc per re-index, surfaced as a Phase 1
+    # cleanup item by the architecture audit (2026-05-23) and removed here.
+    # Admin UI polls /documents/<id> for metadata_extracted=True; indexing flips
+    # it true once the indexing pass completes for the doc.
 
     return jsonify({
         "success": True,
@@ -1069,23 +1049,15 @@ def update_document_metadata(ta_id, doc_id):
         value = data['instructional_unit_number']
         doc.instructional_unit_number = int(value) if value and value != '' else None
 
-    # Phase A retrieval refactor (gap analysis 2026-05-22). doc_role is the new
-    # PRIMARY semantic axis for retrieval. Professor override marks provenance
-    # as 'professor' so auto-classifier doesn't overwrite on subsequent reindexes.
-    # DEPRECATED post-Stage 2B; doc_category is the load-bearing axis now.
-    if 'doc_role' in data:
-        from src.document_processor import VALID_DOC_ROLES
-        new_role = (data['doc_role'] or '').lower() or None
-        if new_role is not None and new_role not in VALID_DOC_ROLES:
-            return jsonify({"error": f"Invalid doc_role; must be one of {sorted(VALID_DOC_ROLES)}"}), 400
-        doc.doc_role = new_role
-        doc.doc_role_provenance = {
-            "source": "professor",
-            "set_at": datetime.utcnow().isoformat() + "Z",
-        }
+    # NOTE: a previous incarnation of this route accepted a "doc_role" field
+    # backed by the VALID_DOC_ROLES enum from the Stage 2 design. That field
+    # had zero readers in retrieval and was removed in Phase 1 cleanup
+    # (architecture audit, 2026-05-23). doc_category replaces it. Clients
+    # that still send doc_role will see it silently ignored.
 
-    # Phase A Stage 2B (research 2026-05-22). doc_category replaces doc_role.
-    # Slug must match one of the parent TA's configured doc_categories.
+    # Phase A Stage 2B (research 2026-05-22). doc_category is the load-bearing
+    # retrieval axis. Slug must match one of the parent TA's configured
+    # doc_categories.
     if 'doc_category' in data:
         new_cat = (data['doc_category'] or '').strip().lower() or None
         if new_cat is not None:
