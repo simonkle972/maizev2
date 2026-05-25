@@ -704,23 +704,90 @@ These are the calls 3.3 will need to make based on the user's risk tolerance, th
 
 ## 3.3 Decisions + path-dependent next move
 
-**Status:** TODO — populated after 3.1 and 3.2 land.
+**Status:** in-progress. Phase 1 decisions logged 2026-05-24. Phase 2 (Group C — top-of-funnel) and Phase 3 (Group B — indexing changes) deferred to dedicated next sessions.
 
-Will record:
-- Per-finding decision (apply now / apply later / reject) with rationale
-- Whether the verdict is "architecture matches best practices, optimize components" (proceed component-by-component with parked plans like top-of-funnel Option B) or "architecture has structural gaps" (refactor structure first)
-- Links to any follow-up implementation plans (e.g., a hypothetical Phase B)
-- Explicit decision about what to do with the parked top-of-funnel research
+### Phase 1 decisions — Group A cleanup (truly independent items)
+
+| Item | Decision | Rationale |
+|---|---|---|
+| **A1** Remove `classify_doc_role` (architecture map step A9) | **DO NOW** | Pure dead code at index time; zero readers in `retriever.py`; superseded by Stage 2B's `doc_category`. Saves ~$0.04 + ~10-15 min per re-index. ~30 min effort. |
+| **A2** Remove duplicate LLM metadata extraction (architecture map step A3) | **DO NOW** | Upload-time background thread duplicates the indexing pipeline's `extract_metadata_with_llm` call on the same content. Admin UI already polls for `metadata_extracted=True` so the user-visible "metadata pending" state works without the redundant call. ~30 min. |
+| **A3** Remove legacy hard-filter cascade (B12.L) + retire the V2 flag | **DEFER** | Auto-action item: drop after 1-2 weeks of stable prod V2 operation. Not a decision, a timer. |
+| **A4** Remove `process_and_index_documents` non-resumable variant | **DO NOW** | ~290 lines of dead code; verified zero live callers. ~10 min effort. |
+| **A5** Drop B17 reranker model from gpt-5.2 reasoning to gpt-4o-mini or cross-encoder | **PARK — see "Rerank parking" subsection below** | Today's eval showed gpt-5.2 reasoning rerank is NET NEGATIVE on this corpus. Decision now requires Cohere comparison data, not a quick model swap. |
+| **A6** Remove B10 early hybrid routing | **DEFER** | Needs analysis to confirm V2 Stage 5 short-circuit covers all B10 cases. Tactical sub-task; not Phase 1. |
+| **A7** Remove B19 supplementary teaching material | **DEFER (gated on B9)** | Cleanest after Contextual Retrieval lands; generation-side prompt needs to absorb B19's pedagogical job first. |
+
+### Rerank parking — 2026-05-24
+
+**The finding.** Today's eval extension added a `correct_hit@5_pre_rerank` column to `eval/run_eval.py`, computing the chunk ordering BEFORE `llm_rerank` runs (using `pre_rerank_candidates` from diagnostics). Running the baseline against gpt-5.2 reasoning MEDIUM revealed the current rerank is **net-negative** on the 64-row ECON S1117 eval:
+
+| Bucket | Pre-rerank hit@5 | Post-rerank hit@5 | Rerank lift |
+|---|---:|---:|---:|
+| A (Lab vs PS) | 100% | 100% | +0% |
+| **B (Roman numeral siblings)** | **100%** | **80%** | **−20%** ❌ |
+| C (lookalike) | 71% | 71% | +0% |
+| D (problem-vs-solutions) | 60% | 60% | +0% |
+| **E (cache anchoring)** | **81%** | **76%** | **−5%** ❌ |
+| working cases | 59% | 59% | +0% |
+
+**Interpretation.** The hybrid retrieval upstream (V2 + Stage 5 short-circuit + structural injection + paste detection) is already producing well-ordered chunk sets. The LLM reranker has less to contribute when pre-rerank ordering is already strong. On Type B specifically, the reranker reads chunk text content and second-guesses, pulling a sibling section into top-5 in 1 row out of 5. Cost: 5-15s of latency per query for 0-to-negative lift.
+
+**This reframes the Group A's A5 decision.** Originally A5 was framed as "drop premium model to cheaper general-purpose LLM." Today's data says the question is bigger: **the rerank STAGE may not earn its place at all**, not just the model choice. Three candidate paths surfaced:
+
+1. **Keep gpt-5.2 reasoning as-is** — status quo. Net-negative on this corpus, may be positive elsewhere.
+2. **No-rerank** — already proven on this eval (pre-rerank IS the no-rerank floor). Requires surgery: skipping `llm_rerank` also means the confidence-assessment + `hybrid_full_doc` fallback path needs a different trigger signal (pre-rerank score spread instead of LLM scores).
+3. **Cohere v3 Rerank cross-encoder** — the canonical 2026 reranker per 3.2's audit. ~100-200ms latency, purpose-built for ranking, may add positive lift where general-purpose LLMs don't.
+
+**Decision: PARK.** Reasons:
+- Single-corpus eval (ECON S1117) is insufficient to confidently delete a step that may help on other TAs with different retrieval profiles.
+- Cohere integration is ~2-4 hours and deserves its own focused session.
+- Prod V2 just shipped; another retrieval-layer change in the same session compounds risk.
+- The "no rerank" surgery requires reworking the confidence-fallback path, not just a flag flip.
+
+**Cohere is the explicit next exploration.** Next-session work:
+- Gather 1-2 weeks of multi-TA prod qa_logs to see if rerank helps anywhere outside ECON S1117
+- Implement Cohere v3 Rerank as an alternative to `llm_rerank` (gated behind a Config flag for A/B)
+- Re-run the eval with all three datapoints (gpt-5.2, no-rerank/pre-rerank floor, Cohere)
+- Decide based on cumulative evidence: ship whichever beats the no-rerank floor by the largest margin on the most queries
+
+### D12 scoping — observability prerequisite
+
+**Status: ACCEPTED IN PRINCIPLE as the prerequisite to Group B/C work; detailed scoping deferred to a dedicated session.**
+
+Per the 3.2 audit's cross-cutting finding #5: without per-TA measurement infrastructure, any Group B (indexing changes) or Group C (top-of-funnel redesign) decision flies blind. We can only see whether changes helped on the ECON S1117 eval corpus; the 25 prod TAs are invisible.
+
+**Scope outline (sub-tasks to detail in the next planning session):**
+- **Chunk-level admin inspector** (~2-3h). New admin route + template showing per-chunk metadata (doc_category, chunk_context, embedding preview, parent doc fields), filterable by TA + doc + score. Lets us inspect retrieval mistakes post-hoc instead of running raw SQL.
+- **Per-TA golden eval harness** (~3-4h). Extends `eval/maize_eval_v1.jsonl` schema to associate rows with specific TAs (not just ECON S1117). New `eval/run_eval.py --ta-id <id>` flag runs the harness scoped to one TA's eval rows, produces a per-TA scorecard. Provides A/B signal across the prod corpus, not just one course.
+- **Optional addition**: prod qa_logs delta-vs-eval report. Takes the prod sheet rows for a given TA, joins against any golden-set rows for the same query patterns, computes drift. Probably ~2h.
+
+**Total effort estimate**: ~5-9h for the chunk inspector + per-TA eval harness, spread across 2 sessions.
+
+**Dependency declaration**: NO Group B or Group C work begins until D12's per-TA golden eval harness is live. The chunk inspector is recommended but not strictly blocking.
+
+### What's NOT decided yet (Phase 2 + Phase 3 work)
+
+The following remain open for dedicated next sessions, gated on D12:
+
+- **Group C — Option B top-of-funnel redesign** (single routing tool call replacing B4 + B6 + B7 + B8). The largest single retrieval-side change in the audit. Decision needs to weigh effort (~1-2 sessions of code + eval) against the architectural cleanup it enables.
+- **Group B — indexing changes** (B8 section_path, B9 Contextual Retrieval, B10 per-doc summary). Each ships independently and compounds. Per the staged-deploy section above, B9 is the heaviest (requires full re-index, ~$5-10).
+- **Reranker decision** (gpt-5.2 vs no-rerank vs Cohere) — parked above, gated on multi-TA prod qa_logs + Cohere implementation effort.
 
 ## Status + audit trail
 
 | Date | Event | Ref |
 |---|---|---|
-| 2026-05-23 | Scaffold created (Step 3.0) | this commit |
-| 2026-05-23 | 3.1 map populated (manual; Explore subagents bailed on phantom permissions) | uncommitted |
-| _TBD_ | 3.2 audit populated by research subagent | _TBD_ |
-| _TBD_ | 3.3 decisions logged | _TBD_ |
-| _TBD_ | Architecture review concluded; follow-up plan(s) created | _TBD_ |
+| 2026-05-23 | Scaffold created (Step 3.0) | commit `fc174c2` |
+| 2026-05-23 | 3.1 map populated (manual; Explore subagents bailed on phantom permissions) | commit `fc174c2` |
+| 2026-05-23 | 3.2 audit populated by research subagent | commit `fc174c2` |
+| 2026-05-23 | 3.2 staged-deploy pattern sub-section added | commit `88777b9` |
+| 2026-05-24 | 3.3 Phase 1 decisions logged: A1+A2+A4 to ship, A5 parked pending Cohere comparison, D12 scoped | _this commit_ |
+| _TBD_ | A1+A2+A4 cleanup shipped | _TBD_ |
+| _TBD_ | Multi-TA prod qa_logs gathered (1-2 weeks post-V2-deploy) | _TBD_ |
+| _TBD_ | D12 per-TA golden eval harness built | _TBD_ |
+| _TBD_ | Rerank decision (Cohere/no-rerank/keep) made with multi-TA data + Cohere implementation | _TBD_ |
+| _TBD_ | Group B and Group C work begins (gated on D12) | _TBD_ |
 
 ## Related documents
 

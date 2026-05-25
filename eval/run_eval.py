@@ -49,6 +49,13 @@ class RowResult:
     correct_hit_at_5: bool
     hard_negative_top1: bool
     forbidden_hit: bool
+    # Pre-rerank metrics — same logic but applied to the chunk order BEFORE
+    # llm_rerank() ran. Lets us measure rerank's actual lift in isolation.
+    # The diff (post − pre) is rerank "lift": positive = rerank helped,
+    # negative = rerank hurt, zero = rerank had no effect on top-5 membership.
+    pre_rerank_retrieved_doc_ids: list[str] = field(default_factory=list)
+    correct_hit_at_5_pre_rerank: bool = False
+    hard_negative_top1_pre_rerank: bool = False
     error: str | None = None
     retrieval_latency_ms: int = 0
 
@@ -70,6 +77,7 @@ def evaluate_row(row: dict, retrieve_context) -> RowResult:
     conversation_history = list(row.get("prior_turns") or [])
 
     t0 = time.time()
+    pre_rerank_retrieved = []
     try:
         chunks, diagnostics = retrieve_context(
             ta_id=row["ta_id"],
@@ -82,16 +90,22 @@ def evaluate_row(row: dict, retrieve_context) -> RowResult:
         latency = int((time.time() - t0) * 1000)
         retrieved = [c.get("file_name", "") for c in (chunks or [])][:8]
         retrieved_top5 = retrieved[:5]
+        # Pre-rerank ordering — extracted from the diagnostics dict so we can
+        # measure rerank lift in isolation (post − pre).
+        pre_candidates = diagnostics.get("pre_rerank_candidates") or []
+        pre_rerank_retrieved = [c.get("file", "") for c in pre_candidates][:8]
         error = None
     except Exception as e:
         latency = int((time.time() - t0) * 1000)
         retrieved = []
         retrieved_top5 = []
+        pre_rerank_retrieved = []
         error = f"{type(e).__name__}: {e}"
 
     correct_set = set(row["correct_doc_ids"])
     hard_neg_set = set(row.get("hard_negative_doc_ids") or [])
     forbidden_set = set(row.get("forbidden_doc_ids") or [])
+    pre_rerank_top5 = pre_rerank_retrieved[:5]
 
     return RowResult(
         row_id=row["row_id"],
@@ -105,6 +119,9 @@ def evaluate_row(row: dict, retrieve_context) -> RowResult:
         correct_hit_at_5=any(d in correct_set for d in retrieved_top5),
         hard_negative_top1=(retrieved[0] in hard_neg_set) if retrieved else False,
         forbidden_hit=any(d in forbidden_set for d in retrieved),
+        pre_rerank_retrieved_doc_ids=pre_rerank_retrieved,
+        correct_hit_at_5_pre_rerank=any(d in correct_set for d in pre_rerank_top5),
+        hard_negative_top1_pre_rerank=(pre_rerank_retrieved[0] in hard_neg_set) if pre_rerank_retrieved else False,
         error=error,
         retrieval_latency_ms=latency,
     )
@@ -132,9 +149,13 @@ def aggregate(results: list[RowResult]) -> dict:
             summary[key] = None
             continue
         n = len(bucket)
+        post = sum(r.correct_hit_at_5 for r in bucket) / n
+        pre = sum(r.correct_hit_at_5_pre_rerank for r in bucket) / n
         summary[key] = {
             "n": n,
-            "correct_hit_at_5_rate": sum(r.correct_hit_at_5 for r in bucket) / n,
+            "correct_hit_at_5_rate": post,
+            "correct_hit_at_5_pre_rerank_rate": pre,
+            "rerank_lift": post - pre,  # positive = rerank helped; negative = rerank hurt
             "hard_negative_top1_rate": sum(r.hard_negative_top1 for r in bucket) / n,
             "forbidden_hit_rate": sum(r.forbidden_hit for r in bucket) / n,
             "error_count": sum(1 for r in bucket if r.error),
@@ -163,7 +184,7 @@ def format_scorecard(summary: dict, label: str = "Retrieval scorecard") -> str:
     lines.append(f"**Total rows:** {overall['total_rows']} ({overall['in_corpus']} in-corpus + "
                  f"{overall['not_in_corpus']} not-in-corpus). **Errors:** {overall['errors']}.")
     lines.append("")
-    lines.append("| Failure type | n | correct_hit@5 | hard_negative_top1 | forbidden_hit | avg_latency_ms | errors |")
+    lines.append("| Failure type | n | hit@5 pre→post (lift) | hard_neg_top1 | forbidden_hit | avg_latency_ms | errors |")
     lines.append("|---|---:|---:|---:|---:|---:|---:|")
     label_map = {"A": "A (Lab vs PS)", "B": "B (Roman numeral siblings)",
                  "C": "C (lookalike-unrelated)", "D": "D (problem-vs-solutions)",
@@ -174,7 +195,9 @@ def format_scorecard(summary: dict, label: str = "Retrieval scorecard") -> str:
             lines.append(f"| {label_map[key]} | 0 | — | — | — | — | — |")
             continue
         lines.append(
-            f"| {label_map[key]} | {b['n']} | {b['correct_hit_at_5_rate']:.0%} | "
+            f"| {label_map[key]} | {b['n']} | "
+            f"{b['correct_hit_at_5_pre_rerank_rate']:.0%}→{b['correct_hit_at_5_rate']:.0%} "
+            f"({b['rerank_lift']:+.0%}) | "
             f"{b['hard_negative_top1_rate']:.0%} | {b['forbidden_hit_rate']:.0%} | "
             f"{b['avg_latency_ms']:.0f} | {b['error_count']} |"
         )
@@ -185,7 +208,8 @@ def format_scorecard(summary: dict, label: str = "Retrieval scorecard") -> str:
                  f"Forbidden-hit rate: {nic['forbidden_hit_rate']:.0%}.")
     lines.append("")
     lines.append("## Metric definitions")
-    lines.append("- **correct_hit@5** — fraction of rows where at least one `correct_doc_ids` appeared in retrieved top-5.")
+    lines.append("- **hit@5 pre→post (lift)** — pre-rerank hit-rate → post-rerank hit-rate, with the rerank's contribution as a `(±X%)` delta. Positive = rerank moved correct chunks into top-5 that weren't there before. Negative = rerank pushed correct chunks out. Zero = rerank didn't affect top-5 membership.")
+    lines.append("- **correct_hit@5** — fraction of rows where at least one `correct_doc_ids` appeared in retrieved top-5 (post-rerank).")
     lines.append("- **hard_negative_top1** — fraction of rows where the retrieved top-1 doc matched a known hard negative "
                  "(i.e., the current bad retrieval pattern fired).")
     lines.append("- **forbidden_hit** — fraction of rows where ANY retrieved doc was on the forbidden list "
