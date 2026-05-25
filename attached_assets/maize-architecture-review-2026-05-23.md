@@ -785,13 +785,23 @@ Indexing-side B8 shipped (schema, multi-level header-hierarchy extractor, update
 - Top-1 source quality on structural queries
 - Cache-anchored switch behavior (Type E rows) since contextualize_query is involved
 
+### B10 — indexing-only ship landed 2026-05-25
+
+`Document.summary` (Text) + `Document.summary_embedding` (Vector(1536)) added. New `summarize_doc(text, filename, content_title) -> str` produces a ~100-150 word per-doc summary via gpt-4o-mini (3 retries; returns empty string on terminal failure). Wired into `process_and_index_documents_resumable` right after `classify_doc_category`, before `bm25_tsvector`. Backfill (`scripts/backfill_doc_summaries.py`) ran on ECON S1117: 68/68 docs summarized + embedded, 0 failures, ~4 min wall-clock. Spot-checks confirmed summaries correctly identify doc kind (syllabus/lab/pset/lecture/solutions), course position (Week N, Lecture N, Pset N), and key topics. Post-ship eval scorecard moved 1 row in pre-rerank metrics vs the B8 baseline — within the LLM-tiebreaker noise band, no retrieval-side code path was touched.
+
+**The retrieval-side activation is the unlock — explicitly deferred:**
+
+`hybrid_doc_search` still uses BM25 + dense + filename RRF + Stage 5 short-circuit. The future refactor replaces that whole stack with summary-cosine + LLM tiebreaker — the largest single retrieval simplification in the audit (~300 lines deletable). Gated on D12 multi-TA prod qa_logs + behind a flag (likely `Config.SUMMARY_DOC_ROUTING_ENABLED`) so we can A/B test against the existing 64-row eval + multi-TA prod traffic before flipping default-on. Naturally pairs with Group C (Option B top-of-funnel redesign) for a clean retrieval-side overhaul.
+
 ### What's NOT decided yet (Phase 2 + Phase 3 work)
 
 The following remain open for dedicated next sessions, gated on D12:
 
 - **Group C — Option B top-of-funnel redesign** (single routing tool call replacing B4 + B6 + B7 + B8). The largest single retrieval-side change in the audit. Decision needs to weigh effort (~1-2 sessions of code + eval) against the architectural cleanup it enables. NOTE: structural_target emission (deferred from B8 above) is a natural fit here — Option B's single tool call should produce it.
-- **Group B — indexing changes** (B8 section_path — landed; B9 Contextual Retrieval; B10 per-doc summary). B8 indexing-only is shipped; query-side activation deferred (see above). B9 still ahead. Per the staged-deploy section above, B9 is the heaviest (requires full re-index, ~$5-10).
+- **Group B — indexing changes** (B8 section_path — landed; B10 per-doc summary — landed; B9 Contextual Retrieval — still ahead). B8 + B10 indexing-only are shipped; their retrieval-side activations are both deferred behind flags pending D12 multi-TA data + A/B testing. Per the staged-deploy section above, B9 is the heaviest of the three (requires full re-index, ~$5-10).
+- **`hybrid_doc_search` refactor → summary-cosine + LLM tiebreaker** (unlocked by B10, ~300 lines deletable). Largest retrieval simplification in the audit. See B10 section above.
 - **Reranker decision** (gpt-5.2 vs no-rerank vs Cohere) — parked above, gated on multi-TA prod qa_logs + Cohere implementation effort.
+- **Multi-TA eval expansion** — currently single-TA (ECON S1117, 64 rows). Plan: bootstrap 2-3 diverse TAs (~15-20 labeled rows each) before the hybrid_doc_search refactor or Group C ship. User handles indexing + ground-truth `correct_doc_ids`; Claude handles the rest of the labeling work. CSV input template + JSONL converter in `eval/`.
 
 ## Status + audit trail
 
@@ -804,7 +814,8 @@ The following remain open for dedicated next sessions, gated on D12:
 | 2026-05-24 | 3.3 Phase 1 decisions logged: A1+A2+A4 to ship, A5 parked pending Cohere comparison, D12 scoped | commit `f3f86c8` |
 | 2026-05-24 | A1+A2+A4 cleanup shipped to prod | commit `67aedb8` |
 | 2026-05-25 | D12 shipped in revised scope: `--ta-id` eval flag + bootstrap doc + chunks API + qa_logs enrichment (no frontend page) | commit `577392b` |
-| 2026-05-25 | B8 indexing-only ship: schema + chunker + backfill + benign retrieval filter. Query-side activation deferred behind a flag for future A/B. | _this commit_ |
+| 2026-05-25 | B8 indexing-only ship: schema + chunker + backfill + benign retrieval filter. Query-side activation deferred behind a flag for future A/B. | commit `b5287c9` |
+| 2026-05-25 | B10 indexing-only ship: Document.summary + summary_embedding columns + summarize_doc LLM call wired into indexing pipeline + ECON S1117 backfill (68/68 docs). Retrieval-side activation (hybrid_doc_search → summary-cosine + LLM tiebreaker, ~300 lines deletable) deferred. | _this commit_ |
 | _TBD_ | Multi-TA prod qa_logs gathered (1-2 weeks post-V2-deploy) | _TBD_ |
 | _TBD_ | Rerank decision (Cohere/no-rerank/keep) made with multi-TA data + Cohere implementation | _TBD_ |
 | _TBD_ | Group B and Group C work begins (gated on D12) | _TBD_ |

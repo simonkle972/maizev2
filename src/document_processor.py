@@ -1151,6 +1151,69 @@ Confidence: 0.9+ = certain; 0.7-0.9 = likely; <0.7 = uncertain. The slug MUST ma
                 return fallback_slug, 0.0, f"classification failed: {type(e).__name__}"
 
 
+def summarize_doc(text: str, filename: str, content_title: str = "") -> str:
+    """Phase B Stage B10: per-doc summary used by the future hybrid_doc_search refactor.
+
+    Returns a ~100-150 word summary describing what the doc is, what it covers,
+    where it sits in the course (week N / lesson topic / etc.), and key concepts.
+    Caller embeds the returned text and persists to `Document.summary` +
+    `Document.summary_embedding`.
+
+    Indexing-only TODAY: nothing reads `Document.summary_embedding` from
+    retrieval yet. The future Phase-B refactor (replacing BM25+dense+filename
+    RRF in hybrid_doc_search with summary-cosine + LLM tiebreaker) is gated on
+    these columns being populated first. See
+    `attached_assets/maize-architecture-review-2026-05-23.md` section 3.3.
+
+    Returns an empty string if the LLM call fails after 3 retries. Callers
+    should treat empty as "no summary available" and leave the column NULL.
+    """
+    from openai import OpenAI
+
+    if not (text and text.strip()):
+        return ""
+
+    client = OpenAI(api_key=Config.OPENAI_API_KEY)
+    preview = text[:8000] if len(text) > 8000 else text  # generous window for richer summaries
+
+    title_hint = f"\nContent title (from metadata): {content_title}" if content_title else ""
+
+    prompt = f"""Summarize this course document in 100-150 words for a teaching-assistant retrieval system. The summary becomes the document's representation in a doc-routing index — when a student asks a question, the system will compare the question's embedding to your summary's embedding to decide whether this doc is relevant.
+
+Filename: {filename}{title_hint}
+
+Document text (truncated to first 8000 chars):
+{preview}
+
+Your summary must:
+- State what KIND of document this is (lecture notes, problem set, quiz, syllabus, solutions, exam, reference sheet, etc.)
+- State the doc's POSITION in the course if extractable (Week N, Lesson N, Lecture N, Quiz N, Pset N, course-level admin, etc.)
+- List the 3-6 KEY TOPICS or CONCEPTS the doc covers
+- Note any structural features that matter for routing (e.g. "covers multiple sections each with their own sub-problems", "single problem with sub-parts a-d", "slide deck with N slides on topic X")
+
+Write a single paragraph. No bullet points. No markdown. No preamble like "This document is...". Start with the document's KIND and POSITION, then topics. ~100-150 words.
+
+Return ONLY the summary text — no JSON wrapping, no surrounding quotes."""
+
+    for attempt in range(3):
+        try:
+            response = client.chat.completions.create(
+                model=Config.VISION_MODEL,  # gpt-4o; cheap + fast for summarization
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=300,
+            )
+            summary = (response.choices[0].message.content or "").strip()
+            # Strip surrounding quotes if the LLM added them despite instructions
+            if len(summary) >= 2 and summary[0] in ('"', "'") and summary[-1] == summary[0]:
+                summary = summary[1:-1].strip()
+            return summary
+        except Exception as e:
+            logger.warning(f"summarize_doc attempt {attempt+1} failed: {e}")
+            if attempt == 2:
+                logger.error(f"All summarize_doc attempts failed for {filename!r}; returning empty summary")
+                return ""
+
+
 def infer_doc_metadata_from_filename(filename: str) -> dict:
     """
     Synchronous lightweight metadata inference from a filename. Used at upload
@@ -1467,6 +1530,29 @@ def process_and_index_documents_resumable(ta_id: str, progress_callback=None, re
                 logger.warning(f"[{ta_id}] [{doc.id}] doc_category classification failed: {cat_err}; leaving unset")
         elif not ta_categories:
             logger.warning(f"[{ta_id}] [{doc.id}] TA has no doc_categories — skipping classify_doc_category")
+
+        # Phase B Stage B10: per-doc LLM-generated summary + summary embedding.
+        # Indexing-only today (no retrieval reads summary_embedding yet); sets up
+        # the future hybrid_doc_search refactor. Skips when summary is already
+        # populated AND not flagged stale (no stale flag today, so set-once
+        # semantics: rebuild a stale summary by manually clearing the column
+        # OR running backfill --force). See attached_assets/maize-architecture-review-2026-05-23.md.
+        if not doc.summary:
+            logger.info(f"[{ta_id}] [{doc.id}] Generating doc summary...")
+            try:
+                summary_text = summarize_doc(text, doc.original_filename, doc.content_title or "")
+                if summary_text:
+                    summary_emb_response = client.embeddings.create(
+                        model=Config.EMBEDDING_MODEL,
+                        input=summary_text,
+                    )
+                    doc.summary = summary_text
+                    doc.summary_embedding = summary_emb_response.data[0].embedding
+                    logger.info(f"[{ta_id}] [{doc.id}] Summary populated ({len(summary_text)} chars, ~{len(summary_text.split())} words)")
+                else:
+                    logger.warning(f"[{ta_id}] [{doc.id}] summarize_doc returned empty; leaving summary unset")
+            except Exception as summary_err:
+                logger.warning(f"[{ta_id}] [{doc.id}] Summary generation failed: {summary_err}; leaving unset")
 
         # Phase A retrieval refactor: BM25 tsvector for hybrid Stage 1 retrieval.
         # Built from the already-extracted text via PostgreSQL's to_tsvector.

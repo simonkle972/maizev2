@@ -216,6 +216,18 @@ class Document(db.Model):
     # upload via LLM from the TA's configured list; professor overrides via UI.
     doc_category = db.Column(db.String(64), nullable=True)
 
+    # Phase B Stage B10 (architecture audit 2026-05-23, cross-cutting finding #3).
+    # Per-doc LLM-generated summary + its embedding. Sets up the future refactor
+    # of hybrid_doc_search: replace BM25 + dense + filename RRF + Stage 5 short-
+    # circuit with summary-cosine + LLM tiebreaker (~300 lines deletable, biggest
+    # single retrieval-side simplification in the audit). Today these columns
+    # are populated at index time + via backfill but NOT yet read by retrieval —
+    # ships as indexing-only infrastructure pending the focused retrieval-side
+    # session that wires summary_embedding into doc-routing.
+    summary = db.Column(db.Text, nullable=True)
+    summary_embedding = db.Column(Vector(1536), nullable=True)
+
+
 class ChatSession(db.Model):
     __tablename__ = 'chat_sessions'
 
