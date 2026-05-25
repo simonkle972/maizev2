@@ -21,7 +21,7 @@ from pathlib import Path
 REQUIRED = {"row_id", "source", "ta_id", "query", "prior_turns",
             "correct_doc_ids", "hard_negative_doc_ids", "forbidden_doc_ids",
             "failure_type_target", "expected_intent"}
-VALID_FAILURE_TYPES = {"A", "B", "C", "D", "E", None}
+VALID_FAILURE_TYPES = {"A", "B", "C", "D", "E", "F1", "F2", "G1", "G2", None}
 VALID_SOURCES = {"prod_log", "synthetic", "synthetic_working_case"}
 
 
@@ -68,7 +68,11 @@ def main() -> int:
             errors.append(f"{rid}: source must be one of {VALID_SOURCES}, got {row['source']!r}")
 
         if row["failure_type_target"] not in VALID_FAILURE_TYPES:
-            errors.append(f"{rid}: failure_type_target must be A/B/C/D/E or null, got {row['failure_type_target']!r}")
+            errors.append(f"{rid}: failure_type_target must be one of {sorted(t for t in VALID_FAILURE_TYPES if t)} or null, got {row['failure_type_target']!r}")
+
+        ftf = row.get("forbidden_text_fragments")
+        if ftf is not None and not isinstance(ftf, list):
+            errors.append(f"{rid}: forbidden_text_fragments must be a list of strings if present, got {type(ftf).__name__}")
 
         if not isinstance(row["correct_doc_ids"], list) or not row["correct_doc_ids"]:
             errors.append(f"{rid}: correct_doc_ids must be non-empty list")
@@ -99,7 +103,7 @@ def main() -> int:
     print(f"Total rows: {len(rows)}")
     print()
     print(f"Failure type distribution:")
-    for k in ["A", "B", "C", "D", "E", None]:
+    for k in ["A", "B", "C", "D", "E", "F1", "F2", "G1", "G2", None]:
         print(f"  {k!s:>6}: {failure_dist[k]}")
     print()
     print(f"Source distribution:")

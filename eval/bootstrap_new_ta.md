@@ -11,6 +11,32 @@ Add eval coverage for a TA when **any** of these is true:
 
 If none of the above applies — wait. Don't pre-author rows speculatively.
 
+## Minimal-input mode (recommended for human-in-the-loop)
+
+The lowest-effort workflow when Simon (or another labeler) provides the inputs and Claude fills the rest:
+
+**Human provides:**
+1. `ta_id` + TA name + 1-line subject description
+2. TA indexed in the local Docker postgres (`maize_postgres_dev`) so the live retriever can be exercised against it
+3. ~10-20 rows in `eval/new_ta_input_template.csv` format, filling only:
+   - `row_id` (use the convention `{ta_slug}_{source}_{type}_{NN}`)
+   - `source` (`prod_log` for queries lifted from qa_logs; `synthetic_working_case` for working cases)
+   - `ta_id`
+   - `query` (verbatim from qa_logs)
+   - `correct_doc_ids` (pipe-delimited; the doc(s) the student was *actually* asking about — this is the one piece only the human can label confidently)
+   - `notes` (free-form, e.g. qa_logs session_id + timestamp for provenance)
+
+**Claude fills the remaining columns:**
+- `prior_turns_json` — reconstructed by walking the qa_logs `session_id` (or `[]` for first-turn)
+- `hard_negative_doc_ids` — by running the live V2 retriever against each query and subtracting `correct_doc_ids` from what it returns
+- `forbidden_doc_ids` — pattern-based (solutions docs when the student is solving)
+- `failure_type_target` — classified A/B/C/D/E from the retrieval pattern
+- `expected_intent` (3 sub-fields) — derived from query wording
+- `not_in_corpus` — verified against the TA's actual indexed docs
+- JSONL conversion + validation (`eval/validate_schema.py`) + smoke-test (`run_eval.py --ta-id <new_ta_id> --limit 3`)
+
+Hand the CSV to Claude; receive validated JSONL appended to `maize_eval_v1.jsonl` + a smoke-tested first 3 rows + a scorecard slice for the new TA.
+
 ## Two bootstrap paths
 
 ### Path 1: from production qa_logs (fastest, ~20-30 min per TA)

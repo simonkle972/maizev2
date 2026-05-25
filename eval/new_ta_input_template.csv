@@ -1,0 +1,4 @@
+row_id,source,ta_id,query,prior_turns_json,correct_doc_ids,hard_negative_doc_ids,forbidden_doc_ids,failure_type_target,not_in_corpus,is_solution_request,concept_or_problem,document_corrected_from_prior_turn,notes
+EXAMPLE_psyc101_real_typeA_01,prod_log,abc1234567890XYZ,help me with question 3 from problem set 4,[],pset4,,,,,,,,session a1b2c3 T1 from qa_logs
+EXAMPLE_psyc101_real_typeE_01,prod_log,abc1234567890XYZ,what about question 5?,"[{""role"":""user"",""content"":""help with q3 pset 4""},{""role"":""assistant"",""content"":""...""}]",pset4,,,,,,,,follow-up after first turn — multi-turn row
+EXAMPLE_psyc101_working_01,synthetic_working_case,abc1234567890XYZ,what does operant conditioning mean,[],lecture_07-conditioning,,,,,,,,working case — pure concept query
