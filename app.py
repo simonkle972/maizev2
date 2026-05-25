@@ -1213,6 +1213,140 @@ def resume_interrupted_indexing_jobs():
             import traceback
             logger.error(traceback.format_exc())
 
+@app.route('/admin/api/tas/<ta_id>/chunks', methods=['GET'])
+@admin_api_required
+def list_ta_chunks(ta_id):
+    """Admin chunk inspector — observability layer for prod retrieval.
+
+    Surfaces per-chunk metadata (doc_category, chunk_context, parent doc fields,
+    embedding norm + preview) with optional filtering by doc / category and
+    optional query-scoring debug mode. Built per the audit's D12 recommendation
+    (attached_assets/maize-architecture-review-2026-05-23.md section 3.3) as the
+    prerequisite for measuring whether Group B/C changes help in production.
+
+    Query parameters:
+      - doc_id (int, optional): filter to chunks from one parent doc
+      - category (str, optional): filter to chunks whose doc_category matches
+      - q (str, optional): "query against TA" mode. Embeds the query and
+          returns per-chunk cosine distance, sorted by distance ascending
+          (closest first). Lets us see what retrieval WOULD surface for a query.
+      - limit (int, default 50): pagination
+      - offset (int, default 0): pagination
+    """
+    from models import db, DocumentChunk, TeachingAssistant
+    from sqlalchemy import literal
+    ta = TeachingAssistant.query.get(ta_id)
+    if not ta:
+        return jsonify({"error": "TA not found"}), 404
+
+    doc_id_filter = request.args.get("doc_id", type=int)
+    category_filter = request.args.get("category", type=str)
+    query_text = (request.args.get("q") or "").strip()
+    limit = min(request.args.get("limit", default=50, type=int), 200)
+    offset = max(request.args.get("offset", default=0, type=int), 0)
+
+    base_query = DocumentChunk.query.filter(DocumentChunk.ta_id == ta_id)
+    if doc_id_filter is not None:
+        base_query = base_query.filter(DocumentChunk.document_id == doc_id_filter)
+    if category_filter:
+        base_query = base_query.filter(DocumentChunk.doc_category == category_filter)
+
+    total = base_query.count()
+
+    # If q provided: embed it once, then order chunks by cosine distance + add
+    # the per-chunk distance to the response. This is the "what would retrieve
+    # for this query?" debug primitive — surfaces the V2 hybrid Stage 1 + chunk
+    # vector search ordering BEFORE rerank.
+    query_embedding = None
+    if query_text:
+        try:
+            from openai import OpenAI
+            client = OpenAI(api_key=Config.OPENAI_API_KEY)
+            query_embedding = client.embeddings.create(
+                model=Config.EMBEDDING_MODEL,
+                input=query_text,
+            ).data[0].embedding
+        except Exception as e:
+            return jsonify({"error": f"Failed to embed query: {type(e).__name__}: {e}"}), 500
+
+    if query_embedding is not None:
+        # Order by cosine distance ASC (closest first). Returns chunks WITH their
+        # distance so the UI can render the per-chunk score.
+        results = (
+            base_query
+            .add_columns(
+                DocumentChunk.embedding.cosine_distance(query_embedding).label("cosine_distance")
+            )
+            .order_by(DocumentChunk.embedding.cosine_distance(query_embedding).asc())
+            .limit(limit)
+            .offset(offset)
+            .all()
+        )
+    else:
+        # Default order: doc_id then chunk_index so the inspector lists chunks
+        # in their original ingestion sequence within each doc.
+        results = (
+            base_query
+            .add_columns(literal(None).label("cosine_distance"))
+            .order_by(DocumentChunk.document_id.asc(), DocumentChunk.chunk_index.asc())
+            .limit(limit)
+            .offset(offset)
+            .all()
+        )
+
+    rows = []
+    for row in results:
+        chunk = row[0]
+        cosine_distance = row[1]
+        # Embedding norm + first-8-dims preview. pgvector returns the embedding
+        # as a list of floats; some envs return a numpy array. Coerce defensively.
+        emb = chunk.embedding
+        if emb is not None:
+            try:
+                emb_list = list(emb)
+                emb_norm = round(sum(v * v for v in emb_list) ** 0.5, 4)
+                emb_preview = [round(float(v), 4) for v in emb_list[:8]]
+            except Exception:
+                emb_norm = None
+                emb_preview = None
+        else:
+            emb_norm = None
+            emb_preview = None
+
+        chunk_text_full = chunk.chunk_text or ""
+        rows.append({
+            "id": chunk.id,
+            "document_id": chunk.document_id,
+            "chunk_index": chunk.chunk_index,
+            "chunk_text": chunk_text_full[:400],
+            "chunk_text_full_length": len(chunk_text_full),
+            "chunk_context": chunk.chunk_context,
+            "doc_type": chunk.doc_type,
+            "doc_category": chunk.doc_category,
+            "assignment_number": chunk.assignment_number,
+            "instructional_unit_number": chunk.instructional_unit_number,
+            "instructional_unit_label": chunk.instructional_unit_label,
+            "file_name": chunk.file_name,
+            "embedding_norm": emb_norm,
+            "embedding_preview": emb_preview,
+            "cosine_distance_vs_query": round(float(cosine_distance), 4) if cosine_distance is not None else None,
+        })
+
+    return jsonify({
+        "ta_id": ta_id,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "filters_applied": {
+            "doc_id": doc_id_filter,
+            "category": category_filter,
+            "q": query_text or None,
+        },
+        "query_mode": "cosine_against_q" if query_embedding is not None else "ingestion_order",
+        "chunks": rows,
+    })
+
+
 @app.route('/admin/api/tas/<ta_id>/reindex', methods=['POST'])
 @admin_api_required
 def reindex_ta(ta_id):

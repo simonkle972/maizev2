@@ -751,20 +751,21 @@ These are the calls 3.3 will need to make based on the user's risk tolerance, th
 - Re-run the eval with all three datapoints (gpt-5.2, no-rerank/pre-rerank floor, Cohere)
 - Decide based on cumulative evidence: ship whichever beats the no-rerank floor by the largest margin on the most queries
 
-### D12 scoping — observability prerequisite
+### D12 scoping — observability prerequisite (shipped 2026-05-25)
 
-**Status: ACCEPTED IN PRINCIPLE as the prerequisite to Group B/C work; detailed scoping deferred to a dedicated session.**
+**Status: SHIPPED in revised scope.** Original scope called for a frontend chunk-inspector page + per-TA golden eval harness (~5-9h). User pushed back during implementation: a separate admin UI for chunk inspection is redundant with what qa_logs already surfaces. Revised scope chose to enrich qa_logs in place rather than build a parallel UI.
 
-Per the 3.2 audit's cross-cutting finding #5: without per-TA measurement infrastructure, any Group B (indexing changes) or Group C (top-of-funnel redesign) decision flies blind. We can only see whether changes helped on the ECON S1117 eval corpus; the 25 prod TAs are invisible.
+**What shipped:**
 
-**Scope outline (sub-tasks to detail in the next planning session):**
-- **Chunk-level admin inspector** (~2-3h). New admin route + template showing per-chunk metadata (doc_category, chunk_context, embedding preview, parent doc fields), filterable by TA + doc + score. Lets us inspect retrieval mistakes post-hoc instead of running raw SQL.
-- **Per-TA golden eval harness** (~3-4h). Extends `eval/maize_eval_v1.jsonl` schema to associate rows with specific TAs (not just ECON S1117). New `eval/run_eval.py --ta-id <id>` flag runs the harness scoped to one TA's eval rows, produces a per-TA scorecard. Provides A/B signal across the prod corpus, not just one course.
-- **Optional addition**: prod qa_logs delta-vs-eval report. Takes the prod sheet rows for a given TA, joins against any golden-set rows for the same query patterns, computes drift. Probably ~2h.
+1. **`eval/run_eval.py --ta-id <id>` flag.** Filters the eval harness to one TA's rows. Without the flag the harness runs all rows (cross-TA aggregate). Scorecard header reports which TA(s) are in the run so operators catch accidental cross-TA scoring.
+2. **`eval/bootstrap_new_ta.md` procedure doc.** When + how to add eval rows for a new prod TA (qa_logs sampling path + hand-authoring path). Codifies the quality bar (~5-10 rows per TA is enough) and the YAGNI rule (don't pre-seed all 25 TAs).
+3. **`GET /admin/api/tas/<ta_id>/chunks` backend API route.** JSON endpoint for browsing chunks (filter by doc_id / doc_category) + ad-hoc query mode (`?q=<text>` returns chunks sorted by cosine distance against the embedded query). Used for offline / CLI debugging without polluting qa_logs.
+4. **Enriched qa_logs diagnostics.** `pre_rerank_candidates` and `chunk_sources_detail` now include `doc_category` + `chunk_context` per chunk. Operators reading the prod qa_logs sheet see the same metadata the reranker saw, which makes debugging "why did the wrong chunk rank first?" a sheet-only operation instead of a sheet + raw-SQL operation.
 
-**Total effort estimate**: ~5-9h for the chunk inspector + per-TA eval harness, spread across 2 sessions.
+**What got dropped from original scope:**
+- Frontend `admin_chunks_inspector.html` page — YAGNI. The backend API answers the same questions when needed; the qa_logs sheet covers everyday ops.
 
-**Dependency declaration**: NO Group B or Group C work begins until D12's per-TA golden eval harness is live. The chunk inspector is recommended but not strictly blocking.
+**Dependency declaration (unchanged):** NO Group B or Group C work begins until per-TA eval coverage exists for the affected TAs. The `--ta-id` flag is the infrastructure; the rows themselves get added per `eval/bootstrap_new_ta.md` when a Phase B/C change is about to touch a given TA.
 
 ### What's NOT decided yet (Phase 2 + Phase 3 work)
 
@@ -782,10 +783,10 @@ The following remain open for dedicated next sessions, gated on D12:
 | 2026-05-23 | 3.1 map populated (manual; Explore subagents bailed on phantom permissions) | commit `fc174c2` |
 | 2026-05-23 | 3.2 audit populated by research subagent | commit `fc174c2` |
 | 2026-05-23 | 3.2 staged-deploy pattern sub-section added | commit `88777b9` |
-| 2026-05-24 | 3.3 Phase 1 decisions logged: A1+A2+A4 to ship, A5 parked pending Cohere comparison, D12 scoped | _this commit_ |
-| _TBD_ | A1+A2+A4 cleanup shipped | _TBD_ |
+| 2026-05-24 | 3.3 Phase 1 decisions logged: A1+A2+A4 to ship, A5 parked pending Cohere comparison, D12 scoped | commit `f3f86c8` |
+| 2026-05-24 | A1+A2+A4 cleanup shipped to prod | commit `67aedb8` |
+| 2026-05-25 | D12 shipped in revised scope: `--ta-id` eval flag + bootstrap doc + chunks API + qa_logs enrichment (no frontend page) | _this commit_ |
 | _TBD_ | Multi-TA prod qa_logs gathered (1-2 weeks post-V2-deploy) | _TBD_ |
-| _TBD_ | D12 per-TA golden eval harness built | _TBD_ |
 | _TBD_ | Rerank decision (Cohere/no-rerank/keep) made with multi-TA data + Cohere implementation | _TBD_ |
 | _TBD_ | Group B and Group C work begins (gated on D12) | _TBD_ |
 

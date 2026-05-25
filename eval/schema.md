@@ -8,7 +8,7 @@ Each line is a single JSON record. UTF-8. No trailing newline inside fields.
 |---|---|---|---|
 | `row_id` | string | yes | Stable unique identifier. Prefix indicates source: `econ_s1117_real_*` (prod log), `econ_s1117_syn_*` (synthetic hard-negative), `working_*` (working-case rows that must not regress). |
 | `source` | enum | yes | `"prod_log"`, `"synthetic"`, or `"synthetic_working_case"`. |
-| `ta_id` | string | yes | The TA the query runs against. For now always `bv1COF3YbWV28OKv` (ECON S1117). |
+| `ta_id` | string | yes | The TA the query runs against. The eval file supports multiple TAs; existing rows are all ECON S1117 (`EgZ14pvqEYzfQRTM`). `run_eval.py --ta-id <id>` filters to one TA's rows; without the flag the harness runs all rows across all TAs (cross-TA mode). See `eval/bootstrap_new_ta.md` for how to add eval rows for a new TA. |
 | `query` | string | yes | The student's message (the target turn we're evaluating retrieval for). |
 | `prior_turns` | array of `{"role": "user"|"assistant", "content": str}` | yes (may be empty) | Conversation history before this query, oldest first. Empty for first-turn rows. |
 | `correct_doc_ids` | array of strings | yes | The doc(s) the retriever SHOULD return. Strings match the canonical `file_name` (= `display_name or original_filename`). Must each appear in `corpus_econ_s1117.md` UNLESS the row carries `not_in_corpus: true` (see below). |

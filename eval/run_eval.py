@@ -41,6 +41,7 @@ class RowResult:
     row_id: str
     failure_type: str | None
     source: str
+    ta_id: str
     not_in_corpus: bool
     correct_doc_ids: list[str]
     hard_negative_doc_ids: list[str]
@@ -111,6 +112,7 @@ def evaluate_row(row: dict, retrieve_context) -> RowResult:
         row_id=row["row_id"],
         failure_type=row["failure_type_target"],
         source=row["source"],
+        ta_id=row.get("ta_id", ""),
         not_in_corpus=bool(row.get("not_in_corpus")),
         correct_doc_ids=row["correct_doc_ids"],
         hard_negative_doc_ids=row.get("hard_negative_doc_ids") or [],
@@ -174,6 +176,7 @@ def aggregate(results: list[RowResult]) -> dict:
         "in_corpus": len(in_corpus),
         "not_in_corpus": len(not_in_corpus),
         "errors": sum(1 for r in results if r.error),
+        "distinct_tas": sorted({r.ta_id for r in results if r.ta_id}),
     }
     return summary
 
@@ -183,6 +186,14 @@ def format_scorecard(summary: dict, label: str = "Retrieval scorecard") -> str:
     overall = summary["__overall__"]
     lines.append(f"**Total rows:** {overall['total_rows']} ({overall['in_corpus']} in-corpus + "
                  f"{overall['not_in_corpus']} not-in-corpus). **Errors:** {overall['errors']}.")
+    distinct_tas = overall.get("distinct_tas") or []
+    if len(distinct_tas) > 1:
+        lines.append(
+            f"**TAs in this run:** {len(distinct_tas)} — `{'`, `'.join(distinct_tas)}`. "
+            f"Cross-TA aggregate scoring; re-run with `--ta-id <id>` to scope to one TA."
+        )
+    elif len(distinct_tas) == 1:
+        lines.append(f"**TA:** `{distinct_tas[0]}` (filtered to one TA — `--ta-id` flag in use OR file only contains rows for this TA).")
     lines.append("")
     lines.append("| Failure type | n | hit@5 pre→post (lift) | hard_neg_top1 | forbidden_hit | avg_latency_ms | errors |")
     lines.append("|---|---:|---:|---:|---:|---:|---:|")
@@ -225,6 +236,9 @@ def main() -> int:
                         help="Write scorecard to a specific path (overrides --baseline default).")
     parser.add_argument("--row-id", type=str, default=None,
                         help="Run only the row with this row_id; useful for debugging a single case.")
+    parser.add_argument("--ta-id", type=str, default=None,
+                        help="Filter eval rows to those whose ta_id matches. Without this flag the harness "
+                             "runs every row across every TA in the eval file (cross-TA mode).")
     parser.add_argument("--limit", type=int, default=None,
                         help="Only run the first N rows. Useful for smoke-testing the harness.")
     args = parser.parse_args()
@@ -242,6 +256,11 @@ def main() -> int:
         rows = [r for r in rows if r["row_id"] == args.row_id]
         if not rows:
             sys.exit(f"ERROR: row_id {args.row_id!r} not found")
+    if args.ta_id:
+        rows_before = len(rows)
+        rows = [r for r in rows if r.get("ta_id") == args.ta_id]
+        if not rows:
+            sys.exit(f"ERROR: no eval rows match ta_id={args.ta_id!r} (had {rows_before} rows before filter)")
     if args.limit:
         rows = rows[: args.limit]
 

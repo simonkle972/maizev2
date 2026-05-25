@@ -2652,6 +2652,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
     
     base_query = db.session.query(
         DocumentChunk.chunk_text,
+        DocumentChunk.chunk_context,  # D12: surfaced to qa_logs for inspector parity
         DocumentChunk.file_name,
         DocumentChunk.doc_type,
         DocumentChunk.doc_category,  # Phase A Stage 4 — surfaced to reranker as text context
@@ -2798,6 +2799,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
             "file_name": row.file_name or "unknown",
             "doc_type": row.doc_type or "other",
             "doc_category": row.doc_category,  # Phase A Stage 4
+            "chunk_context": row.chunk_context,  # D12: surfaced to qa_logs
             "metadata": {
                 "assignment_number": row.assignment_number,
                 "instructional_unit_number": row.instructional_unit_number,
@@ -2819,6 +2821,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
 
         structural_query = db.session.query(
             DocumentChunk.chunk_text,
+            DocumentChunk.chunk_context,  # D12: surfaced to qa_logs
             DocumentChunk.file_name,
             DocumentChunk.doc_type,
             DocumentChunk.doc_category,  # Phase A Stage 4
@@ -2861,6 +2864,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                         "file_name": row.file_name or "unknown",
                         "doc_type": row.doc_type or "other",
                         "doc_category": row.doc_category,  # Phase A Stage 4
+                        "chunk_context": row.chunk_context,  # D12
                         "metadata": {
                             "assignment_number": row.assignment_number,
                             "instructional_unit_number": row.instructional_unit_number,
@@ -2901,6 +2905,11 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                 f"promoted to top before rerank."
             )
 
+    # D12 enrichment (2026-05-25): include doc_category + chunk_context in
+    # pre_rerank_candidates so the qa_logs sheet shows WHY each chunk got the
+    # ranking it did — same metadata the reranker actually sees. Without these,
+    # operators reading the sheet can't tell "did the wrong doc category
+    # surface?" without a follow-up DB query.
     pre_rerank_candidates = []
     for i, chunk in enumerate(initial_chunks):
         text_preview = chunk["text"][:200].replace("\n", " ").replace("\t", " ").strip()
@@ -2908,7 +2917,9 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
             "idx": i,
             "file": chunk["file_name"],
             "score": round(chunk["score"], 4),
-            "text": text_preview
+            "doc_category": chunk.get("doc_category"),
+            "chunk_context": (chunk.get("chunk_context") or "")[:60],
+            "text": text_preview,
         })
     diagnostics["pre_rerank_candidates"] = pre_rerank_candidates
 
@@ -2921,8 +2932,16 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
     else:
         scores = [c.get("score", 0.0) for c in chunks]
     
+    # D12 enrichment (2026-05-25): per-chunk metadata now includes doc_category
+    # + chunk_context so qa_logs readers can see what the rerank saw.
     sources_detail = [
-        f"{c['file_name']}|{c['doc_type'] or 'unknown'}|unit:{c['metadata'].get('instructional_unit_number') or 'N/A'}"
+        (
+            f"{c['file_name']}|"
+            f"{c['doc_type'] or 'unknown'}|"
+            f"cat:{c.get('doc_category') or 'none'}|"
+            f"ctx:{((c.get('chunk_context') or '')[:40] or 'none')}|"
+            f"unit:{c['metadata'].get('instructional_unit_number') or 'N/A'}"
+        )
         for c in chunks
     ]
     
