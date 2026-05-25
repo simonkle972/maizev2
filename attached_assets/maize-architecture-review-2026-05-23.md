@@ -669,6 +669,26 @@ Per the user's framing, the highest-leverage moves are ingest-side changes that 
 
 ---
 
+### 3.2 Staged deploy pattern + re-index requirements per indexing change
+
+Important nuance on the indexing changes ranked above: they are *replacements*, not *additive enhancements*. Each one moves computation earlier in the pipeline and makes corresponding retrieval-side code dead. But the safe deploy pattern is to ship the indexing change FIRST, leave the now-redundant retrieval code in place, verify the new metadata behaves correctly on prod data, THEN ship a follow-up commit that deletes the old retrieval code.
+
+**Transition state vs target state.** During transition (between the indexing-change deploy and the retrieval-cleanup deploy), both code paths are live. Retrieval is slightly slower (it runs the now-deprecated computation on top of the new metadata), but produces the same or better results. That's the rollback path — if the new metadata turns out to be wrong on real prod data, we can roll back the indexing change without having broken retrieval. Target state is reached when the retrieval-cleanup commit lands and the deprecated code is deleted.
+
+**Per-change deploy logistics:**
+
+| Change | Indexing-side deploy | Retrieval becomes deletable after | Re-index required? | One-shot backfill |
+|---|---|---|---|---|
+| B8 — `section_path` chunk metadata | Add `section_path: list[str]` column on DocumentChunk + populate in `chunk_text_with_context` | Verify section_path filter on chunk vector search returns same/better slide-N results as B15 | NO — chunk text + embedding unchanged | YES — backfill script reconstructs paths from existing chunk_context + neighbouring chunks |
+| B9 — Anthropic Contextual Retrieval prefix | Modify `chunk_text_with_context` to prepend LLM-generated context blob to the EMBEDDED text (raw text stays for display); re-embed every chunk | Verify B17 reranker on prod queries shows quality lift (or hold) and B19 supplementary chunks are demonstrably noisy in the qa_logs_v2 sheet | **YES — every chunk's embedding changes.** Cost: ~1 LLM call per chunk at ingest (~$1/M doc tokens with prompt caching). For Maize's current prod corpus (~220 indexed docs, est. ~5-15k chunks): ~$5-10 one-time + several hours of indexing time | NO separate backfill needed — runs as part of the re-index |
+| B10 — per-doc summary + summary embedding | Add `Document.summary` (text) + `Document.summary_embedding` (vector) columns; populate via 1 LLM call per doc at index time | Land the Phase-B retrieval refactor that replaces `hybrid_doc_search` with summary-cosine + LLM tiebreaker; verify on the existing 27-query battery + eval harness | NO — chunk embeddings unchanged | YES — one-shot backfill script runs LLM summary per existing doc |
+
+**Implication for the deploy roadmap.** B8 and B10 are pure metadata additions (one-shot backfill on existing prod data, no re-embedding). B9 is the heaviest — requires full re-index of every prod chunk. **Sequencing recommendation:** ship B8 and B10's metadata first (cheap, fast, reversible), then schedule B9's re-index as a maintenance window (~hours of indexing, ~$5-10 cost). All three's retrieval-side cleanup commits land as separate follow-up PRs once their respective indexing changes are proven on prod.
+
+**Why this matters for 3.3 decision-making.** A decision like "let's do B9" is actually a two-part commitment: (a) we accept the indexing-side cost (re-index every doc) and (b) we will later ship the retrieval-side cleanup (delete B19). It's NOT a decision to break retrieval atomically. The "redundancy worst case" during transition is the safe deploy path.
+
+---
+
 ### 3.2 What the literature doesn't tell us
 
 Gaps where 3.3 will need first-principles calls:
