@@ -302,6 +302,15 @@ class DocumentChunk(db.Model):
     # without joining back to documents. Synced via the metadata-edit PATCH
     # routes and the indexing pipeline.
     doc_category = db.Column(db.String(64), nullable=True)
+    # Phase B Stage B9 (2026-05-25). Anthropic Contextual Retrieval — 1-2
+    # sentence LLM-generated context blob situating the chunk within its parent
+    # doc. Prepended to the embedded text at index time; the raw chunk_text
+    # above is unchanged and remains the display-time return value. Stored
+    # separately so we can debug "why did this chunk match" and re-embed
+    # without re-running the LLM. NULL on pre-B9 chunks until the backfill
+    # script repopulates them. See attached_assets/maize-b9-contextual-
+    # retrieval-plan.md and section 3.3 of maize-architecture-review-2026-05-23.md.
+    contextual_prefix = db.Column(db.Text, nullable=True)
     embedding = db.Column(Vector(1536), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
