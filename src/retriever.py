@@ -1168,6 +1168,20 @@ def detect_pasted_question(
     }
 
 
+# NEGATIVE RESULT — do not re-attempt without re-validation (2026-05-26).
+# An audit-recommended refactor of this function — replacing the 3-signal RRF
+# + Stage 5 short-circuit with a single summary-cosine match against
+# Document.summary_embedding + an LLM tiebreaker — was implemented, eval-tested
+# against the 92-row body, and ROLLED BACK. Overall hit@5 regressed 75.5% →
+# 61.0% (-14.5pp). Every failure-bucket except F2/G1/Working cases regressed;
+# Type A -33pp, Type B -60pp, Type C -57pp, Type E -18pp. Anthropic's
+# published 49% retrieval-lift from summary-cosine routing doesn't apply to
+# Maize's query distribution because numeric/structural queries
+# ("pset 2", "extra problems II", "lecture 5") need exact-token matching that
+# dense summary embeddings dilute. The BM25 + filename overlap + Stage 5
+# short-circuit logic below is load-bearing for that query class — keep it.
+# Full results + diagnosis: attached_assets/maize-hybrid-doc-search-refactor-
+# plan.md ("Result — did not ship") + audit-doc 3.3 entry.
 def hybrid_doc_search(query: str, query_embedding: list, ta_id: str, top_k: int = None, query_analysis: dict = None) -> tuple:
     """Stage 1 hybrid document-level retrieval (Phase A Stage 3 + Stage 5).
 
