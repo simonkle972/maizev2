@@ -398,6 +398,7 @@ def stream_chat_response(
                 current_images=current_images,
                 history_for_llm=history_for_llm,
                 usage_capture=retrieval_diagnostics,
+                session_id=session_id,
             ):
                 if generation_ttft_ms == 0 and token:
                     generation_ttft_ms = int((time.time() - generation_start) * 1000)

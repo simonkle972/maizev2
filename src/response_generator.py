@@ -454,22 +454,32 @@ def generate_response(
     hybrid_mode: bool = False,
     hybrid_doc_filename: Optional[str] = None,
     query_reference: Optional[str] = None,
-    attempt_count: int = 0
+    attempt_count: int = 0,
+    session_id: str = "",
 ) -> str:
     client = OpenAI(api_key=Config.OPENAI_API_KEY)
-    
+
     messages = build_messages(
         query, context, system_prompt, conversation_history, course_name,
         hybrid_mode=hybrid_mode, hybrid_doc_filename=hybrid_doc_filename, query_reference=query_reference,
         attempt_count=attempt_count
     )
-    
+
+    # Prompt caching (2026-08-05): pass session_id as prompt_cache_key so
+    # OpenAI's routing hint sends same-session requests to the same backend
+    # machine, maximizing cache-hit on the stable system prefix (BASE_INSTRUCTIONS
+    # + persona). Safe at session granularity — per-session traffic is ≤1 RPM,
+    # well under the ~15 RPM per-key overflow threshold that would trigger
+    # cache re-warm on multiple machines. Empty session_id → omit the param.
+    cache_kwargs = {"prompt_cache_key": session_id} if session_id else {}
+
     try:
         response = client.chat.completions.create(
             model=Config.LLM_MODEL,
             messages=messages,
             max_completion_tokens=Config.LLM_MAX_COMPLETION_TOKENS,
-            reasoning_effort=Config.LLM_REASONING_MEDIUM
+            reasoning_effort=Config.LLM_REASONING_MEDIUM,
+            **cache_kwargs,
         )
 
         content = response.choices[0].message.content
@@ -484,7 +494,8 @@ def generate_response(
                 model=Config.LLM_MODEL,
                 messages=messages,
                 max_completion_tokens=Config.LLM_MAX_COMPLETION_TOKENS,
-                reasoning_effort=Config.LLM_REASONING_LOW
+                reasoning_effort=Config.LLM_REASONING_LOW,
+                **cache_kwargs,
             )
             content = response.choices[0].message.content
             if not content or not content.strip():
@@ -513,6 +524,7 @@ def generate_response_stream(
     current_images: Optional[list] = None,
     history_for_llm: Optional[list] = None,
     usage_capture: Optional[dict] = None,
+    session_id: str = "",
 ):
     client = OpenAI(api_key=Config.OPENAI_API_KEY)
 
@@ -523,6 +535,9 @@ def generate_response_stream(
         current_images=current_images, history_for_llm=history_for_llm,
     )
 
+    # Prompt caching (2026-08-05): see generate_response for rationale.
+    cache_kwargs = {"prompt_cache_key": session_id} if session_id else {}
+
     try:
         stream = client.chat.completions.create(
             model=Config.LLM_MODEL,
@@ -531,6 +546,7 @@ def generate_response_stream(
             stream=True,
             stream_options={"include_usage": True},
             reasoning_effort=Config.LLM_REASONING_MEDIUM,
+            **cache_kwargs,
         )
 
         has_content = False
@@ -547,14 +563,15 @@ def generate_response_stream(
             if chunk.choices and chunk.choices[0].delta.content:
                 has_content = True
                 yield chunk.choices[0].delta.content
-        
+
         if not has_content:
             logger.warning("Streaming produced zero content tokens. Falling back to non-streaming retry at low reasoning.")
             response = OpenAI(api_key=Config.OPENAI_API_KEY).chat.completions.create(
                 model=Config.LLM_MODEL,
                 messages=messages,
                 max_completion_tokens=Config.LLM_MAX_COMPLETION_TOKENS,
-                reasoning_effort=Config.LLM_REASONING_LOW
+                reasoning_effort=Config.LLM_REASONING_LOW,
+                **cache_kwargs,
             )
             fallback = response.choices[0].message.content
             if fallback and fallback.strip():

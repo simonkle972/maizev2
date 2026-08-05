@@ -722,13 +722,17 @@ def retrieve_supplementary_teaching_material(ta_id, primary_chunks, query_analys
     return supplementary_chunks, len(supplementary_chunks) > 0
 
 
-def llm_rerank(query: str, chunks: list, top_k: int = FINAL_K) -> tuple:
+def llm_rerank(query: str, chunks: list, top_k: int = FINAL_K, session_id: str = "") -> tuple:
     """
     Rerank chunks using GPT-4o-mini for semantic relevance scoring.
-    
+
     The LLM evaluates each chunk's relevance to the specific query,
     understanding context like "problem 2f" vs "problem 3d".
-    
+
+    `session_id` is passed to OpenAI as `prompt_cache_key` — the reranker
+    prompt template is stable per-TA, so session-scoped caching improves
+    hit rate within a conversation.
+
     Returns:
         tuple: (reranked_chunks, rerank_info)
     """
@@ -787,14 +791,18 @@ Example: {{"scores": [{{"index": 0, "score": 8, "reason": "Contains problem 2f s
 
     try:
         client = get_openai_client()
+        # Prompt caching (2026-08-05): session_id as routing hint. See
+        # generate_response in response_generator.py for the full rationale.
+        cache_kwargs = {"prompt_cache_key": session_id} if session_id else {}
         response = client.chat.completions.create(
             model=Config.LLM_MODEL,
             messages=[{"role": "user", "content": prompt}],
             max_completion_tokens=2000,
             response_format={"type": "json_object"},
-            reasoning_effort=Config.LLM_REASONING_MEDIUM
+            reasoning_effort=Config.LLM_REASONING_MEDIUM,
+            **cache_kwargs,
         )
-        
+
         rerank_latency_ms = int((time.time() - rerank_start) * 1000)
         
         result_text = response.choices[0].message.content or "{}"
@@ -1871,7 +1879,7 @@ def _format_history_for_contextualizer(conversation_history: list, max_turns: in
     return "\n".join(normalized)
 
 
-def contextualize_query(query: str, conversation_history: list = None, session_context: dict = None, ta_id: str = "") -> dict:
+def contextualize_query(query: str, conversation_history: list = None, session_context: dict = None, ta_id: str = "", session_id: str = "") -> dict:
     """
     Pre-retrieval contextualization: rewrite the query into a self-contained form
     and classify the student's intent using a single cheap LLM call.
@@ -1993,12 +2001,16 @@ Respond with JSON ONLY, no prose:
     start = time.time()
     try:
         client = get_openai_client()
+        # Prompt caching (2026-08-05): session_id as routing hint. See
+        # generate_response in response_generator.py for the full rationale.
+        cache_kwargs = {"prompt_cache_key": session_id} if session_id else {}
         response = client.chat.completions.create(
             model=Config.CONTEXTUALIZER_MODEL,
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"},
             max_tokens=300,
             temperature=0.0,
+            **cache_kwargs,
         )
         raw = response.choices[0].message.content.strip()
         parsed = json.loads(raw)
@@ -2241,7 +2253,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
     # and classifies intent (continuation | concept_lookup | pivot | clarification | new).
     # The rewritten query feeds downstream retrieval; the intent steers cache behavior.
     # Falls back silently to raw-query heuristic path if disabled or if the call fails.
-    ctx_result = contextualize_query(query, conversation_history, session_context, ta_id)
+    ctx_result = contextualize_query(query, conversation_history, session_context, ta_id, session_id=session_id)
     diagnostics["contextualizer_latency_ms"] = ctx_result["latency_ms"]
     diagnostics["contextualizer_fallback"] = ctx_result["fallback"]
     diagnostics["rewritten_query"] = ctx_result["rewritten_query"]
@@ -2979,7 +2991,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         })
     diagnostics["pre_rerank_candidates"] = pre_rerank_candidates
 
-    chunks, rerank_info = llm_rerank(query, initial_chunks, top_k=final_k)
+    chunks, rerank_info = llm_rerank(query, initial_chunks, top_k=final_k, session_id=session_id)
     diagnostics["rerank_applied"] = rerank_info.get("reranked", False)
     diagnostics["rerank_info"] = rerank_info
     

@@ -553,6 +553,9 @@ def test_chat_stream(ta_id):
                 hybrid_doc_filename=hybrid_doc_filename,
                 query_reference=query_reference,
                 attempt_count=attempt_count,
+                # Professor test-chat: TA-scoped cache key (no per-session id — professor testing).
+                # TA-scoped is safe at low RPM (only the TA's owner is testing).
+                session_id=f"prof-preview-{ta.id}",
             ):
                 full_response += token
                 token_count += 1
