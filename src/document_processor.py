@@ -1214,98 +1214,6 @@ Return ONLY the summary text — no JSON wrapping, no surrounding quotes."""
                 return ""
 
 
-# Phase B Stage B9 — Anthropic Contextual Retrieval. Per-chunk LLM-generated
-# context blob, prepended to the chunk's text BEFORE embedding so each chunk
-# embedding self-describes its position in the parent doc. See
-# attached_assets/maize-b9-contextual-retrieval-plan.md.
-#
-# The published technique uses Claude with prompt caching; we use gpt-4o-mini
-# with OpenAI's automatic prompt caching (kicks in for prefixes >=1024 tokens,
-# which the full-doc prefix always is). Batching all chunks of one doc
-# sequentially means chunks 2+ hit the cache, getting the ~50% input-token
-# discount. Cost: ~$0.20 for the 75-doc ECON corpus, ~$5-10 for the full prod
-# re-index.
-_CONTEXTUAL_PREFIX_PROMPT = """Here is the document, for context:
-<document>
-{full_doc_text}
-</document>
-
-Here is the chunk we want to situate within the whole document:
-<chunk>
-{chunk_text}
-</chunk>
-
-Please give a short succinct context (1-2 sentences, max ~80 words) to situate this chunk within the overall document for the purposes of improving search retrieval of the chunk. State what kind of document this is, where in the document this chunk sits (section/problem/slide number if discernible), and the specific topic the chunk addresses. Answer only with the succinct context and nothing else."""
-
-# Cap full-doc context at the same window summarize_doc uses (~8k chars). Past
-# this we'd start eating into gpt-4o-mini's 128k context for tail chunks of
-# huge docs, and prompt-caching benefits diminish on very long prefixes.
-_CONTEXTUAL_PREFIX_DOC_MAX_CHARS = 80_000
-
-
-def generate_contextual_prefix(
-    full_doc_text: str,
-    chunk_text: str,
-    filename: str,
-    content_title: str = "",
-    client=None,
-) -> str:
-    """Phase B Stage B9: Anthropic-style contextual retrieval prefix.
-
-    Returns a 1-2 sentence context blob situating ``chunk_text`` within
-    ``full_doc_text``. Caller prepends this to the chunk's embedded text and
-    persists it to ``DocumentChunk.contextual_prefix`` for observability.
-
-    Returns empty string on terminal LLM failure (3 retries) — the caller should
-    fall back to embedding without a prefix rather than block indexing.
-
-    ``client`` is optional so the indexing pipeline can pass a shared OpenAI
-    client across all chunks of a doc (avoids 100 client constructions per doc).
-    """
-    from openai import OpenAI
-
-    if not (chunk_text and chunk_text.strip()):
-        return ""
-    if not (full_doc_text and full_doc_text.strip()):
-        return ""
-
-    if client is None:
-        client = OpenAI(api_key=Config.OPENAI_API_KEY)
-
-    # Truncate the doc context; prepend a filename/title hint so even after
-    # truncation the chunk's situational header is intact.
-    title_hint = f" (titled: {content_title})" if content_title else ""
-    doc_header = f"[Filename: {filename}{title_hint}]\n\n"
-    available_for_body = max(0, _CONTEXTUAL_PREFIX_DOC_MAX_CHARS - len(doc_header))
-    doc_body = full_doc_text[:available_for_body] if len(full_doc_text) > available_for_body else full_doc_text
-    full_doc_prefix = doc_header + doc_body
-
-    prompt = _CONTEXTUAL_PREFIX_PROMPT.format(
-        full_doc_text=full_doc_prefix,
-        chunk_text=chunk_text[:4000],  # individual chunks are ~800 chars, but guard anyway
-    )
-
-    for attempt in range(3):
-        try:
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=200,
-                temperature=0.0,
-            )
-            prefix = (response.choices[0].message.content or "").strip()
-            # Strip surrounding quotes if the LLM added them.
-            if len(prefix) >= 2 and prefix[0] in ('"', "'") and prefix[-1] == prefix[0]:
-                prefix = prefix[1:-1].strip()
-            return prefix
-        except Exception as e:
-            logger.warning(f"generate_contextual_prefix attempt {attempt+1} failed for {filename!r}: {e}")
-            if attempt == 2:
-                logger.error(f"All generate_contextual_prefix attempts failed for {filename!r}; returning empty prefix")
-                return ""
-            time.sleep(2 ** attempt)
-
-
 def infer_doc_metadata_from_filename(filename: str) -> dict:
     """
     Synchronous lightweight metadata inference from a filename. Used at upload
@@ -1660,46 +1568,14 @@ def process_and_index_documents_resumable(ta_id: str, progress_callback=None, re
         
         chunks = chunk_text_with_context(text, Config.CHUNK_SIZE, Config.CHUNK_OVERLAP, doc.original_filename)
         num_chunks = len(chunks)
-
-        # Phase B Stage B9 — Anthropic Contextual Retrieval. Generate a per-chunk
-        # context blob via gpt-4o-mini (with the full doc as a static prefix so
-        # OpenAI prompt-caching kicks in for chunks 2+). Persisted to
-        # DocumentChunk.contextual_prefix and prepended to the embedded text.
-        # Graceful degradation: empty prefix on LLM failure → chunk embeds with
-        # current section-enrichment only.
-        logger.info(f"[{ta_id}] [{doc.id}] Generating contextual prefixes for {num_chunks} chunks...")
-        contextual_prefixes = []
-        for chunk_data in chunks:
-            prefix = generate_contextual_prefix(
-                full_doc_text=text,
-                chunk_text=chunk_data["original_text"],
-                filename=doc.original_filename,
-                content_title=doc.content_title or "",
-                client=client,
-            )
-            contextual_prefixes.append(prefix)
-        prefixes_generated = sum(1 for p in contextual_prefixes if p)
-        logger.info(
-            f"[{ta_id}] [{doc.id}] Contextual prefixes: {prefixes_generated}/{num_chunks} populated "
-            f"({num_chunks - prefixes_generated} empty/failed)"
-        )
-
+        
         doc_chunk_data = []
         doc_log_entries = []
         for i, chunk_data in enumerate(chunks):
-            prefix = contextual_prefixes[i]
-            # Embed prefix + existing section-enriched text. When the prefix
-            # generation failed (empty string), the chunk falls back to the
-            # pre-B9 embedding shape.
-            if prefix:
-                embed_input = f"{prefix}\n\n{chunk_data['text']}"
-            else:
-                embed_input = chunk_data["text"]
             doc_chunk_data.append({
                 "chunk_index": i,
                 "chunk_text": chunk_data["original_text"],
-                "chunk_text_enriched": embed_input,
-                "contextual_prefix": prefix,  # Phase B B9 — empty string if LLM failed
+                "chunk_text_enriched": chunk_data["text"],
                 "context": chunk_data.get("context", ""),
                 "section_path": chunk_data.get("section_path") or [],  # Phase B B8
                 "doc_type": doc.doc_type or "other",
@@ -1760,7 +1636,6 @@ def process_and_index_documents_resumable(ta_id: str, progress_callback=None, re
                     file_name=chunk_item["file_name"],
                     doc_role=chunk_item.get("doc_role"),  # Phase A — None on legacy paths is OK
                     doc_category=chunk_item.get("doc_category"),  # Phase A Stage 2B
-                    contextual_prefix=chunk_item.get("contextual_prefix") or None,  # Phase B B9
                     embedding=doc_embeddings[i]
                 )
                 db.session.add(chunk_obj)
