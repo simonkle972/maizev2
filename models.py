@@ -227,6 +227,15 @@ class Document(db.Model):
     summary = db.Column(db.Text, nullable=True)
     summary_embedding = db.Column(Vector(1536), nullable=True)
 
+    # Phase B latency-optimization Phase 1 (2026-08-06). Cached full extracted
+    # text for the doc, populated once at indexing time. Read by
+    # get_full_document_text() in src/retriever.py as the fast path for the
+    # hybrid_full_doc fallback — avoids re-running pdfplumber + gpt-4o vision
+    # extraction (~30-40s per fire) on every fallback trigger. Falls back to
+    # chunk-text reconstruction from DocumentChunk rows when NULL (e.g., docs
+    # indexed before this column existed and not yet backfilled).
+    full_text = db.Column(db.Text, nullable=True)
+
 
 class ChatSession(db.Model):
     __tablename__ = 'chat_sessions'

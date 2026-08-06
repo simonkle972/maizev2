@@ -12,24 +12,65 @@ logger = logging.getLogger(__name__)
 
 def get_full_document_text(document_id: int) -> tuple:
     """
-    Retrieve and extract full text from a document.
-    
+    Retrieve full text from a document. Three-tier priority (Phase B latency
+    Phase 1, 2026-08-06):
+
+      1. FAST PATH (~50ms): doc.full_text (populated at indexing time).
+         Bit-identical to what extract_text_from_file produced originally.
+
+      2. MEDIUM FALLBACK (~500ms): reconstruct from DocumentChunk.chunk_text
+         rows in chunk_index order. For docs indexed BEFORE this column
+         existed and not yet backfilled by scripts/backfill_document_full_text.py.
+         Text may include chunk-overlap redundancy at non-section-boundary
+         transitions; functionally equivalent for LLM consumption.
+
+      3. LAST RESORT (~30-40s): re-run extract_text_from_file (pdfplumber +
+         gpt-4o vision). Preserves prior behavior for pathological cases
+         (corrupted doc, indexing never completed).
+
     Args:
         document_id: The document ID to retrieve
-        
+
     Returns:
         tuple: (text, filename, token_estimate) or (None, None, 0) if failed
     """
-    from models import Document
-    from src.document_processor import extract_text_from_file
-    
+    from models import Document, DocumentChunk
+
     doc = Document.query.get(document_id)
     if not doc:
         logger.warning(f"Document {document_id} not found")
         return None, None, 0
-    
+
+    filename = doc.display_name or doc.original_filename
+
+    # Tier 1 — fast path
+    if doc.full_text:
+        text = doc.full_text
+        return text, filename, len(text) // 4
+
+    # Tier 2 — chunk-reconstruction fallback
+    chunk_rows = (DocumentChunk.query
+                  .filter_by(document_id=document_id)
+                  .order_by(DocumentChunk.chunk_index)
+                  .with_entities(DocumentChunk.chunk_text)
+                  .all())
+    if chunk_rows:
+        text = "\n\n".join(row.chunk_text for row in chunk_rows if row.chunk_text)
+        if text:
+            logger.info(
+                f"Document {document_id}: full_text NULL; reconstructed {len(text)} chars from "
+                f"{len(chunk_rows)} chunks (backfill scripts/backfill_document_full_text.py to eliminate this path)"
+            )
+            return text, filename, len(text) // 4
+
+    # Tier 3 — last-resort extraction (preserves prior behavior)
+    from src.document_processor import extract_text_from_file
+
+    logger.warning(
+        f"Document {document_id}: full_text NULL AND no chunks; falling back to live PDF extraction "
+        f"(expensive — 30-40s for PDFs)"
+    )
     text = None
-    
     if doc.file_content:
         with tempfile.NamedTemporaryFile(delete=False, suffix=f".{doc.file_type}") as tmp_file:
             tmp_file.write(doc.file_content)
@@ -43,14 +84,12 @@ def get_full_document_text(document_id: int) -> tuple:
     else:
         logger.warning(f"Document {document_id} has no file_content and storage_path is missing or invalid: {doc.storage_path}")
         return None, None, 0
-    
+
     if not text:
         logger.warning(f"Could not extract text from document {document_id} (extraction returned empty)")
         return None, None, 0
-    
-    token_estimate = len(text) // 4
-    
-    return text, doc.display_name or doc.original_filename, token_estimate
+
+    return text, filename, len(text) // 4
 
 
 def find_solution_document(problem_doc_name: str, ta_id: str) -> tuple:

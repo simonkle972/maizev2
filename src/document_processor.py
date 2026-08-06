@@ -1554,6 +1554,16 @@ def process_and_index_documents_resumable(ta_id: str, progress_callback=None, re
             except Exception as summary_err:
                 logger.warning(f"[{ta_id}] [{doc.id}] Summary generation failed: {summary_err}; leaving unset")
 
+        # Phase B latency Phase 1 (2026-08-06). Cache the extracted full text
+        # so the hybrid_full_doc fallback (src/retriever.py:get_full_document_text)
+        # can serve it without re-running pdfplumber + gpt-4o vision extraction.
+        # Pilot data (July 2026) showed re-extraction costing 30-40s per fallback
+        # fire — this caches the result once at indexing time. Set-once: skips
+        # when already populated (backfill --force to rebuild).
+        if not doc.full_text:
+            doc.full_text = sanitize_text(text)
+            logger.info(f"[{ta_id}] [{doc.id}] Cached full_text ({len(doc.full_text)} chars)")
+
         # Phase A retrieval refactor: BM25 tsvector for hybrid Stage 1 retrieval.
         # Built from the already-extracted text via PostgreSQL's to_tsvector.
         doc.bm25_tsvector = db.func.to_tsvector('english', sanitize_text(text))
