@@ -37,9 +37,17 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 
 JSONL_PATH = Path(__file__).parent / "maize_eval_v1.jsonl"
-REQUIRED_INPUT_COLS = {"row_id", "source", "ta_id", "query", "correct_doc_ids"}
+# correct_doc_ids is required EXCEPT for K (followup) and L (off-topic) rows
+# where the right answer is "don't retrieve anything." Those rows must
+# instead set failure_type_target=K|L and the appropriate expected_action.
+REQUIRED_INPUT_COLS = {"row_id", "source", "ta_id", "query"}
 VALID_SOURCES = {"prod_log", "synthetic", "synthetic_working_case"}
-VALID_FAILURE_TYPES = {"A", "B", "C", "D", "E", "F1", "F2", "G1", "G2"}
+# Wave 2 (2026-05-31) — H/I/J/K/L for intent-classification dimensions.
+VALID_FAILURE_TYPES = {"A", "B", "C", "D", "E", "F1", "F2", "G1", "G2",
+                        "H", "I", "J", "K", "L"}
+VALID_EXPECTED_ACTIONS = {"retrieve", "redirect", "no_retrieval"}
+VALID_INTENT_CLASSES = {"continuation", "concept_lookup", "pivot",
+                         "clarification", "new", "off_topic"}
 
 SOLUTION_REQUEST_PATTERNS = [
     r"\bshow me the answer\b",
@@ -279,17 +287,36 @@ def parse_csv_row(row: dict, lineno: int) -> tuple[dict | None, list[str]]:
     if ftt and ftt not in VALID_FAILURE_TYPES:
         errors.append(f"line {lineno} ({rid!r}): failure_type_target {ftt!r} not in {sorted(VALID_FAILURE_TYPES)}")
 
+    expected_action = (row.get("expected_action") or "").strip() or None
+    if expected_action and expected_action not in VALID_EXPECTED_ACTIONS:
+        errors.append(f"line {lineno} ({rid!r}): expected_action {expected_action!r} not in {sorted(VALID_EXPECTED_ACTIONS)}")
+
+    intent_class = (row.get("intent_class") or "").strip() or None
+    if intent_class and intent_class not in VALID_INTENT_CLASSES:
+        errors.append(f"line {lineno} ({rid!r}): intent_class {intent_class!r} not in {sorted(VALID_INTENT_CLASSES)}")
+
+    # correct_doc_ids: required for retrieve rows; may be empty for K/L (redirect/no_retrieval).
+    correct_doc_ids = split_pipe(row.get("correct_doc_ids") or "")
+    if not correct_doc_ids and ftt not in {"K", "L"} and expected_action not in {"redirect", "no_retrieval"}:
+        errors.append(
+            f"line {lineno} ({rid!r}): correct_doc_ids is empty and this isn't a K/L row "
+            f"(or expected_action=redirect/no_retrieval). Either populate correct_doc_ids or set "
+            f"failure_type_target=K|L + expected_action=no_retrieval|redirect."
+        )
+
     parsed = {
         "row_id": rid,
         "source": source,
         "ta_id": row["ta_id"].strip(),
         "query": row["query"].strip(),
         "prior_turns": prior_turns,
-        "correct_doc_ids": split_pipe(row["correct_doc_ids"]),
+        "correct_doc_ids": correct_doc_ids,
         "hard_negative_doc_ids_input": split_pipe(row.get("hard_negative_doc_ids", "")),
         "forbidden_doc_ids_input": split_pipe(row.get("forbidden_doc_ids", "")),
         "forbidden_text_fragments_input": split_pipe(row.get("forbidden_text_fragments", "")),
         "failure_type_target_input": ftt,
+        "expected_action_input": expected_action,
+        "intent_class_input": intent_class,
         "not_in_corpus_input": parse_bool(row.get("not_in_corpus")),
         "is_solution_request_input": parse_bool(row.get("is_solution_request")),
         "concept_or_problem_input": (row.get("concept_or_problem") or "").strip() or None,
@@ -362,6 +389,41 @@ def autofill(parsed: dict, ta_doc_names: list[str]) -> tuple[dict, list[str]]:
         else:
             notes_log.append("not_in_corpus: false (all correct_doc_ids verified in corpus)")
 
+    # Wave 2: expected_action defaults from bucket when not explicitly set.
+    # K → no_retrieval, L → redirect; all others → retrieve.
+    if parsed["expected_action_input"]:
+        expected_action = parsed["expected_action_input"]
+        notes_log.append(f"expected_action: from CSV → {expected_action}")
+    elif ftype == "K":
+        expected_action = "no_retrieval"
+        notes_log.append("expected_action: auto-set to 'no_retrieval' (K bucket)")
+    elif ftype == "L":
+        expected_action = "redirect"
+        notes_log.append("expected_action: auto-set to 'redirect' (L bucket)")
+    else:
+        expected_action = "retrieve"
+
+    # intent_class also defaults from bucket: K → clarification, L → off_topic.
+    if parsed["intent_class_input"]:
+        intent_class = parsed["intent_class_input"]
+        notes_log.append(f"intent_class: from CSV → {intent_class}")
+    elif ftype == "K":
+        intent_class = "clarification"
+        notes_log.append("intent_class: auto-set to 'clarification' (K bucket)")
+    elif ftype == "L":
+        intent_class = "off_topic"
+        notes_log.append("intent_class: auto-set to 'off_topic' (L bucket)")
+    else:
+        intent_class = None
+
+    expected_intent: dict = {
+        "is_solution_request": is_sol,
+        "concept_or_problem": cop,
+        "document_corrected_from_prior_turn": corrected,
+    }
+    if intent_class is not None:
+        expected_intent["intent_class"] = intent_class
+
     final_row: dict = {
         "row_id": parsed["row_id"],
         "source": parsed["source"],
@@ -372,12 +434,12 @@ def autofill(parsed: dict, ta_doc_names: list[str]) -> tuple[dict, list[str]]:
         "hard_negative_doc_ids": hard_negs,
         "forbidden_doc_ids": forbidden,
         "failure_type_target": ftype,
-        "expected_intent": {
-            "is_solution_request": is_sol,
-            "concept_or_problem": cop,
-            "document_corrected_from_prior_turn": corrected,
-        },
+        "expected_intent": expected_intent,
     }
+    # Only emit expected_action when it diverges from the default "retrieve" —
+    # keeps existing rows (which don't have the field) cleanly minimal.
+    if expected_action != "retrieve":
+        final_row["expected_action"] = expected_action
     if parsed["forbidden_text_fragments_input"]:
         final_row["forbidden_text_fragments"] = parsed["forbidden_text_fragments_input"]
         notes_log.append(f"forbidden_text_fragments: from CSV → {parsed['forbidden_text_fragments_input']}")
@@ -395,8 +457,9 @@ def validate_row(row: dict, existing_row_ids: set[str]) -> list[str]:
     rid = row["row_id"]
     if rid in existing_row_ids:
         errors.append(f"{rid}: row_id already exists in maize_eval_v1.jsonl")
-    if not row["correct_doc_ids"]:
-        errors.append(f"{rid}: correct_doc_ids is empty")
+    expected_action = row.get("expected_action", "retrieve")
+    if expected_action == "retrieve" and not row["correct_doc_ids"]:
+        errors.append(f"{rid}: correct_doc_ids is empty (required for expected_action='retrieve')")
     overlap = set(row["correct_doc_ids"]) & set(row["forbidden_doc_ids"])
     if overlap:
         errors.append(f"{rid}: docs in both correct_doc_ids and forbidden_doc_ids: {sorted(overlap)}")
@@ -405,8 +468,8 @@ def validate_row(row: dict, existing_row_ids: set[str]) -> list[str]:
             errors.append(
                 f"{rid}: auto-classifier couldn't infer failure_type_target (current retriever likely "
                 f"already works for this query, so no failure pattern is observable). Pre-fill "
-                f"failure_type_target=A/B/C/D/E in the CSV if this row is a regression test, or rename "
-                f"to use source='synthetic_working_case' if it's a working-case row."
+                f"failure_type_target=A/B/C/D/E/H/I/J/K/L in the CSV if this row is a regression test, "
+                f"or rename to use source='synthetic_working_case' if it's a working-case row."
             )
     return errors
 

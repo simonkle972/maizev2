@@ -61,6 +61,29 @@ class RowResult:
     hard_negative_top1_pre_rerank: bool = False
     error: str | None = None
     retrieval_latency_ms: int = 0
+    # Wave 2 (2026-05-31) — intent-classification dimensions. Populated for ALL
+    # rows so we can audit intent-class accuracy across the body, but the
+    # per-bucket scorecard surfaces them only where they're the primary signal
+    # (H/I/J/K/L). See eval/schema.md "Wave 2 intent-classification failures".
+    expected_action: str = "retrieve"          # row's expected_action ("retrieve" | "redirect" | "no_retrieval")
+    expected_intent_class: str | None = None   # row's expected_intent.intent_class, if labeled
+    contextualizer_intent: str | None = None   # diagnostics["intent"] — what the contextualizer classified as
+    adversarial_short_circuit_fired: bool = False  # diagnostics["adversarial_short_circuit"]
+    retrieved_chunk_count: int = 0             # raw count of returned chunks (0 means skip-retrieval path fired)
+    # Bucket-specific HIT signal — what counts as a pass for THIS row's
+    # expected_action. For "retrieve" rows this equals correct_hit_at_5; for
+    # "redirect" rows, equals adversarial_short_circuit_fired; for
+    # "no_retrieval" rows, equals (intent == "clarification") today (proxy)
+    # OR retrieved_chunk_count == 0 post-LangGraph-adaptation.
+    bucket_hit: bool = False
+    # Multi-doc (H) — stricter than correct_hit_at_5 (which is ANY correct in
+    # top-5). all_correct_in_top_k requires EVERY correct doc to land in top-5.
+    all_correct_in_top_5: bool = False
+    # Concept-vs-problem (J) — did the contextualizer's classification match
+    # the expected concept_or_problem label? Proxy until we expose a
+    # dedicated concept_or_problem signal in diagnostics; today maps
+    # contextualizer_intent="concept_lookup" → "concept", anything else → "problem".
+    intent_class_match: bool = False
 
 
 def load_rows():
@@ -130,6 +153,7 @@ def evaluate_row(row: dict, retrieve_context, warm_cache: bool = True) -> RowRes
 
     t0 = time.time()
     pre_rerank_retrieved = []
+    diagnostics: dict = {}
     try:
         chunks, diagnostics = retrieve_context(
             ta_id=row["ta_id"],
@@ -143,6 +167,7 @@ def evaluate_row(row: dict, retrieve_context, warm_cache: bool = True) -> RowRes
         retrieved = [c.get("file_name", "") for c in (chunks or [])][:8]
         retrieved_top5 = retrieved[:5]
         retrieved_chunk_texts = [c.get("text", "") for c in (chunks or [])][:8]
+        retrieved_chunk_count = len(chunks or [])
         # Pre-rerank ordering — extracted from the diagnostics dict so we can
         # measure rerank lift in isolation (post − pre).
         pre_candidates = diagnostics.get("pre_rerank_candidates") or []
@@ -153,6 +178,7 @@ def evaluate_row(row: dict, retrieve_context, warm_cache: bool = True) -> RowRes
         retrieved = []
         retrieved_top5 = []
         retrieved_chunk_texts = []
+        retrieved_chunk_count = 0
         pre_rerank_retrieved = []
         error = f"{type(e).__name__}: {e}"
 
@@ -171,6 +197,36 @@ def evaluate_row(row: dict, retrieve_context, warm_cache: bool = True) -> RowRes
         for text in retrieved_chunk_texts
     )
 
+    # --- Wave 2: extract intent diagnostics + compute bucket_hit per expected_action ---
+    expected_action = row.get("expected_action", "retrieve")
+    expected_intent = row.get("expected_intent") or {}
+    expected_intent_class = expected_intent.get("intent_class")
+    contextualizer_intent = diagnostics.get("intent")
+    adversarial_short_circuit_fired = bool(diagnostics.get("adversarial_short_circuit"))
+
+    correct_hit_at_5 = any(d in correct_set for d in retrieved_top5)
+    all_correct_in_top_5 = bool(correct_set) and correct_set.issubset(set(retrieved_top5))
+
+    # bucket_hit — the primary HIT signal, depends on the row's expected_action.
+    if expected_action == "retrieve":
+        bucket_hit = correct_hit_at_5
+    elif expected_action == "redirect":
+        # HIT = system fired the off-topic short-circuit AND returned no chunks.
+        bucket_hit = adversarial_short_circuit_fired and retrieved_chunk_count == 0
+    elif expected_action == "no_retrieval":
+        # Today (pre-LangGraph): proxy via contextualizer classifying as "clarification".
+        # Post-LangGraph adaptation: chunks==[] is also a HIT signal once the upstream skip-gate exists.
+        bucket_hit = (contextualizer_intent == "clarification") or (retrieved_chunk_count == 0)
+    else:
+        bucket_hit = False  # unknown expected_action, validator catches this
+
+    # intent_class_match — used by J (concept-vs-problem) and any row that
+    # carries an explicit intent_class label.
+    intent_class_match = (
+        expected_intent_class is not None
+        and contextualizer_intent == expected_intent_class
+    )
+
     return RowResult(
         row_id=row["row_id"],
         failure_type=row["failure_type_target"],
@@ -182,7 +238,7 @@ def evaluate_row(row: dict, retrieve_context, warm_cache: bool = True) -> RowRes
         forbidden_doc_ids=row.get("forbidden_doc_ids") or [],
         forbidden_text_fragments=forbidden_fragments,
         retrieved_doc_ids=retrieved,
-        correct_hit_at_5=any(d in correct_set for d in retrieved_top5),
+        correct_hit_at_5=correct_hit_at_5,
         hard_negative_top1=(retrieved[0] in hard_neg_set) if retrieved else False,
         forbidden_hit=any(d in forbidden_set for d in retrieved),
         forbidden_text_hit=forbidden_text_hit,
@@ -191,18 +247,37 @@ def evaluate_row(row: dict, retrieve_context, warm_cache: bool = True) -> RowRes
         hard_negative_top1_pre_rerank=(pre_rerank_retrieved[0] in hard_neg_set) if pre_rerank_retrieved else False,
         error=error,
         retrieval_latency_ms=latency,
+        expected_action=expected_action,
+        expected_intent_class=expected_intent_class,
+        contextualizer_intent=contextualizer_intent,
+        adversarial_short_circuit_fired=adversarial_short_circuit_fired,
+        retrieved_chunk_count=retrieved_chunk_count,
+        bucket_hit=bucket_hit,
+        all_correct_in_top_5=all_correct_in_top_5,
+        intent_class_match=intent_class_match,
     )
 
 
-BUCKET_KEYS = ["A", "B", "C", "D", "E", "F1", "F2", "G1", "G2", "working"]
+# Wave 1 doc-routing buckets (existing) + Wave 2 intent-classification buckets
+# (H/I/J/K/L added 2026-05-31 — see eval/schema.md).
+BUCKET_KEYS = ["A", "B", "C", "D", "E", "F1", "F2", "G1", "G2",
+               "H", "I", "J", "K", "L", "working"]
 
 
 def aggregate(results: list[RowResult]) -> dict:
     """Group by failure_type and compute per-bucket metrics.
 
     Buckets:
-      - In-corpus rows by failure_type (A, B, C, D, E, F1, F2, G1, G2, working)
-      - not_in_corpus rows (reported separately — retrieval cannot pass)
+      - Wave 1 doc-routing: A, B, C, D, E, F1, F2, G1, G2
+      - Wave 2 intent-classification: H (multi-doc), I (doc correction),
+        J (concept-vs-problem), K (followup/clarification), L (off-topic)
+      - working: rows that must not regress
+      - not_in_corpus: reported separately (retrieval cannot pass)
+
+    All buckets carry the shared metrics (hit@5, forbidden_hit, etc.) plus
+    bucket-specific metrics that surface in the scorecard when relevant —
+    all_correct_in_top_5 for H, intent_class_match for J, and the bucket_hit
+    rule which differs by expected_action for K/L.
     """
     in_corpus = [r for r in results if not r.not_in_corpus]
     not_in_corpus = [r for r in results if r.not_in_corpus]
@@ -231,6 +306,17 @@ def aggregate(results: list[RowResult]) -> dict:
             "forbidden_text_hit_rate": sum(r.forbidden_text_hit for r in bucket) / n,
             "error_count": sum(1 for r in bucket if r.error),
             "avg_latency_ms": sum(r.retrieval_latency_ms for r in bucket) / n,
+            # Wave 2 metrics — meaningful only on certain buckets but computed
+            # everywhere so the scorecard can show or hide them per-bucket.
+            "bucket_hit_rate": sum(r.bucket_hit for r in bucket) / n,
+            "all_correct_in_top_5_rate": sum(r.all_correct_in_top_5 for r in bucket) / n,
+            "intent_class_match_rate": (
+                sum(r.intent_class_match for r in bucket if r.expected_intent_class is not None)
+                / max(sum(1 for r in bucket if r.expected_intent_class is not None), 1)
+                if any(r.expected_intent_class is not None for r in bucket) else None
+            ),
+            "redirect_fired_rate": sum(r.adversarial_short_circuit_fired for r in bucket) / n,
+            "chunks_returned_avg": sum(r.retrieved_chunk_count for r in bucket) / n,
         }
     summary["not_in_corpus"] = {
         "n": len(not_in_corpus),
@@ -263,6 +349,9 @@ def format_scorecard(summary: dict, label: str = "Retrieval scorecard") -> str:
         )
     elif len(distinct_tas) == 1:
         lines.append(f"**TA:** `{distinct_tas[0]}` (filtered to one TA — `--ta-id` flag in use OR file only contains rows for this TA).")
+    # ---- Wave 1 doc-routing scorecard table ----
+    lines.append("")
+    lines.append("## Doc-routing buckets (Wave 1)")
     lines.append("")
     lines.append("| Failure type | n | hit@5 pre→post (lift) | hard_neg_top1 | forbidden_hit | forbidden_text_hit | avg_latency_ms | errors |")
     lines.append("|---|---:|---:|---:|---:|---:|---:|---:|")
@@ -276,9 +365,15 @@ def format_scorecard(summary: dict, label: str = "Retrieval scorecard") -> str:
         "F2": "F2 (explicit document switch)",
         "G1": "G1 (intra-doc section confusion)",
         "G2": "G2 (intra-doc Roman/numeric sibling)",
+        "H": "H (multi-document intent)",
+        "I": "I (document correction)",
+        "J": "J (concept-vs-problem)",
+        "K": "K (followup/clarification)",
+        "L": "L (off-topic / redirect)",
         "working": "working cases",
     }
-    for key in BUCKET_KEYS:
+    wave1_keys = ["A", "B", "C", "D", "E", "F1", "F2", "G1", "G2", "working"]
+    for key in wave1_keys:
         b = summary.get(key)
         if b is None:
             lines.append(f"| {label_map[key]} | 0 | — | — | — | — | — | — |")
@@ -291,6 +386,33 @@ def format_scorecard(summary: dict, label: str = "Retrieval scorecard") -> str:
             f"{b['forbidden_text_hit_rate']:.0%} | "
             f"{b['avg_latency_ms']:.0f} | {b['error_count']} |"
         )
+
+    # ---- Wave 2 intent-classification scorecard table ----
+    lines.append("")
+    lines.append("## Intent-classification buckets (Wave 2)")
+    lines.append("")
+    lines.append("| Failure type | n | bucket_hit | hit@5 (doc-routing) | all_correct_in_top_5 (H only) | intent_class_match | redirect_fired (L only) | avg_chunks_returned | avg_latency_ms |")
+    lines.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|")
+    wave2_keys = ["H", "I", "J", "K", "L"]
+    for key in wave2_keys:
+        b = summary.get(key)
+        if b is None:
+            lines.append(f"| {label_map[key]} | 0 | — | — | — | — | — | — | — |")
+            continue
+        intent_match_str = "—" if b.get("intent_class_match_rate") is None else f"{b['intent_class_match_rate']:.0%}"
+        all_correct_str = f"{b['all_correct_in_top_5_rate']:.0%}" if key == "H" else "—"
+        redirect_str = f"{b['redirect_fired_rate']:.0%}" if key == "L" else "—"
+        lines.append(
+            f"| {label_map[key]} | {b['n']} | "
+            f"{b['bucket_hit_rate']:.0%} | "
+            f"{b['correct_hit_at_5_rate']:.0%} | "
+            f"{all_correct_str} | "
+            f"{intent_match_str} | "
+            f"{redirect_str} | "
+            f"{b['chunks_returned_avg']:.1f} | "
+            f"{b['avg_latency_ms']:.0f} |"
+        )
+
     nic = summary["not_in_corpus"]
     lines.append("")
     lines.append(f"**Not-in-corpus bucket:** {nic['n']} rows. Retrieved a labeled-correct doc on "
@@ -307,6 +429,13 @@ def format_scorecard(summary: dict, label: str = "Retrieval scorecard") -> str:
     lines.append("- **forbidden_text_hit** — fraction of rows where ANY retrieved chunk's text contained a forbidden substring "
                  "(e.g., \"Part II\" when the row tests Part I retrieval). Detects G failures — right doc, wrong section/part. "
                  "Lower is better; ideal = 0%.")
+    lines.append("- **bucket_hit** (Wave 2) — the primary HIT signal for a row, depends on its `expected_action`: "
+                 "for `retrieve` rows it equals hit@5; for `redirect` rows it requires `adversarial_short_circuit` fired AND zero chunks returned; "
+                 "for `no_retrieval` rows it's a proxy via `intent == 'clarification'` today (becomes a true skip-gate metric post-LangGraph adaptation).")
+    lines.append("- **all_correct_in_top_5** (H bucket) — stricter than hit@5: requires EVERY `correct_doc_ids` entry to appear in top-5, not just one. Tests whether multi-doc intent surfaces ALL needed docs.")
+    lines.append("- **intent_class_match** — fraction of rows (with `expected_intent.intent_class` labeled) where the contextualizer's classification matches the label. Measures intent-classification accuracy independently of retrieval — Q1+Q2 deep-research flagged this as a literature gap; doing this puts Maize ahead of published practice.")
+    lines.append("- **redirect_fired** (L bucket) — fraction of rows where `adversarial_short_circuit` fired in diagnostics, regardless of whether chunks were also returned.")
+    lines.append("- **avg_chunks_returned** — average number of chunks the retriever returned. For K/L rows the IDEAL value is 0 (system should skip retrieval). Useful as a smoke check that the skip-gate is firing.")
     return "\n".join(lines)
 
 
@@ -362,10 +491,17 @@ def main() -> int:
         for i, row in enumerate(rows, 1):
             res = evaluate_row(row, retrieve_context, warm_cache=warm)
             results.append(res)
-            status = "ERR" if res.error else ("HIT" if res.correct_hit_at_5 else "MISS")
+            status = "ERR" if res.error else ("HIT" if res.bucket_hit else "MISS")
+            # For Wave 2 expected-action rows, show the diagnostic that explains the HIT/MISS
+            # decision instead of top1 (which isn't meaningful for redirect/no_retrieval).
+            if res.expected_action == "redirect":
+                detail = f"redirect_fired={res.adversarial_short_circuit_fired} chunks={res.retrieved_chunk_count}"
+            elif res.expected_action == "no_retrieval":
+                detail = f"intent={res.contextualizer_intent} chunks={res.retrieved_chunk_count}"
+            else:
+                detail = f"top1={res.retrieved_doc_ids[0] if res.retrieved_doc_ids else '<none>'}"
             print(f"  [{i:3}/{len(rows)}] {status:4} {res.row_id:55} "
-                  f"({res.retrieval_latency_ms}ms) "
-                  f"top1={res.retrieved_doc_ids[0] if res.retrieved_doc_ids else '<none>'}",
+                  f"({res.retrieval_latency_ms}ms) {detail}",
                   flush=True)
 
     summary = aggregate(results)
