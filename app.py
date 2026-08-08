@@ -303,10 +303,6 @@ def landing():
     return render_template('landing.html')
 
 
-@app.route('/landing-preview')
-def landing_preview():
-    return render_template('landing_v2.html')
-
 @app.route('/privacy')
 def privacy():
     return render_template('privacy.html')
