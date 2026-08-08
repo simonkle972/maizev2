@@ -109,7 +109,11 @@ def _get_sheets_service():
 
     SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
-    # Option A: full JSON blob in env var (recommended — no file needed on VPS)
+    # Option A: full JSON blob in env var (recommended — no file needed on VPS).
+    # NOTE: python-dotenv only reads unquoted values to the first newline. If .env
+    # contains the raw multi-line JSON without single quotes around it, this will
+    # load truncated (usually just "{") and json.loads will throw. Fix in .env:
+    # wrap the blob in single quotes.
     sa_json = os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON')
     if sa_json:
         try:
@@ -117,7 +121,11 @@ def _get_sheets_service():
             creds = SACredentials.from_service_account_info(sa_info, scopes=SCOPES)
             return build('sheets', 'v4', credentials=creds, cache_discovery=False)
         except Exception as e:
-            logger.error(f"Failed to build Sheets service from JSON env var: {e}")
+            logger.exception(
+                "Failed to build Sheets service from GOOGLE_SERVICE_ACCOUNT_JSON "
+                "(len=%d, starts=%r). If this is truncated, single-quote the value in .env.",
+                len(sa_json), sa_json[:40],
+            )
             return None
 
     # Option B: path to a JSON key file
@@ -127,10 +135,13 @@ def _get_sheets_service():
             creds = SACredentials.from_service_account_file(sa_file, scopes=SCOPES)
             return build('sheets', 'v4', credentials=creds, cache_discovery=False)
         except Exception as e:
-            logger.error(f"Failed to build Sheets service from file {sa_file}: {e}")
+            logger.exception("Failed to build Sheets service from file %s", sa_file)
             return None
 
-    logger.warning("No Google service account credentials configured (set GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_SERVICE_ACCOUNT_FILE)")
+    logger.error(
+        "No Google service account credentials configured — QA logging DISABLED. "
+        "Set GOOGLE_SERVICE_ACCOUNT_JSON (single-quoted in .env) or GOOGLE_SERVICE_ACCOUNT_FILE."
+    )
     return None
 
 def _ensure_headers_exist(service, spreadsheet_id: str, tab_name: str) -> bool:
@@ -217,9 +228,12 @@ def log_qa_entry(
         try:
             service = _get_sheets_service()
             if not service:
-                logger.warning("Could not get Google Sheets service")
+                logger.error(
+                    "Could not get Google Sheets service — QA entry dropped (query=%r).",
+                    query[:80] if query else "",
+                )
                 return
-            
+
             if not _ensure_headers_exist(service, Config.QA_LOG_SHEET_ID, Config.QA_LOG_TAB_NAME):
                 return
             
@@ -311,9 +325,9 @@ def log_qa_entry(
             ).execute()
             
             logger.info(f"Logged QA entry for query: {query[:50]}...")
-            
-        except Exception as e:
-            logger.error(f"Failed to log QA entry: {e}")
+
+        except Exception:
+            logger.exception("Failed to log QA entry (query=%r)", query[:80] if query else "")
     
     thread = threading.Thread(target=_do_log, daemon=True)
     thread.start()
@@ -432,12 +446,12 @@ def log_index_entry(
         try:
             service = _get_sheets_service()
             if not service:
-                logger.warning("Could not get Google Sheets service for index logging")
+                logger.error("Could not get Google Sheets service for index logging — chunk %s dropped.", chunk_index)
                 return
-            
+
             if not _ensure_index_headers_exist(service, Config.QA_LOG_SHEET_ID):
                 return
-            
+
             row = [
                 datetime.utcnow().isoformat() + 'Z',
                 str(ta_id),
@@ -466,9 +480,9 @@ def log_index_entry(
             ).execute()
             
             logger.debug(f"Logged index entry for {file_name} chunk {chunk_index}")
-            
-        except Exception as e:
-            logger.error(f"Failed to log index entry: {e}")
+
+        except Exception:
+            logger.exception("Failed to log index entry (file=%s chunk=%s)", file_name, chunk_index)
     
     thread = threading.Thread(target=_do_log, daemon=True)
     thread.start()
@@ -488,12 +502,12 @@ def log_index_batch(entries: list) -> bool:
         try:
             service = _get_sheets_service()
             if not service:
-                logger.warning("Could not get Google Sheets service for index logging")
+                logger.error("Could not get Google Sheets service for index logging — batch of %d dropped.", len(entries))
                 return
-            
+
             if not _ensure_index_headers_exist(service, Config.QA_LOG_SHEET_ID):
                 return
-            
+
             rows = []
             for entry in entries:
                 row = [
@@ -526,9 +540,9 @@ def log_index_batch(entries: list) -> bool:
             ).execute()
             
             logger.info(f"Logged {len(rows)} index entries to Google Sheets")
-            
-        except Exception as e:
-            logger.error(f"Failed to log index batch: {e}")
+
+        except Exception:
+            logger.exception("Failed to log index batch (size=%d)", len(entries))
     
     thread = threading.Thread(target=_do_log, daemon=True)
     thread.start()

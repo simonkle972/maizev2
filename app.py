@@ -104,6 +104,31 @@ app.register_blueprint(student_bp)
 app.register_blueprint(auth0_bp)
 init_oauth(app)
 
+
+# Startup validation: fail loud if QA logging can't reach Sheets. Runs once per
+# gunicorn worker at import time — a bad credential is a one-line ERROR in
+# journalctl at boot instead of a silent stream of dropped writes per query.
+def _validate_qa_logging():
+    if not Config.QA_LOG_SHEET_ID:
+        logger.info("QA logging disabled — no QA_LOG_SHEET_ID configured.")
+        return
+    try:
+        from src.qa_logger import _get_sheets_service
+        if _get_sheets_service() is None:
+            logger.error(
+                "QA logging is DISABLED at startup — Sheets service could not be initialized. "
+                "Check GOOGLE_SERVICE_ACCOUNT_JSON quoting in .env (must be single-quoted "
+                "if the value spans multiple lines)."
+            )
+        else:
+            logger.info("QA logging enabled: Sheets service initialized OK.")
+    except Exception:
+        logger.exception("QA logging startup validation crashed")
+
+
+_validate_qa_logging()
+
+
 @app.errorhandler(429)
 def ratelimit_handler(e):
     return jsonify(error="Rate limit exceeded", message=str(e.description)), 429
