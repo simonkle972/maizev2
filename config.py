@@ -123,6 +123,19 @@ class Config:
     HYBRID_MAX_DOC_TOKENS = 80000
     HYBRID_SCORE_SPREAD_THRESHOLD = 2
 
+    # Ceiling on the context assembled for a session-cache follow-up turn. That
+    # path concatenates up to four sources (cached document + solution doc +
+    # cached supplementary + fresh concept-lookup chunks) and historically
+    # bounded none of them jointly — only the cached document was size-checked,
+    # and only at cache-write time. Deliberately equal to HYBRID_MAX_DOC_TOKENS
+    # (an assembled context should not exceed what a single full document may
+    # be) but named separately so the two can diverge. At 80000 no current
+    # corpus is affected; it bounds the pathological case, e.g. a textbook
+    # solutions manual matching the `'solution' in doc_name` detector.
+    # Env-tunable so the drop path can be exercised without a code edit:
+    #   SESSION_CONTEXT_MAX_TOKENS=500 python eval/run_eval.py ...
+    SESSION_CONTEXT_MAX_TOKENS = int(os.getenv("SESSION_CONTEXT_MAX_TOKENS", "80000"))
+
     CONTEXTUALIZER_ENABLED = os.getenv('CONTEXTUALIZER_ENABLED', 'true').lower() == 'true'
     CONTEXTUALIZER_MODEL = os.getenv('CONTEXTUALIZER_MODEL', 'gpt-4o-mini')
     CONTEXTUALIZER_MAX_HISTORY = 6

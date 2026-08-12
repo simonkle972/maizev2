@@ -10,6 +10,15 @@ from config import Config
 logger = logging.getLogger(__name__)
 
 
+def _estimate_tokens(text: str) -> int:
+    """
+    Token estimate for context-budgeting. Matches the `len(text) // 4` heuristic
+    get_full_document_text already returns, so budget arithmetic and the
+    hybrid-fallback guards agree on what a "token" is.
+    """
+    return len(text) // 4 if text else 0
+
+
 def get_full_document_text(document_id: int) -> tuple:
     """
     Retrieve full text from a document. Three-tier priority (Phase B latency
@@ -152,8 +161,22 @@ def find_solution_document(problem_doc_name: str, ta_id: str) -> tuple:
     
     if solution_doc:
         full_text, filename, token_estimate = get_full_document_text(solution_doc.id)
+
+        # Size guard, mirroring both hybrid-fallback call sites. Skip rather than
+        # truncate: this document is fetched to verify a student's answer, and a
+        # truncated solutions doc may be missing the very answer it was fetched
+        # for — a silent failure. Skipping is observable in the logs.
+        # `'solution' in doc_name` also matches a textbook solutions manual, which
+        # is where an unbounded document realistically comes from.
+        if full_text and token_estimate > Config.HYBRID_MAX_DOC_TOKENS:
+            logger.warning(
+                f"[{ta_id}] Solution document '{filename}' too large for answer verification: "
+                f"{token_estimate} tokens > {Config.HYBRID_MAX_DOC_TOKENS} — skipping"
+            )
+            return None, None, 0
+
         return full_text, filename, token_estimate
-    
+
     logger.info(f"[{ta_id}] No solution document found for: {problem_doc_name}")
     return None, None, 0
 
@@ -2541,34 +2564,73 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
             # context (2+ student messages means at least one Q&A exchange has occurred,
             # so the student has had a chance to attempt the problem).
             # This avoids exposing solution content on the very first help request.
+            # CONTEXT BUDGET: this path concatenates up to four sources (cached
+            # document, solution doc, cached supplementary, fresh concept-lookup
+            # chunks) and previously bounded none of them jointly — only the
+            # cached document was size-checked, and only at cache-write time.
+            # Components are admitted in priority order and anything that would
+            # push the total over the ceiling is dropped WHOLE rather than
+            # truncated, so the LLM never receives a half-sentence fragment.
+            # No current corpus reaches this ceiling; it bounds the pathological
+            # case (e.g. a textbook solutions manual).
+            ctx_budget = Config.SESSION_CONTEXT_MAX_TOKENS
+            ctx_dropped = []
+
             combined_content = session_context.get("document_content", "")
             solution_added = False
-            
+
+            # The cached document is the primary context and is never dropped —
+            # it was already guarded at cache-write time. Log if it alone is over
+            # budget, which would mean a guard upstream let something through.
+            if _estimate_tokens(combined_content) > ctx_budget:
+                logger.warning(
+                    f"[{ta_id}] Cached document alone exceeds context budget: "
+                    f"{_estimate_tokens(combined_content)} tokens > {ctx_budget} — keeping it, "
+                    f"dropping all supplementary material"
+                )
+
             student_messages = [m for m in conversation_history if getattr(m, 'role', None) == "user" or (isinstance(m, dict) and m.get("role") == "user")]
             if len(student_messages) >= 2:
                 problem_doc_name = session_context.get("document_filename", "")
                 solution_text, solution_filename, solution_tokens = find_solution_document(problem_doc_name, ta_id)
-                
+
                 if solution_text:
-                    logger.info(f"[{ta_id}] Including solution document '{solution_filename}' for answer verification (exchange #{len(student_messages)})")
-                    combined_content = f"=== PROBLEM DOCUMENT: {problem_doc_name} ===\n\n{combined_content}\n\n=== SOLUTION DOCUMENT (for answer verification): {solution_filename} ===\n\n{solution_text}"
-                    diagnostics["solution_doc_added"] = True
-                    diagnostics["solution_doc_filename"] = solution_filename
-                    solution_added = True
+                    candidate = f"=== PROBLEM DOCUMENT: {problem_doc_name} ===\n\n{combined_content}\n\n=== SOLUTION DOCUMENT (for answer verification): {solution_filename} ===\n\n{solution_text}"
+                    if _estimate_tokens(candidate) <= ctx_budget:
+                        logger.info(f"[{ta_id}] Including solution document '{solution_filename}' for answer verification (exchange #{len(student_messages)})")
+                        combined_content = candidate
+                        diagnostics["solution_doc_added"] = True
+                        diagnostics["solution_doc_filename"] = solution_filename
+                        solution_added = True
+                    else:
+                        ctx_dropped.append("solution_doc")
+                        logger.warning(
+                            f"[{ta_id}] Solution document '{solution_filename}' dropped — would take assembled "
+                            f"context to {_estimate_tokens(candidate)} tokens > {ctx_budget}"
+                        )
+                        diagnostics["solution_doc_added"] = False
                 else:
                     logger.info(f"[{ta_id}] No solution document found - LLM will use problem context only")
                     diagnostics["solution_doc_added"] = False
             else:
                 logger.info(f"[{ta_id}] Early conversation (exchange #{len(student_messages)}) - solution doc not yet included")
                 diagnostics["solution_doc_added"] = False
-            
+
             # Include cached supplementary teaching material
             supplementary_content = session_context.get("supplementary_content", "")
             if supplementary_content:
-                combined_content += f"\n\n---\n\n{supplementary_content}"
-                diagnostics["supplementary_teaching_found"] = True
-                diagnostics["supplementary_chunk_count"] = len(session_context.get("supplementary_sources", []))
-                logger.info(f"[{ta_id}] Including cached supplementary teaching material in follow-up")
+                candidate = combined_content + f"\n\n---\n\n{supplementary_content}"
+                if _estimate_tokens(candidate) <= ctx_budget:
+                    combined_content = candidate
+                    diagnostics["supplementary_teaching_found"] = True
+                    diagnostics["supplementary_chunk_count"] = len(session_context.get("supplementary_sources", []))
+                    logger.info(f"[{ta_id}] Including cached supplementary teaching material in follow-up")
+                else:
+                    ctx_dropped.append("cached_supplementary")
+                    logger.warning(
+                        f"[{ta_id}] Cached supplementary teaching material dropped — would take assembled "
+                        f"context to {_estimate_tokens(candidate)} tokens > {ctx_budget}"
+                    )
 
             # FRESH CONCEPT LOOKUP: when intent is concept_lookup, pull new teaching material
             # for the current turn's concept against the rewritten query. Cache stays intact;
@@ -2580,11 +2642,23 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                         f"[TEACHING MATERIAL — From: {c['file_name']}]\n{c['text']}"
                         for c in fresh_supp
                     )
-                    combined_content += f"\n\n---\n\n{fresh_text}"
-                    diagnostics["supplementary_teaching_found"] = True
-                    diagnostics["supplementary_chunk_count"] = (diagnostics.get("supplementary_chunk_count") or 0) + len(fresh_supp)
-                    diagnostics["supplementary_concept_lookup_fresh"] = True
-                    logger.info(f"[{ta_id}] Fresh concept_lookup supplementary: +{len(fresh_supp)} teaching chunks for '{effective_query[:80]}'")
+                    candidate = combined_content + f"\n\n---\n\n{fresh_text}"
+                    if _estimate_tokens(candidate) <= ctx_budget:
+                        combined_content = candidate
+                        diagnostics["supplementary_teaching_found"] = True
+                        diagnostics["supplementary_chunk_count"] = (diagnostics.get("supplementary_chunk_count") or 0) + len(fresh_supp)
+                        diagnostics["supplementary_concept_lookup_fresh"] = True
+                        logger.info(f"[{ta_id}] Fresh concept_lookup supplementary: +{len(fresh_supp)} teaching chunks for '{effective_query[:80]}'")
+                    else:
+                        ctx_dropped.append("fresh_concept_supplementary")
+                        logger.warning(
+                            f"[{ta_id}] Fresh concept_lookup supplementary dropped — would take assembled "
+                            f"context to {_estimate_tokens(candidate)} tokens > {ctx_budget}"
+                        )
+
+            diagnostics["context_assembled_tokens"] = _estimate_tokens(combined_content)
+            diagnostics["context_budget_exceeded"] = bool(ctx_dropped)
+            diagnostics["context_dropped_components"] = ctx_dropped
 
             cached_chunk = {
                 "text": combined_content,
