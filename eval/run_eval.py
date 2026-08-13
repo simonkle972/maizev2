@@ -98,7 +98,57 @@ def load_rows():
     return rows
 
 
-def evaluate_row(row: dict, retrieve_context, warm_cache: bool = True) -> RowResult:
+def _log_row_to_sheet(row: dict, chunks: list, diagnostics: dict, session_id: str,
+                      latency_ms: int) -> None:
+    """
+    Write one eval row to the QA-log sheet so results are reviewable in the same
+    place as real traffic.
+
+    The eval calls retrieve_context directly, bypassing the chat layer where
+    log_qa_entry normally fires — so without this, eval results exist only as an
+    aggregate scorecard with no row-level detail to inspect.
+
+    Retrieval-only: `answer` is empty and generation latency/token count are 0.
+    Everything retrieval-side (sources, diagnostics, retrieval latency) populates
+    normally.
+
+    Point this at its own tab via `qa_log_tab_name=eval_logs` so 92 synthetic rows
+    don't skew reads of real dev traffic. Never raises — a logging failure must
+    not fail an eval row.
+    """
+    try:
+        from src.qa_logger import log_qa_entry
+        from models import TeachingAssistant
+        from config import Config
+
+        ta = TeachingAssistant.query.get(row["ta_id"])
+        sources = list(dict.fromkeys(c.get("file_name", "") for c in (chunks or [])[:8]))[:3]
+
+        log_qa_entry(
+            ta_id=str(row["ta_id"]),
+            ta_slug=(ta.slug if ta else ""),
+            ta_name=(ta.name if ta else ""),
+            course_name=(ta.course_name if ta else ""),
+            session_id=session_id,
+            query=row["query"],
+            answer="",                      # retrieval-only harness
+            sources=sources,
+            chunk_count=len(chunks or []),
+            latency_ms=latency_ms,
+            retrieval_latency_ms=latency_ms,
+            generation_latency_ms=0,
+            token_count=0,
+            retrieval_diagnostics=diagnostics,
+            llm_model=Config.LLM_MODEL,
+            is_anonymous=False,
+        )
+    except Exception as e:
+        print(f"    [warn] sheet logging failed for {row.get('row_id')}: "
+              f"{type(e).__name__}: {e}", flush=True)
+
+
+def evaluate_row(row: dict, retrieve_context, warm_cache: bool = True,
+                 log_to_sheet: bool = False) -> RowResult:
     """Evaluate one row.
 
     warm_cache=True (default): for multi-turn rows, replay each prior user-turn
@@ -195,6 +245,11 @@ def evaluate_row(row: dict, retrieve_context, warm_cache: bool = True) -> RowRes
         retrieved_chunk_count = 0
         pre_rerank_retrieved = []
         error = f"{type(e).__name__}: {e}"
+
+    # Log before the session row is dropped, so anything reading the sheet can
+    # still correlate session_id against chat_sessions if needed.
+    if log_to_sheet:
+        _log_row_to_sheet(row, chunks if not error else [], diagnostics, session_id, latency)
 
     # Drop the eval session. Retrieval is finished, so everything below is pure
     # computation over already-captured results. Leaving these behind would
@@ -485,6 +540,19 @@ def main() -> int:
                              "Without this faithful replay, cache-anchoring failure modes (E, F1, F2) "
                              "may not reproduce. Pass --cold-cache to revert to cheaper single-call "
                              "evaluation (~3x faster on multi-turn rows; useful for quick smoke tests).")
+    parser.add_argument("--log-to-sheet", action="store_true",
+                        help="Write each row to the QA-log Google Sheet so results are reviewable "
+                             "row-by-row (query, sources, intent, cache action, retrieval method) "
+                             "instead of only as an aggregate scorecard. OFF by default. "
+                             "Writes to the 'eval_logs' tab unless --log-tab says otherwise, so eval "
+                             "rows never land in dev_logs or qa_logs_v2. Note the harness is "
+                             "retrieval-only, so the answer column will be empty.")
+    parser.add_argument("--log-tab", type=str, default="eval_logs",
+                        help="Sheet tab for --log-to-sheet (default: eval_logs). Set explicitly at "
+                             "runtime rather than via the qa_log_tab_name env var, because config.py "
+                             "calls load_dotenv(override=True) — the .env file always beats an "
+                             "exported variable, so env-based targeting silently writes to whatever "
+                             "the file says (which is how 4 eval rows once landed in dev_logs).")
     args = parser.parse_args()
 
     # Set up Flask app context for DB queries.
@@ -511,11 +579,41 @@ def main() -> int:
     warm = not args.cold_cache
     cache_mode = "warm-cache (prior turns replayed)" if warm else "cold-cache (target query only)"
     print(f"Running {len(rows)} eval rows against the current retriever... [{cache_mode}]", flush=True)
+    if args.log_to_sheet:
+        from config import Config as _C
+        # Set the tab on Config directly. qa_logger reads Config.QA_LOG_TAB_NAME at
+        # call time, and config.py's load_dotenv(override=True) means an exported
+        # env var is overwritten by the .env file — so this is the only reliable
+        # way to target a tab from the harness.
+        _prev_tab = _C.QA_LOG_TAB_NAME
+        _C.QA_LOG_TAB_NAME = args.log_tab
+        if not _C.QA_LOG_SHEET_ID:
+            sys.exit("ERROR: --log-to-sheet given but no sheet configured "
+                     "(qa_log_googlesheet is unset). Refusing to run.")
+        print(f"Sheet logging ON -> tab {_C.QA_LOG_TAB_NAME!r} "
+              f"(env default was {_prev_tab!r})", flush=True)
+
+    def _drain_log_threads(timeout_each: float = 20.0) -> None:
+        """
+        Wait for qa_logger's background writers before the process exits.
+
+        log_qa_entry starts a DAEMON thread and returns True immediately — True
+        means "thread started", not "row written". A short-lived CLI exits before
+        those threads finish and the writes are killed mid-flight, so without this
+        the last rows of a run silently never land (and a single-row run lands
+        nothing at all).
+        """
+        import threading
+        main = threading.main_thread()
+        for t in threading.enumerate():
+            if t is not main and t.is_alive():
+                t.join(timeout=timeout_each)
 
     results: list[RowResult] = []
     with app.app_context():
         for i, row in enumerate(rows, 1):
-            res = evaluate_row(row, retrieve_context, warm_cache=warm)
+            res = evaluate_row(row, retrieve_context, warm_cache=warm,
+                               log_to_sheet=args.log_to_sheet)
             results.append(res)
             status = "ERR" if res.error else ("HIT" if res.bucket_hit else "MISS")
             # For Wave 2 expected-action rows, show the diagnostic that explains the HIT/MISS
@@ -529,6 +627,10 @@ def main() -> int:
             print(f"  [{i:3}/{len(rows)}] {status:4} {res.row_id:55} "
                   f"({res.retrieval_latency_ms}ms) {detail}",
                   flush=True)
+
+    if args.log_to_sheet:
+        print("Waiting for sheet writes to finish...", flush=True)
+        _drain_log_threads()
 
     summary = aggregate(results)
     label = "Baseline (CURRENT retriever)" if args.baseline else "Retrieval scorecard"
