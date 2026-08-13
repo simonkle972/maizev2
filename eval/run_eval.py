@@ -114,8 +114,22 @@ def evaluate_row(row: dict, retrieve_context, warm_cache: bool = True) -> RowRes
 
     For single-turn rows (no prior_turns), warm and cold modes are identical.
     """
-    session_id = f"eval-{uuid.uuid4()}"
+    # A REAL ChatSession row is required, not just an id string. retrieve_context
+    # loads the cache via ChatSession.query.get(session_id) and writes it back the
+    # same way — with no row, session_context stays None, the cached path is never
+    # entered, and every multi-turn row silently degrades to fresh retrieval. That
+    # was the state until 2026-08-12: warm-cache mode replayed prior turns at full
+    # API cost while populating nothing, so cache-anchoring modes (E, F1, F2) could
+    # not reproduce despite being what warm-cache exists to test.
+    # ChatSession.id is String(32), so the id must fit — the old f"eval-{uuid4()}"
+    # was 41 chars and would not have inserted even if it had been attempted.
+    from models import db, ChatSession
+
+    session_id = "eval" + uuid.uuid4().hex[:28]
     prior_turns = list(row.get("prior_turns") or [])
+
+    db.session.add(ChatSession(id=session_id, ta_id=row["ta_id"], user_id=None))
+    db.session.commit()
 
     # Build [user, assistant] pairs from prior_turns so we can replay turn-by-turn.
     turn_pairs: list[tuple[str, str]] = []
@@ -181,6 +195,18 @@ def evaluate_row(row: dict, retrieve_context, warm_cache: bool = True) -> RowRes
         retrieved_chunk_count = 0
         pre_rerank_retrieved = []
         error = f"{type(e).__name__}: {e}"
+
+    # Drop the eval session. Retrieval is finished, so everything below is pure
+    # computation over already-captured results. Leaving these behind would
+    # accumulate a row per eval row per run.
+    try:
+        db.session.rollback()  # clear any failed transaction from the except path
+        stale = ChatSession.query.get(session_id)
+        if stale:
+            db.session.delete(stale)
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
 
     correct_set = set(row["correct_doc_ids"])
     hard_neg_set = set(row.get("hard_negative_doc_ids") or [])
