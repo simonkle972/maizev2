@@ -147,8 +147,98 @@ def _log_row_to_sheet(row: dict, chunks: list, diagnostics: dict, session_id: st
               f"{type(e).__name__}: {e}", flush=True)
 
 
+def _user_turns(row: dict) -> list:
+    """The user-message texts from a row's recorded prior_turns, in order."""
+    return [t.get("content", "") for t in (row.get("prior_turns") or [])
+            if t.get("role") == "user"]
+
+
+def group_into_sessions(rows: list[dict]) -> list[list[dict]]:
+    """
+    Reconstruct the conversations the eval rows were cut from.
+
+    Row B continues row A when B's recorded user-turn history is exactly A's
+    history plus A's own query — i.e. B is the turn that followed A. Chaining on
+    that yields the original multi-turn sessions.
+
+    Why this matters: run row-by-row, a 3-turn conversation costs 6 retrieval
+    calls (turn 1; then 1-2; then 1-2-3) because each row rebuilds the whole
+    prefix from scratch, and only the final turn of each row is ever logged. Run
+    as sessions it costs 3, and every turn is visible. The retrieval context at
+    turn N is identical either way — the cache is built by turns 1..N-1 in both
+    cases — so this changes cost and observability, not behaviour.
+
+    Verified against the current eval body: 43 of 92 rows chain, 18 openers cover
+    64 rows, and NO parent has more than one continuation, so every chain is
+    linear and the grouping is unambiguous. A branch would mean two different
+    turns followed the same turn, which cannot be one session; if that ever
+    appears, the assertion in verify_grouping() fails loudly rather than silently
+    picking one.
+
+    Rows whose history does not match any other row (7 today) become their own
+    single-row session and keep the replay path — their prefix isn't an eval row,
+    so there is nothing to chain to.
+
+    Returns a list of sessions, each an ordered list of rows.
+    """
+    by_id = {r["row_id"]: r for r in rows}
+    child_of: dict[str, str] = {}   # parent row_id -> child row_id
+    parent_of: dict[str, str] = {}
+
+    for b in rows:
+        ub = _user_turns(b)
+        if not ub:
+            continue
+        for a in rows:
+            if a is b or a.get("ta_id") != b.get("ta_id"):
+                continue
+            if _user_turns(a) + [a["query"]] == ub:
+                child_of[a["row_id"]] = b["row_id"]
+                parent_of[b["row_id"]] = a["row_id"]
+                break
+
+    sessions: list[list[dict]] = []
+    consumed: set[str] = set()
+    for r in rows:
+        if r["row_id"] in parent_of or r["row_id"] in consumed:
+            continue  # not a session opener, or already placed
+        chain = [r]
+        consumed.add(r["row_id"])
+        cur = r["row_id"]
+        while cur in child_of:
+            nxt = child_of[cur]
+            chain.append(by_id[nxt])
+            consumed.add(nxt)
+            cur = nxt
+        sessions.append(chain)
+
+    return sessions
+
+
+def verify_grouping(rows: list[dict], sessions: list[list[dict]]) -> dict:
+    """Structural checks on the grouping, run before any API calls are made."""
+    flat = [r for s in sessions for r in s]
+    ids = [r["row_id"] for r in flat]
+    stats = {
+        "rows_in": len(rows),
+        "rows_out": len(flat),
+        "sessions": len(sessions),
+        "multi_turn_sessions": sum(1 for s in sessions if len(s) > 1),
+        "longest_session": max((len(s) for s in sessions), default=0),
+        "duplicates": len(ids) - len(set(ids)),
+    }
+    assert stats["rows_out"] == stats["rows_in"], (
+        f"grouping lost or duplicated rows: {stats['rows_out']} out vs {stats['rows_in']} in")
+    assert stats["duplicates"] == 0, "a row appears in more than one session"
+    for s in sessions:
+        tas = {r.get("ta_id") for r in s}
+        assert len(tas) == 1, f"session spans multiple TAs: {tas}"
+    return stats
+
+
 def evaluate_row(row: dict, retrieve_context, warm_cache: bool = True,
-                 log_to_sheet: bool = False) -> RowResult:
+                 log_to_sheet: bool = False, session_id: str = None,
+                 skip_replay: bool = False) -> RowResult:
     """Evaluate one row.
 
     warm_cache=True (default): for multi-turn rows, replay each prior user-turn
@@ -175,11 +265,16 @@ def evaluate_row(row: dict, retrieve_context, warm_cache: bool = True,
     # was 41 chars and would not have inserted even if it had been attempted.
     from models import db, ChatSession
 
-    session_id = "eval" + uuid.uuid4().hex[:28]
-    prior_turns = list(row.get("prior_turns") or [])
+    # session_id is supplied by the caller, which owns the ChatSession lifecycle so
+    # that consecutive turns of one conversation share a session (and therefore a
+    # cache). Standalone use still works: create one here if not given.
+    owns_session = session_id is None
+    if owns_session:
+        session_id = "eval" + uuid.uuid4().hex[:28]
+        db.session.add(ChatSession(id=session_id, ta_id=row["ta_id"], user_id=None))
+        db.session.commit()
 
-    db.session.add(ChatSession(id=session_id, ta_id=row["ta_id"], user_id=None))
-    db.session.commit()
+    prior_turns = list(row.get("prior_turns") or [])
 
     # Build [user, assistant] pairs from prior_turns so we can replay turn-by-turn.
     turn_pairs: list[tuple[str, str]] = []
@@ -195,7 +290,10 @@ def evaluate_row(row: dict, retrieve_context, warm_cache: bool = True,
     # turn in prior_turns would be malformed — and we'd duplicate the query).
 
     # Warm-cache replay — feed prior turns through retrieval to populate cache.
-    if warm_cache and turn_pairs:
+    # Skipped when this row is a later turn of a session whose earlier turns have
+    # already been run for real: replaying would redo work already done and would
+    # double-apply the same turns to the cache.
+    if warm_cache and turn_pairs and not skip_replay:
         cumulative_history: list[dict] = []
         for user_msg, asst_msg in turn_pairs:
             try:
@@ -251,17 +349,18 @@ def evaluate_row(row: dict, retrieve_context, warm_cache: bool = True,
     if log_to_sheet:
         _log_row_to_sheet(row, chunks if not error else [], diagnostics, session_id, latency)
 
-    # Drop the eval session. Retrieval is finished, so everything below is pure
-    # computation over already-captured results. Leaving these behind would
-    # accumulate a row per eval row per run.
-    try:
-        db.session.rollback()  # clear any failed transaction from the except path
-        stale = ChatSession.query.get(session_id)
-        if stale:
-            db.session.delete(stale)
-            db.session.commit()
-    except Exception:
-        db.session.rollback()
+    # Drop the eval session only if this call created it. When the caller owns the
+    # session (the normal path) it is deleted after the whole conversation, since
+    # later turns still need the cache this turn just wrote.
+    if owns_session:
+        try:
+            db.session.rollback()  # clear any failed transaction from the except path
+            stale = ChatSession.query.get(session_id)
+            if stale:
+                db.session.delete(stale)
+                db.session.commit()
+        except Exception:
+            db.session.rollback()
 
     correct_set = set(row["correct_doc_ids"])
     hard_neg_set = set(row.get("hard_negative_doc_ids") or [])
@@ -609,24 +708,55 @@ def main() -> int:
             if t is not main and t.is_alive():
                 t.join(timeout=timeout_each)
 
+    sessions = group_into_sessions(rows)
+    gstats = verify_grouping(rows, sessions)
+    print(f"Grouped into {gstats['sessions']} sessions "
+          f"({gstats['multi_turn_sessions']} multi-turn, longest {gstats['longest_session']} turns)",
+          flush=True)
+
     results: list[RowResult] = []
+    i = 0
     with app.app_context():
-        for i, row in enumerate(rows, 1):
-            res = evaluate_row(row, retrieve_context, warm_cache=warm,
-                               log_to_sheet=args.log_to_sheet)
-            results.append(res)
-            status = "ERR" if res.error else ("HIT" if res.bucket_hit else "MISS")
-            # For Wave 2 expected-action rows, show the diagnostic that explains the HIT/MISS
-            # decision instead of top1 (which isn't meaningful for redirect/no_retrieval).
-            if res.expected_action == "redirect":
-                detail = f"redirect_fired={res.adversarial_short_circuit_fired} chunks={res.retrieved_chunk_count}"
-            elif res.expected_action == "no_retrieval":
-                detail = f"intent={res.contextualizer_intent} chunks={res.retrieved_chunk_count}"
-            else:
-                detail = f"top1={res.retrieved_doc_ids[0] if res.retrieved_doc_ids else '<none>'}"
-            print(f"  [{i:3}/{len(rows)}] {status:4} {res.row_id:55} "
-                  f"({res.retrieval_latency_ms}ms) {detail}",
-                  flush=True)
+        from models import db as _db, ChatSession as _CS
+        for session in sessions:
+            # One ChatSession per conversation. Consecutive turns share it, so the
+            # cache carries across turns exactly as it does in production; deleting
+            # it afterwards is the clean break between conversations.
+            sid = "eval" + uuid.uuid4().hex[:28]
+            _db.session.add(_CS(id=sid, ta_id=session[0]["ta_id"], user_id=None))
+            _db.session.commit()
+
+            for pos, row in enumerate(session):
+                i += 1
+                # Only the opening turn replays its recorded prefix. Later turns had
+                # their prefix actually executed as earlier turns of this session.
+                res = evaluate_row(row, retrieve_context, warm_cache=warm,
+                                   log_to_sheet=args.log_to_sheet,
+                                   session_id=sid, skip_replay=(pos > 0))
+                results.append(res)
+                status = "ERR" if res.error else ("HIT" if res.bucket_hit else "MISS")
+                # For Wave 2 expected-action rows, show the diagnostic that explains the HIT/MISS
+                # decision instead of top1 (which isn't meaningful for redirect/no_retrieval).
+                if res.expected_action == "redirect":
+                    detail = f"redirect_fired={res.adversarial_short_circuit_fired} chunks={res.retrieved_chunk_count}"
+                elif res.expected_action == "no_retrieval":
+                    detail = f"intent={res.contextualizer_intent} chunks={res.retrieved_chunk_count}"
+                else:
+                    detail = f"top1={res.retrieved_doc_ids[0] if res.retrieved_doc_ids else '<none>'}"
+                turn = f"t{pos + 1}/{len(session)}" if len(session) > 1 else "  -"
+                print(f"  [{i:3}/{len(rows)}] {turn:5} {status:4} {res.row_id:55} "
+                      f"({res.retrieval_latency_ms}ms) {detail}",
+                      flush=True)
+
+            # Clean break between conversations.
+            try:
+                _db.session.rollback()
+                stale = _CS.query.get(sid)
+                if stale:
+                    _db.session.delete(stale)
+                    _db.session.commit()
+            except Exception:
+                _db.session.rollback()
 
     if args.log_to_sheet:
         print("Waiting for sheet writes to finish...", flush=True)
