@@ -359,14 +359,21 @@ def extract_jupyter_notebook(file_path: str) -> str:
         return ""
 
 
-def extract_text_from_file(file_path: str) -> tuple:
-    """Extract text from file. Returns (text, page_count) - page_count is 0 for non-PDFs."""
+def extract_text_from_file(file_path: str, heartbeat=None) -> tuple:
+    """
+    Extract text from file. Returns (text, page_count) - page_count is 0 for non-PDFs.
+
+    heartbeat: optional callable the PDF path invokes periodically during
+    page-by-page vision work. The indexing watchdog fails any job whose progress
+    row has not moved in 5 minutes, and a long PDF can spend far longer than that
+    inside a single document — the job is working, but invisibly.
+    """
     ext = file_path.rsplit('.', 1)[-1].lower() if '.' in file_path else ''
     page_count = 0
 
     try:
         if ext == 'pdf':
-            text, page_count = extract_pdf(file_path)
+            text, page_count = extract_pdf(file_path, heartbeat=heartbeat)
         elif ext == 'docx':
             text = extract_docx(file_path)
         elif ext == 'doc':
@@ -398,32 +405,110 @@ def extract_text_from_file(file_path: str) -> tuple:
         logger.error(f"Error extracting text from {file_path}: {e}")
         return "", 0
 
-def extract_pdf(file_path: str) -> tuple:
-    """Extract PDF text and return (text, page_count)."""
-    text, page_count = _extract_pdf_pypdf2(file_path)
+def extract_pdf(file_path: str, heartbeat=None) -> tuple:
+    """
+    Extract PDF text and return (text, page_count).
+
+    heartbeat: optional callable passed down to the page-by-page vision loops so a
+    long document keeps reporting progress to the indexing watchdog.
+    """
+    text, page_count = _extract_pdf_pypdf2(file_path, heartbeat=heartbeat)
     if text and len(text.strip()) > 100:
-        text = _supplement_pdf_with_figures(file_path, text)
+        text = _supplement_pdf_with_figures(file_path, text, heartbeat=heartbeat)
         return text, page_count
 
     logger.info("PyPDF2 extraction insufficient, trying pdfplumber...")
-    text, page_count = _extract_pdf_pdfplumber(file_path)
+    text, page_count = _extract_pdf_pdfplumber(file_path, heartbeat=heartbeat)
     if text and len(text.strip()) > 100:
-        text = _supplement_pdf_with_figures(file_path, text)
+        text = _supplement_pdf_with_figures(file_path, text, heartbeat=heartbeat)
         return text, page_count
 
     logger.info("Text extraction insufficient - attempting vision-based extraction for image/handwritten PDF...")
-    text, page_count = _extract_pdf_vision(file_path)
+    text, page_count = _extract_pdf_vision(file_path, heartbeat=heartbeat)
     if text and len(text.strip()) > 50:
         return text, page_count  # vision already described figures — skip supplement
 
     return "", 0
 
 
-def _supplement_pdf_with_figures(file_path: str, text: str) -> str:
+def _select_figure_candidate_pages(file_path: str, heartbeat=None) -> list:
     """
-    Run a figure-only vision pass over every PDF page and splice descriptions
-    into the already-extracted text under the matching '--- Page N ---' marker.
-    Pages with no figures return 'No figures' and are left untouched.
+    Page numbers (1-based) that plausibly contain a figure, decided from the PDF's
+    own structure — no rendering and no API calls.
+
+    A page qualifies if it has an embedded raster image or enough vector drawing
+    operations to look like a plot. Tables are deliberately NOT caught: they show
+    up as rects and lines rather than curves, and transcribing them is what the
+    text extractor is for.
+
+    A "page has no extractable text" condition was tried and removed. It was meant
+    to catch full-page figures, but any real figure is necessarily either a raster
+    or a vector drawing and is already caught — so the rule added no coverage and
+    fired on genuinely blank front-matter pages. Measured: it inflated doc 161 from
+    60 to 73 candidates, and 9 of the first 12 came back "No figures".
+
+    Returns a list of page numbers on success — possibly EMPTY, which legitimately
+    means "this document has no figures" and must not be confused with failure.
+    Returns None if screening itself failed, so the caller can fall back to the
+    pre-screening behaviour of visioning every page.
+    """
+    try:
+        import pdfplumber
+
+        candidates = []
+        with pdfplumber.open(file_path) as pdf:
+            total = len(pdf.pages)
+            for i, page in enumerate(pdf.pages, 1):
+                # This loop is the slowest phase of PDF extraction on a long
+                # document — reading images/curves means parsing each page's
+                # content stream. Measured ~125s on a 356-page textbook, longer
+                # than the text extraction and the vision calls combined. Heartbeat
+                # frequently or the watchdog fails the job mid-screen.
+                if heartbeat and i % 25 == 0:
+                    heartbeat()
+                has_raster = len(page.images) > 0
+                has_vector = len(page.curves) >= Config.VISION_FIGURE_CURVE_THRESHOLD
+                if has_raster or has_vector:
+                    candidates.append(i)
+
+        if len(candidates) > Config.VISION_MAX_PAGES_PER_DOC:
+            logger.warning(
+                f"Figure supplement: {len(candidates)} candidate pages exceeds cap "
+                f"{Config.VISION_MAX_PAGES_PER_DOC}; taking the first {Config.VISION_MAX_PAGES_PER_DOC}. "
+                f"Figures on later pages will not be described."
+            )
+            candidates = candidates[:Config.VISION_MAX_PAGES_PER_DOC]
+
+        logger.info(
+            f"Figure supplement: {len(candidates)}/{total} pages look like figures "
+            f"({100 * len(candidates) / total:.0f}%) for {file_path}"
+        )
+        return candidates
+
+    except Exception as e:
+        logger.warning(
+            f"Figure-candidate screening failed ({type(e).__name__}: {e}); "
+            f"falling back to every page"
+        )
+        return None
+
+
+def _supplement_pdf_with_figures(file_path: str, text: str, heartbeat=None) -> str:
+    """
+    Run a figure-only vision pass over the PDF pages that plausibly contain a
+    figure, splicing descriptions into the already-extracted text under the
+    matching '--- Page N ---' marker.
+
+    Pages are screened first (see _select_figure_candidate_pages) and rendered ONE
+    AT A TIME. Previously this rendered the whole document up front —
+    convert_from_path with no page range — so a 356-page book produced 356
+    in-memory JPEGs at 200 DPI before the first API call. That cost landed before
+    any vision work and was a major reason large PDFs tripped the 5-minute
+    indexing watchdog.
+
+    heartbeat: optional callable invoked every Config.VISION_HEARTBEAT_EVERY pages
+    so long documents keep reporting progress. Without it the watchdog marks a job
+    failed while it is still working — the job is never actually stuck.
     """
     try:
         import base64
@@ -433,12 +518,38 @@ def _supplement_pdf_with_figures(file_path: str, text: str) -> str:
         from openai import OpenAI
 
         client = OpenAI(api_key=Config.OPENAI_API_KEY)
-        images = convert_from_path(file_path, dpi=200, fmt='jpeg', poppler_path=Config.POPPLER_PATH)
-        logger.info(f"Figure supplement: rendering {len(images)} pages for {file_path}")
+
+        candidate_pages = _select_figure_candidate_pages(file_path, heartbeat=heartbeat)
+        if candidate_pages is None:
+            # Screening ITSELF failed — fall back to the pre-screening behaviour of
+            # every page. An empty list is a different thing entirely: it means the
+            # document genuinely has no figures, and we should do no vision at all.
+            try:
+                import pdfplumber
+                with pdfplumber.open(file_path) as pdf:
+                    candidate_pages = list(range(1, len(pdf.pages) + 1))
+            except Exception:
+                return text
+        elif not candidate_pages:
+            logger.info(f"Figure supplement: no figure-bearing pages in {file_path}; skipping vision")
+            return text
 
         supplemented = text
-        for page_num, img in enumerate(images, 1):
+        for seq, page_num in enumerate(candidate_pages, 1):
             try:
+                # Render just this page. first_page/last_page are 1-based inclusive.
+                rendered = convert_from_path(
+                    file_path, dpi=200, fmt='jpeg',
+                    first_page=page_num, last_page=page_num,
+                    poppler_path=Config.POPPLER_PATH,
+                )
+                if not rendered:
+                    continue
+                img = rendered[0]
+
+                if heartbeat and seq % Config.VISION_HEARTBEAT_EVERY == 0:
+                    heartbeat()
+
                 img_buffer = BytesIO()
                 img.save(img_buffer, format='JPEG', quality=85)
                 img_base64 = base64.b64encode(img_buffer.getvalue()).decode()
@@ -506,11 +617,15 @@ def _supplement_pdf_with_figures(file_path: str, text: str) -> str:
         return text
 
 
-def _extract_pdf_vision(file_path: str) -> tuple:
+def _extract_pdf_vision(file_path: str, heartbeat=None) -> tuple:
     """
     Extract content from image-heavy/handwritten PDFs using GPT-4o vision.
     Converts each page to an image and sends to GPT-4o for transcription.
     Returns (text, page_count).
+
+    heartbeat: optional callable invoked every Config.VISION_HEARTBEAT_EVERY pages.
+    This path is already capped at 50 pages, but 50 vision calls can still exceed
+    the indexing watchdog's 5-minute window on a single document.
     """
     try:
         import base64
@@ -535,6 +650,9 @@ def _extract_pdf_vision(file_path: str) -> tuple:
         text_parts = []
         for page_num, img in enumerate(images, 1):
             try:
+                if heartbeat and page_num % Config.VISION_HEARTBEAT_EVERY == 0:
+                    heartbeat()
+
                 img_buffer = BytesIO()
                 img.save(img_buffer, format='JPEG', quality=85)
                 img_base64 = base64.b64encode(img_buffer.getvalue()).decode()
@@ -599,18 +717,26 @@ def _extract_pdf_vision(file_path: str) -> tuple:
         logger.error(f"Vision extraction failed: {e}")
         return "", 0
 
-def _extract_pdf_pdfplumber(file_path: str) -> tuple:
-    """Extract PDF text using pdfplumber with total time limit. Returns (text, page_count)."""
+def _extract_pdf_pdfplumber(file_path: str, heartbeat=None) -> tuple:
+    """
+    Extract PDF text using pdfplumber with total time limit. Returns (text, page_count).
+
+    heartbeat fires every 25 pages so the indexing watchdog can see progress. This
+    path is already bounded at 120s by max_total_time, but that is still a large
+    share of the watchdog's 5-minute window before anything else runs.
+    """
     try:
         import pdfplumber
-        
+
         text_parts = []
         start_time = time.time()
         max_total_time = 120
-        
+
         with pdfplumber.open(file_path) as pdf:
             total_pages = len(pdf.pages)
             for page_num, page in enumerate(pdf.pages):
+                if heartbeat and page_num and page_num % 25 == 0:
+                    heartbeat()
                 page_start = time.time()
                 try:
                     if time.time() - start_time > max_total_time:
@@ -634,15 +760,24 @@ def _extract_pdf_pdfplumber(file_path: str) -> tuple:
         logger.warning(f"pdfplumber extraction failed: {e}")
         return "", 0
 
-def _extract_pdf_pypdf2(file_path: str) -> tuple:
-    """Extract PDF text using PyPDF2. Returns (text, page_count)."""
+def _extract_pdf_pypdf2(file_path: str, heartbeat=None) -> tuple:
+    """
+    Extract PDF text using PyPDF2. Returns (text, page_count).
+
+    heartbeat fires every 25 pages. Measured on a 356-page textbook, this loop
+    alone runs ~170s — longer than the vision supplement that follows it — so
+    without a heartbeat here a large PDF can burn most of the indexing watchdog's
+    5-minute window before the first progress update is even possible.
+    """
     try:
         from PyPDF2 import PdfReader
-        
+
         reader = PdfReader(file_path)
         text_parts = []
         page_count = len(reader.pages)
         for page_num, page in enumerate(reader.pages, 1):
+            if heartbeat and page_num % 25 == 0:
+                heartbeat()
             text = page.extract_text()
             if text:
                 text_parts.append(f"--- Page {page_num} ---\n{text}")
@@ -1457,17 +1592,33 @@ def process_and_index_documents_resumable(ta_id: str, progress_callback=None, re
         text = None
         page_count = 0
 
+        # Keep the indexing watchdog informed WHILE a single document is being
+        # extracted. check_stale_indexing_jobs fails any job whose row has not been
+        # touched in 5 minutes, and a long PDF's page-by-page vision work can run
+        # well past that inside one document — the job is progressing, just
+        # silently. Re-reports the current document's progress, which is enough to
+        # move IndexingJob.updated_at (see update_indexing_progress in app.py).
+        _hb_progress = int((absolute_doc_idx / total_docs) * 80) if total_docs else 0
+
+        def _heartbeat(_p=_hb_progress, _i=absolute_doc_idx):
+            if not progress_callback:
+                return
+            try:
+                progress_callback(ta_id, _p, docs_processed=_i)
+            except Exception as hb_e:
+                logger.warning(f"[{ta_id}] heartbeat failed: {type(hb_e).__name__}: {hb_e}")
+
         logger.info(f"[{ta_id}] [{doc.id}] Extracting text...")
         if doc.file_content:
             with tempfile.NamedTemporaryFile(delete=False, suffix=f".{doc.file_type}") as tmp_file:
                 tmp_file.write(doc.file_content)
                 tmp_path = tmp_file.name
             try:
-                text, page_count = extract_text_from_file(tmp_path)
+                text, page_count = extract_text_from_file(tmp_path, heartbeat=_heartbeat)
             finally:
                 os.unlink(tmp_path)
         elif os.path.exists(doc.storage_path):
-            text, page_count = extract_text_from_file(doc.storage_path)
+            text, page_count = extract_text_from_file(doc.storage_path, heartbeat=_heartbeat)
         else:
             err = "No file content available — please re-upload this document."
             logger.warning(f"[{ta_id}] [{doc.id}] {err}")

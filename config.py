@@ -136,6 +136,26 @@ class Config:
     #   SESSION_CONTEXT_MAX_TOKENS=500 python eval/run_eval.py ...
     SESSION_CONTEXT_MAX_TOKENS = int(os.getenv("SESSION_CONTEXT_MAX_TOKENS", "80000"))
 
+    # --- PDF figure-supplement vision pass -------------------------------------
+    # The supplement used to render EVERY page at 200 DPI and send EVERY page to
+    # gpt-4o. On a 356-page textbook that is 356 in-memory JPEGs before the first
+    # API call, plus 356 calls — which blew past the 5-minute indexing watchdog and
+    # made large PDFs impossible to index at all.
+    #
+    # Pages are now pre-screened with pdfplumber, which reports embedded rasters
+    # and vector drawings for free. Measured on two econometrics textbooks
+    # (356pp and 246pp): median curves per page = 0, so figure pages stand out
+    # sharply. `curves >= 10 or raster or no-text` selects 17% and 11% of pages —
+    # roughly a 7x cut that keeps the figures, unlike a blanket page cap which
+    # would discard every figure in a long book.
+    VISION_FIGURE_CURVE_THRESHOLD = int(os.getenv("VISION_FIGURE_CURVE_THRESHOLD", "10"))
+    # Backstop so a pathological file (vector-heavy on every page) cannot explode.
+    VISION_MAX_PAGES_PER_DOC = int(os.getenv("VISION_MAX_PAGES_PER_DOC", "120"))
+    # How often the extraction heartbeat fires, in candidate pages. The indexing
+    # watchdog fails a job after 5 minutes without a progress update, so this must
+    # stay well below that in wall-clock terms.
+    VISION_HEARTBEAT_EVERY = int(os.getenv("VISION_HEARTBEAT_EVERY", "5"))
+
     CONTEXTUALIZER_ENABLED = os.getenv('CONTEXTUALIZER_ENABLED', 'true').lower() == 'true'
     CONTEXTUALIZER_MODEL = os.getenv('CONTEXTUALIZER_MODEL', 'gpt-4o-mini')
     CONTEXTUALIZER_MAX_HISTORY = 6
