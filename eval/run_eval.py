@@ -98,8 +98,77 @@ def load_rows():
     return rows
 
 
+def _generate_answer(row: dict, chunks: list, diagnostics: dict, session_id: str) -> tuple:
+    """
+    Produce the answer the student would actually have seen, so results can be
+    judged on the answer rather than only on which documents were retrieved.
+
+    Mirrors the assembly in src/chat_streaming.py (context ordering, hybrid flags,
+    limited_context heuristic, prose history) so the eval exercises the same
+    generation path as production rather than an approximation of it. Kept in sync
+    by hand — if chat_streaming's assembly changes, this needs the same change.
+
+    Returns (answer, generation_ms). Never raises: a generation failure must not
+    lose the retrieval result for that row.
+    """
+    import time as _t
+    t0 = _t.time()
+    try:
+        from src.response_generator import generate_response
+        from models import TeachingAssistant
+        from config import Config
+
+        ta = TeachingAssistant.query.get(row["ta_id"])
+
+        # Primary chunks first, teaching material tagged after — same ordering the
+        # chat path uses, since ordering affects what the model leans on.
+        primary = [c for c in chunks if c.get('retrieval_role') != 'teaching_material']
+        teaching = [c for c in chunks if c.get('retrieval_role') == 'teaching_material']
+        parts = [f"[From: {c.get('file_name','')}]\n{c.get('text','')}" for c in primary]
+        if teaching:
+            parts.append("[RELEVANT TEACHING MATERIAL FROM COURSE LECTURES]")
+            parts.extend(f"[From: {c.get('file_name','')}]\n{c.get('text','')}" for c in teaching)
+        context = "\n\n---\n\n".join(parts)
+
+        history_parts = []
+        for msg in (row.get("prior_turns") or [])[-6:]:
+            role_label = "Student" if msg.get("role") == "user" else "Assistant"
+            history_parts.append(f"{role_label}: {(msg.get('content') or '')[:300]}...")
+        history_text = "\n".join(history_parts)
+
+        chunk_count = len(chunks or [])
+        score_top1 = diagnostics.get("score_top1", 0) or 0
+        hybrid_mode = diagnostics.get("hybrid_fallback_triggered", False)
+        limited_context = (
+            chunk_count == 0
+            or (chunk_count <= 2 and score_top1 < 0.5)
+            or (hybrid_mode and score_top1 < 0.6)
+            or (diagnostics.get("total_chunks_in_ta", 0) or 0) <= 5
+        ) and not diagnostics.get("supplementary_teaching_found", False) \
+          and not diagnostics.get("session_cache_used", False)
+
+        answer = generate_response(
+            query=row["query"],
+            context=context,
+            system_prompt=(ta.system_prompt if ta else ""),
+            conversation_history=history_text,
+            course_name=(ta.course_name if ta else ""),
+            hybrid_mode=hybrid_mode,
+            hybrid_doc_filename=diagnostics.get("hybrid_doc_filename"),
+            query_reference=diagnostics.get("validation_expected_ref"),
+            attempt_count=diagnostics.get("attempt_count", 0) or 0,
+            session_id=session_id,
+        )
+        return (answer or ""), int((_t.time() - t0) * 1000)
+
+    except Exception as e:
+        print(f"    [warn] generation failed for {row.get('row_id')}: "
+              f"{type(e).__name__}: {e}", flush=True)
+        return "", int((_t.time() - t0) * 1000)
+
+
 def _log_row_to_sheet(row: dict, chunks: list, diagnostics: dict, session_id: str,
-                      latency_ms: int) -> None:
+                      latency_ms: int, answer: str = "", generation_ms: int = 0) -> None:
     """
     Write one eval row to the QA-log sheet so results are reviewable in the same
     place as real traffic.
@@ -108,7 +177,8 @@ def _log_row_to_sheet(row: dict, chunks: list, diagnostics: dict, session_id: st
     log_qa_entry normally fires — so without this, eval results exist only as an
     aggregate scorecard with no row-level detail to inspect.
 
-    Retrieval-only: `answer` is empty and generation latency/token count are 0.
+    With --generate the `answer` column carries the response a student would have
+    seen; without it the column is empty and generation latency/token count are 0.
     Everything retrieval-side (sources, diagnostics, retrieval latency) populates
     normally.
 
@@ -131,13 +201,13 @@ def _log_row_to_sheet(row: dict, chunks: list, diagnostics: dict, session_id: st
             course_name=(ta.course_name if ta else ""),
             session_id=session_id,
             query=row["query"],
-            answer="",                      # retrieval-only harness
+            answer=answer,
             sources=sources,
             chunk_count=len(chunks or []),
-            latency_ms=latency_ms,
+            latency_ms=latency_ms + generation_ms,
             retrieval_latency_ms=latency_ms,
-            generation_latency_ms=0,
-            token_count=0,
+            generation_latency_ms=generation_ms,
+            token_count=len(answer.split()) if answer else 0,
             retrieval_diagnostics=diagnostics,
             llm_model=Config.LLM_MODEL,
             is_anonymous=False,
@@ -238,7 +308,7 @@ def verify_grouping(rows: list[dict], sessions: list[list[dict]]) -> dict:
 
 def evaluate_row(row: dict, retrieve_context, warm_cache: bool = True,
                  log_to_sheet: bool = False, session_id: str = None,
-                 skip_replay: bool = False) -> RowResult:
+                 skip_replay: bool = False, generate: bool = False) -> RowResult:
     """Evaluate one row.
 
     warm_cache=True (default): for multi-turn rows, replay each prior user-turn
@@ -344,10 +414,18 @@ def evaluate_row(row: dict, retrieve_context, warm_cache: bool = True,
         pre_rerank_retrieved = []
         error = f"{type(e).__name__}: {e}"
 
+    # Generate the answer the student would have seen, before logging, so the sheet
+    # row carries it. Runs after retrieval and cannot affect it — scoring below is
+    # unchanged whether or not generation is on.
+    answer, generation_ms = "", 0
+    if generate and not error:
+        answer, generation_ms = _generate_answer(row, chunks, diagnostics, session_id)
+
     # Log before the session row is dropped, so anything reading the sheet can
     # still correlate session_id against chat_sessions if needed.
     if log_to_sheet:
-        _log_row_to_sheet(row, chunks if not error else [], diagnostics, session_id, latency)
+        _log_row_to_sheet(row, chunks if not error else [], diagnostics, session_id, latency,
+                          answer=answer, generation_ms=generation_ms)
 
     # Drop the eval session only if this call created it. When the caller owns the
     # session (the normal path) it is deleted after the whole conversation, since
@@ -646,6 +724,13 @@ def main() -> int:
                              "Writes to the 'eval_logs' tab unless --log-tab says otherwise, so eval "
                              "rows never land in dev_logs or qa_logs_v2. Note the harness is "
                              "retrieval-only, so the answer column will be empty.")
+    parser.add_argument("--generate", action="store_true",
+                        help="Also generate the answer for each row, so results can be judged on "
+                             "what the student would have seen rather than only on which documents "
+                             "were retrieved. Mirrors src/chat_streaming.py's context assembly. "
+                             "Adds roughly 7s and generation spend per row; retrieval and scoring "
+                             "are unaffected. Most useful with --log-to-sheet, which puts the "
+                             "answer in the sheet's `answer` column.")
     parser.add_argument("--log-tab", type=str, default="eval_logs",
                         help="Sheet tab for --log-to-sheet (default: eval_logs). Set explicitly at "
                              "runtime rather than via the qa_log_tab_name env var, because config.py "
@@ -732,7 +817,8 @@ def main() -> int:
                 # their prefix actually executed as earlier turns of this session.
                 res = evaluate_row(row, retrieve_context, warm_cache=warm,
                                    log_to_sheet=args.log_to_sheet,
-                                   session_id=sid, skip_replay=(pos > 0))
+                                   session_id=sid, skip_replay=(pos > 0),
+                                   generate=args.generate)
                 results.append(res)
                 status = "ERR" if res.error else ("HIT" if res.bucket_hit else "MISS")
                 # For Wave 2 expected-action rows, show the diagnostic that explains the HIT/MISS
