@@ -162,6 +162,10 @@ def run_pass(queries: list[dict], retrieve_context, label: str) -> dict:
             "keys": [chunk_key(c) for c in (chunks or [])],
             "reranked": bool(diag.get("rerank_applied")),
             "method": diag.get("retrieval_method"),
+            # Supplementary material performs its own LLM concept extraction and
+            # appends chunks to the result, so rows where it fired are NOT a clean
+            # reranker-only measurement even with the contextualizer disabled.
+            "supp": bool(diag.get("supplementary_teaching_found")),
             "ms": ms,
         }
         print(f"  [{label}] {i:3}/{len(queries)} {q['row_id']:52} "
@@ -181,12 +185,25 @@ def run_pass(queries: list[dict], retrieve_context, label: str) -> dict:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--runs", type=int, default=2, help="passes to make (2 = self-agreement)")
+    ap.add_argument("--no-contextualizer", action="store_true",
+                    help="Disable the contextualizer so effective_query is the raw query. The "
+                         "contextualizer is an LLM that rewrites the query BEFORE retrieval, so a "
+                         "different rewrite hands the reranker different candidates — variance a "
+                         "reranker swap would not fix. Turning it off isolates the reranker as "
+                         "the (near-)only remaining LLM in the path.")
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--out", default=str(Path(__file__).parent / "rerank_agreement_results.md"))
     args = ap.parse_args()
 
     from app import app
     from src.retriever import retrieve_context
+    from config import Config
+
+    if args.no_contextualizer:
+        # Set on Config directly: config.py calls load_dotenv(override=True), so an
+        # exported env var loses to the .env file.
+        Config.CONTEXTUALIZER_ENABLED = False
+        print("Contextualizer DISABLED — effective_query is the raw query", flush=True)
 
     queries = load_queries(args.limit)
     print(f"{len(queries)} queries x {args.runs} passes\n", flush=True)
@@ -216,12 +233,21 @@ def main() -> None:
             "identical": 1.0 if a[:8] == b[:8] else 0.0,
         })
 
-    def m(k):
-        return st.mean([r[k] for r in results]) if results else 0.0
+    # Rows where the supplementary step fired in either pass are not a clean
+    # reranker-only measurement — that step runs its own LLM concept extraction
+    # and appends chunks to the result.
+    clean = [r for r in results
+             if not any(p.get(r["row_id"], {}).get("supp") for p in passes)]
+
+    def m(k, rows=None):
+        rows = results if rows is None else rows
+        return st.mean([r[k] for r in rows]) if rows else 0.0
 
     print("=" * 62)
     print(f"queries: {len(queries)} | reranked in some pass: {reranked_any} | "
           f"comparable (reranked in all): {len(comparable)}")
+    if args.no_contextualizer:
+        print(f"contextualizer OFF | supplementary-free subset: {len(clean)}/{len(results)}")
     print("=" * 62)
     if results:
         print(f"  RBO (top-weighted)      : {m('rbo'):.3f}")
@@ -229,6 +255,11 @@ def main() -> None:
         print(f"  overlap@8               : {m('ov8'):.3f}")
         print(f"  top-1 agreement         : {m('top1'):.3f}")
         print(f"  identical top-8 ordering: {m('identical'):.3f}")
+        if clean and len(clean) != len(results):
+            print(f"  --- supplementary-free subset (n={len(clean)}), cleanest isolation ---")
+            print(f"  RBO                     : {m('rbo', clean):.3f}")
+            print(f"  top-1 agreement         : {m('top1', clean):.3f}")
+            print(f"  identical top-8 ordering: {m('identical', clean):.3f}")
     else:
         print("  no comparable rows — rerank never fired in all passes")
 
