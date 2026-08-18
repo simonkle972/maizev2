@@ -342,6 +342,14 @@ def assess_retrieval_confidence(chunks: list, rerank_info: dict) -> dict:
             "score_spread": 0
         }
     
+    # Confidence thresholds are calibrated to the incumbent's 0-10 scale. Cohere's
+    # scores are scaled x10 onto that scale, but scaling is not calibration — the
+    # vendor-specific override exists so the threshold can be re-derived from real
+    # score distributions rather than assumed equivalent.
+    threshold = (Config.HYBRID_CONFIDENCE_THRESHOLD_COHERE
+                 if (Config.RERANKER_VENDOR or "").lower() == "cohere"
+                 else Config.HYBRID_CONFIDENCE_THRESHOLD)
+
     if not rerank_info.get("reranked", False):
         vector_scores = [c.get("score", 0) for c in chunks]
         top_vector = vector_scores[0] if vector_scores else 0
@@ -367,9 +375,9 @@ def assess_retrieval_confidence(chunks: list, rerank_info: dict) -> dict:
     is_low_confidence = False
     reason = "adequate_confidence"
     
-    if top_score < Config.HYBRID_CONFIDENCE_THRESHOLD:
+    if top_score < threshold:
         is_low_confidence = True
-        reason = f"top_score_{top_score}_below_threshold_{Config.HYBRID_CONFIDENCE_THRESHOLD}"
+        reason = f"top_score_{top_score}_below_threshold_{threshold}"
     elif score_spread < Config.HYBRID_SCORE_SPREAD_THRESHOLD and top_score < 8:
         is_low_confidence = True
         reason = f"low_spread_{score_spread}_and_moderate_top_{top_score}"
@@ -784,9 +792,122 @@ def retrieve_supplementary_teaching_material(ta_id, primary_chunks, query_analys
     return supplementary_chunks, len(supplementary_chunks) > 0
 
 
+def rerank(query: str, chunks: list, top_k: int = FINAL_K, session_id: str = "") -> tuple:
+    """
+    Rerank chunks with the configured vendor. Single entry point for retrieval.
+
+    Dispatches on Config.RERANKER_VENDOR, defaulting to the gpt-5.2 incumbent so
+    the Cohere path ships dormant and rollback is an env var rather than a deploy.
+
+    If Cohere fails or times out, fall back to VECTOR ORDER rather than to the
+    gpt-5.2 reranker: the whole point of the swap is removing an 11-19s call from
+    the critical path, and a circuit-breaker back onto it would reintroduce that
+    spike precisely when the system is already degraded. Some ranking quality is
+    lost on those turns; the diagnostics record when it happens so the rate is
+    visible rather than inferred.
+
+    Returns the same (chunks, rerank_info) contract as llm_rerank.
+    """
+    vendor = (Config.RERANKER_VENDOR or "gpt-5.2").lower()
+
+    if vendor == "cohere":
+        reranked, info = cohere_rerank(query, chunks, top_k=top_k)
+        if info.get("reranked") or info.get("reason") in ("no_chunks", "chunks_under_limit"):
+            return reranked, info
+        # Cohere errored — vector order, and say so loudly enough to alert on.
+        logger.warning(
+            f"Cohere rerank unavailable ({info.get('reason')}); serving vector order. "
+            f"Ranking quality is degraded for this turn."
+        )
+        return chunks[:top_k], info
+
+    return llm_rerank(query, chunks, top_k=top_k, session_id=session_id)
+
+
+def cohere_rerank(query: str, chunks: list, top_k: int = FINAL_K) -> tuple:
+    """
+    Rerank with Cohere's cross-encoder. Deterministic: identical input yields
+    identical scores, unlike the gpt-5.2 incumbent.
+
+    Cohere scores relevance in [0,1]; the incumbent uses 0-10. Scores are written
+    to `llm_relevance_score` scaled x10 so assess_retrieval_confidence and every
+    other downstream consumer keep working untouched. The raw score is preserved
+    as `cohere_relevance_score` for calibration work — scaling is not calibration,
+    and the confidence threshold has to be re-derived from real distributions
+    before this vendor is enabled in prod.
+    """
+    import time
+
+    if not chunks:
+        return [], {"reranked": False, "reason": "no_chunks", "method": "none"}
+    if len(chunks) <= top_k:
+        return chunks, {"reranked": False, "reason": "chunks_under_limit", "method": "none"}
+
+    rerank_start = time.time()
+    try:
+        import cohere
+
+        if not Config.COHERE_API_KEY:
+            raise RuntimeError("COHERE_API_KEY is not set")
+
+        client = cohere.ClientV2(api_key=Config.COHERE_API_KEY)
+        documents = [c.get("text", "") for c in chunks]
+
+        response = client.rerank(
+            model=Config.COHERE_RERANK_MODEL,
+            query=query,
+            documents=documents,
+            top_n=top_k,
+            request_options={"timeout_in_seconds": Config.COHERE_TIMEOUT_S},
+        )
+        rerank_latency_ms = int((time.time() - rerank_start) * 1000)
+
+        reranked, scores, raw = [], [], []
+        for r in response.results:
+            chunk = chunks[r.index].copy()
+            chunk["cohere_relevance_score"] = r.relevance_score
+            chunk["llm_relevance_score"] = round(r.relevance_score * 10, 2)
+            chunk["llm_reason"] = f"cohere:{Config.COHERE_RERANK_MODEL}"
+            reranked.append(chunk)
+            scores.append(chunk["llm_relevance_score"])
+            raw.append(round(r.relevance_score, 4))
+
+        vector_scores = [chunks[r.index].get("score", 0) for r in response.results]
+
+        info = {
+            "reranked": True,
+            "method": f"cohere:{Config.COHERE_RERANK_MODEL}",
+            "initial_count": len(chunks),
+            "final_count": len(reranked),
+            "rerank_latency_ms": rerank_latency_ms,
+            "llm_score_top1": scores[0] if scores else 0,
+            "llm_score_top8": scores[-1] if scores else 0,
+            "vector_score_top1": round(vector_scores[0], 4) if vector_scores else 0,
+            "cohere_raw_scores": raw[:8],
+            "top_reasons": [],
+            "reranked_indices": [r.index for r in response.results][:8],
+        }
+        logger.info(
+            f"Cohere reranked {len(chunks)} -> {len(reranked)} chunks in {rerank_latency_ms}ms "
+            f"| top_score={scores[0] if scores else 0} (raw {raw[0] if raw else 0})"
+        )
+        return reranked, info
+
+    except Exception as e:
+        rerank_latency_ms = int((time.time() - rerank_start) * 1000)
+        logger.error(f"Cohere rerank failed after {rerank_latency_ms}ms: {type(e).__name__}: {e}")
+        return chunks[:top_k], {
+            "reranked": False,
+            "method": "fallback_vector",
+            "reason": f"cohere_failed: {type(e).__name__}: {str(e)[:80]}",
+            "rerank_latency_ms": rerank_latency_ms,
+            "cohere_fallback_fired": True,
+        }
+
+
 def llm_rerank(query: str, chunks: list, top_k: int = FINAL_K, session_id: str = "") -> tuple:
     """
-    Rerank chunks using GPT-4o-mini for semantic relevance scoring.
+    Rerank chunks using gpt-5.2 (Config.LLM_MODEL) at medium reasoning effort.
 
     The LLM evaluates each chunk's relevance to the specific query,
     understanding context like "problem 2f" vs "problem 3d".
@@ -3104,10 +3225,24 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         })
     diagnostics["pre_rerank_candidates"] = pre_rerank_candidates
 
-    chunks, rerank_info = llm_rerank(query, initial_chunks, top_k=final_k, session_id=session_id)
+    chunks, rerank_info = rerank(query, initial_chunks, top_k=final_k, session_id=session_id)
     diagnostics["rerank_applied"] = rerank_info.get("reranked", False)
     diagnostics["rerank_info"] = rerank_info
-    
+
+    # Promote the reranker facts to top-level diagnostics so they reach qa_logs.
+    # The sheet has a rerank_latency_ms column that was always blank because these
+    # lived only inside the nested rerank_info blob. Without them there is no way
+    # to measure the vendor's real P50/P99 from the VPS, or how often the fallback
+    # fires — the two things the swap decision needs from production.
+    diagnostics["rerank_method"] = rerank_info.get("method")
+    diagnostics["rerank_vendor"] = (Config.RERANKER_VENDOR or "gpt-5.2")
+    diagnostics["rerank_latency_ms"] = rerank_info.get("rerank_latency_ms")
+    diagnostics["rerank_fallback_fired"] = bool(rerank_info.get("cohere_fallback_fired"))
+    diagnostics["llm_score_top1"] = rerank_info.get("llm_score_top1")
+    diagnostics["llm_score_top8"] = rerank_info.get("llm_score_top8")
+    diagnostics["vector_score_top1"] = rerank_info.get("vector_score_top1")
+
+
     if diagnostics["rerank_applied"]:
         scores = [c.get("llm_relevance_score", c.get("score", 0.0)) for c in chunks]
     else:

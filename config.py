@@ -123,6 +123,38 @@ class Config:
     HYBRID_MAX_DOC_TOKENS = 80000
     HYBRID_SCORE_SPREAD_THRESHOLD = 2
 
+    # --- Reranker vendor -------------------------------------------------------
+    # "gpt-5.2" (default, incumbent) | "cohere". Defaults to the incumbent so the
+    # Cohere code ships dormant and a rollback is one env var, not a deploy.
+    #
+    # Why swap at all: gpt-5.2 rerank measures 11-19s per fresh-retrieval turn and
+    # dominates the 29s T1 median that drives adoption erosion. Cohere measured
+    # 161-556ms on the same shape of call.
+    #
+    # Second reason, measured 2026-08-17: gpt-5.2's reranking is markedly
+    # NONDETERMINISTIC. Two identical passes over 58 queries agreed at RBO 0.772
+    # with the top result differing on ~24% of them, and disabling the query
+    # rewriter changed that by 0.018 — so the reranker, not the contextualizer,
+    # owns it. A cross-encoder is deterministic, which also stabilises
+    # assess_retrieval_confidence, since that thresholds directly on these scores.
+    RERANKER_VENDOR = os.getenv("RERANKER_VENDOR", "gpt-5.2")
+    COHERE_API_KEY = os.getenv("COHERE_API_KEY")
+    COHERE_RERANK_MODEL = os.getenv("COHERE_RERANK_MODEL", "rerank-v3.5")
+    COHERE_TIMEOUT_S = float(os.getenv("COHERE_TIMEOUT_S", "10"))
+
+    # Cohere returns relevance in [0,1]; gpt-5.2 returns 0-10. Scores are scaled
+    # x10 onto the incumbent scale so assess_retrieval_confidence and every
+    # downstream consumer keep working unchanged.
+    #
+    # SCALING IS NOT CALIBRATION. A Cohere 0.6 does not mean what a gpt-5.2 6
+    # means, and the two Cohere models differ from each other too — on one probe
+    # rerank-v3.5 scored a correct answer 0.82 where rerank-english-v3.0 scored it
+    # 0.9995. So HYBRID_CONFIDENCE_THRESHOLD must be re-derived from real score
+    # distributions before Cohere is enabled in prod; this override exists to hold
+    # that value once measured.
+    HYBRID_CONFIDENCE_THRESHOLD_COHERE = float(
+        os.getenv("HYBRID_CONFIDENCE_THRESHOLD_COHERE", str(HYBRID_CONFIDENCE_THRESHOLD)))
+
     # Ceiling on the context assembled for a session-cache follow-up turn. That
     # path concatenates up to four sources (cached document + solution doc +
     # cached supplementary + fresh concept-lookup chunks) and historically
