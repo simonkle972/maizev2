@@ -131,16 +131,36 @@ def load_queries(limit: int | None) -> list[dict]:
 
     rows = load_rows()
     openers = [s[0] for s in group_into_sessions(rows)]
+    # correct_doc_ids must be carried through: calibrate() derives the
+    # LABEL-OPTIMAL threshold from it, and without it that whole half silently
+    # computes over an empty set and returns None. Every calibration run before
+    # 2026-08-19 reported label_optimal_threshold=None for every vendor for
+    # exactly this reason -- the rate-matched thresholds were the only ones that
+    # ever actually ran.
     out = [{"source": "eval_opener", "ta_id": r["ta_id"], "query": r["query"],
-            "row_id": r["row_id"]} for r in openers]
+            "row_id": r["row_id"], "correct_doc_ids": r.get("correct_doc_ids")}
+           for r in openers]
     out += [{"source": "concept_probe", "ta_id": DEFAULT_TA, "query": q,
              "row_id": f"concept_{i+1:02d}"} for i, q in enumerate(CONCEPT_QUERIES)]
     return out[:limit] if limit else out
 
 
-def run_pass(queries: list[dict], retrieve_context, label: str) -> dict:
-    """One full pass: returns {row_id: {ordered chunk keys, reranked flag, ms}}."""
+def run_pass(queries: list[dict], retrieve_context, label: str, vendor: str = None,
+             model: str = None) -> dict:
+    """
+    One full pass: returns {row_id: {ordered chunk keys, reranked flag, scores, ms}}.
+
+    vendor/model override Config for this pass, so a single invocation can compare
+    rerankers on identical inputs rather than stitching together runs taken at
+    different times.
+    """
     from models import db, ChatSession
+    from config import Config
+
+    if vendor:
+        Config.RERANKER_VENDOR = vendor
+    if model:
+        Config.COHERE_RERANK_MODEL = model
 
     out = {}
     for i, q in enumerate(queries, 1):
@@ -160,8 +180,19 @@ def run_pass(queries: list[dict], retrieve_context, label: str) -> dict:
 
         out[q["row_id"]] = {
             "keys": [chunk_key(c) for c in (chunks or [])],
+            # Filenames of the reranked chunks, so threshold calibration can ask
+            # whether a labelled-correct document actually survived the rerank.
+            "files": [c.get("file_name") for c in (chunks or [])],
             "reranked": bool(diag.get("rerank_applied")),
             "method": diag.get("retrieval_method"),
+            # Scores drive both candidate thresholds: the rate-matched one and the
+            # label-optimal one. Captured per row rather than aggregated so the
+            # distribution is inspectable afterwards.
+            "top1_score": diag.get("llm_score_top1"),
+            "top8_score": diag.get("llm_score_top8"),
+            "rerank_ms": diag.get("rerank_latency_ms"),
+            "rerank_method": diag.get("rerank_method"),
+            "fallback_fired": bool(diag.get("rerank_fallback_fired")),
             # Supplementary material performs its own LLM concept extraction and
             # appends chunks to the result, so rows where it fired are NOT a clean
             # reranker-only measurement even with the contextualizer disabled.
@@ -185,6 +216,12 @@ def run_pass(queries: list[dict], retrieve_context, label: str) -> dict:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--runs", type=int, default=2, help="passes to make (2 = self-agreement)")
+    ap.add_argument("--vendors", type=str, default=None,
+                    help="Comma-separated vendor[:model] per pass, e.g. "
+                         "'gpt-5.2,cohere:rerank-v3.5,cohere:rerank-v3.5,cohere:rerank-v4.0'. "
+                         "Overrides --runs. Pass 1 is the reference; every later pass is compared "
+                         "against it. Repeating a vendor measures its self-agreement — worth doing "
+                         "for Cohere rather than assuming determinism.")
     ap.add_argument("--no-contextualizer", action="store_true",
                     help="Disable the contextualizer so effective_query is the raw query. The "
                          "contextualizer is an LLM that rewrites the query BEFORE retrieval, so a "
@@ -208,10 +245,20 @@ def main() -> None:
     queries = load_queries(args.limit)
     print(f"{len(queries)} queries x {args.runs} passes\n", flush=True)
 
+    # Each entry: (label, vendor, model). Default keeps the old self-agreement mode.
+    if args.vendors:
+        specs = []
+        for spec in args.vendors.split(","):
+            spec = spec.strip()
+            v, _, m = spec.partition(":")
+            specs.append((spec, v, m or None))
+    else:
+        specs = [(f"pass {n+1}", None, None) for n in range(args.runs)]
+
     passes = []
     with app.app_context():
-        for n in range(args.runs):
-            passes.append(run_pass(queries, retrieve_context, f"pass {n+1}"))
+        for n, (label, vendor, model) in enumerate(specs):
+            passes.append(run_pass(queries, retrieve_context, f"{n+1}:{label}", vendor, model))
             print(flush=True)
 
     # Only rows where rerank actually fired in EVERY pass are comparable — the
@@ -221,17 +268,23 @@ def main() -> None:
     reranked_any = sum(1 for q in queries
                        if any(p.get(q["row_id"], {}).get("reranked") for p in passes))
 
-    results = []
-    for rid in comparable:
-        a, b = passes[0][rid]["keys"], passes[1][rid]["keys"]
-        results.append({
-            "row_id": rid,
-            "rbo": rbo(a, b),
-            "ov5": overlap_at(a, b, 5),
-            "ov8": overlap_at(a, b, 8),
-            "top1": 1.0 if (a and b and a[0] == b[0]) else 0.0,
-            "identical": 1.0 if a[:8] == b[:8] else 0.0,
-        })
+    # Pass 1 is the reference; every later pass is scored against it.
+    def compare(ref_idx: int, other_idx: int) -> list:
+        rows = []
+        for rid in comparable:
+            a, b = passes[ref_idx][rid]["keys"], passes[other_idx][rid]["keys"]
+            rows.append({
+                "row_id": rid,
+                "rbo": rbo(a, b),
+                "ov5": overlap_at(a, b, 5),
+                "ov8": overlap_at(a, b, 8),
+                "top1": 1.0 if (a and b and a[0] == b[0]) else 0.0,
+                "identical": 1.0 if a[:8] == b[:8] else 0.0,
+            })
+        return rows
+
+    comparisons = [(specs[i][0], compare(0, i)) for i in range(1, len(passes))]
+    results = comparisons[0][1] if comparisons else []
 
     # Rows where the supplementary step fired in either pass are not a clean
     # reranker-only measurement — that step runs its own LLM concept extraction
@@ -243,25 +296,101 @@ def main() -> None:
         rows = results if rows is None else rows
         return st.mean([r[k] for r in rows]) if rows else 0.0
 
+    def calibrate(pass_idx: int, label: str, qmap: dict) -> dict:
+        """
+        Two candidate confidence thresholds for one pass, from the same scores.
+
+        RATE-MATCHED reproduces the incumbent's fallback rate. It changes one thing
+        at a time, which is a debugging convenience — NOT evidence the threshold is
+        right. The incumbent's 6 was never validated either, and it thresholds a
+        measurably noisy signal, so matching it also imports that noise.
+
+        LABEL-OPTIMAL asks what the fallback is actually for: when the labelled
+        correct document did NOT survive into the reranked top-8, did the score
+        fall below the threshold? Picks the cutoff that best separates
+        "right document present" from "right document missing" (Youden's J).
+        Closer to Cohere's own advice, which is to calibrate on borderline cases.
+
+        If the two agree the choice is easy. If they diverge, that says the current
+        threshold is mis-set — a finding about the running system, not just an
+        input to the swap.
+        """
+        scored = [(rid, passes[pass_idx][rid].get("top1_score"))
+                  for rid in comparable
+                  if passes[pass_idx][rid].get("top1_score") is not None]
+        if not scored:
+            return {"label": label, "error": "no scores captured"}
+
+        vals = sorted(s for _, s in scored)
+
+        # Ground truth: did a labelled-correct doc survive the rerank?
+        labelled = []
+        for rid, score in scored:
+            correct = set(qmap.get(rid, {}).get("correct_doc_ids") or [])
+            if not correct:
+                continue  # concept probes carry no labels
+            files = set(passes[pass_idx][rid].get("files") or [])
+            labelled.append((score, bool(correct & files)))
+
+        best_t, best_j = None, -1.0
+        if labelled:
+            for t in [round(v, 2) for v in vals]:
+                # Predict "retrieval OK" when score >= t.
+                tp = sum(1 for s, ok in labelled if s >= t and ok)
+                fn = sum(1 for s, ok in labelled if s < t and ok)
+                tn = sum(1 for s, ok in labelled if s < t and not ok)
+                fp = sum(1 for s, ok in labelled if s >= t and not ok)
+                sens = tp / (tp + fn) if (tp + fn) else 0.0
+                spec = tn / (tn + fp) if (tn + fp) else 0.0
+                j = sens + spec - 1
+                if j > best_j:
+                    best_j, best_t = j, t
+
+        return {
+            "label": label,
+            "n_scored": len(scored),
+            "n_labelled": len(labelled),
+            "score_min": round(min(vals), 2),
+            "score_median": round(st.median(vals), 2),
+            "score_max": round(max(vals), 2),
+            "below_incumbent_6": sum(1 for v in vals if v < 6),
+            "fallback_rate_at_6": round(sum(1 for v in vals if v < 6) / len(vals), 3),
+            "label_optimal_threshold": best_t,
+            "label_optimal_youden_j": round(best_j, 3) if best_t is not None else None,
+        }
+
+    qmap = {q["row_id"]: q for q in queries}
+    calibrations = [calibrate(i, specs[i][0], qmap) for i in range(len(passes))]
+
     print("=" * 62)
     print(f"queries: {len(queries)} | reranked in some pass: {reranked_any} | "
           f"comparable (reranked in all): {len(comparable)}")
     if args.no_contextualizer:
         print(f"contextualizer OFF | supplementary-free subset: {len(clean)}/{len(results)}")
     print("=" * 62)
-    if results:
-        print(f"  RBO (top-weighted)      : {m('rbo'):.3f}")
-        print(f"  overlap@5               : {m('ov5'):.3f}")
-        print(f"  overlap@8               : {m('ov8'):.3f}")
-        print(f"  top-1 agreement         : {m('top1'):.3f}")
-        print(f"  identical top-8 ordering: {m('identical'):.3f}")
+    if comparisons:
+        print(f"AGREEMENT vs pass 1 ({specs[0][0]})")
+        for lbl, rows in comparisons:
+            print(f"  {lbl:26} RBO={m('rbo', rows):.3f}  ov@8={m('ov8', rows):.3f}  "
+                  f"top1={m('top1', rows):.3f}  identical={m('identical', rows):.3f}")
         if clean and len(clean) != len(results):
-            print(f"  --- supplementary-free subset (n={len(clean)}), cleanest isolation ---")
-            print(f"  RBO                     : {m('rbo', clean):.3f}")
-            print(f"  top-1 agreement         : {m('top1', clean):.3f}")
-            print(f"  identical top-8 ordering: {m('identical', clean):.3f}")
+            print(f"  (supplementary-free subset n={len(clean)}: "
+                  f"RBO={m('rbo', clean):.3f} top1={m('top1', clean):.3f})")
     else:
         print("  no comparable rows — rerank never fired in all passes")
+
+    print()
+    print("SCORE DISTRIBUTIONS + CANDIDATE THRESHOLDS (scores on the 0-10 scale)")
+    for c in calibrations:
+        if c.get("error"):
+            print(f"  {c['label']:26} {c['error']}")
+            continue
+        print(f"  {c['label']:26} min={c['score_min']:5} med={c['score_median']:5} "
+              f"max={c['score_max']:5} | at incumbent 6: {c['below_incumbent_6']}/{c['n_scored']} "
+              f"fall back ({c['fallback_rate_at_6']:.0%})")
+        if c["label_optimal_threshold"] is not None:
+            print(f"  {'':26} label-optimal threshold = {c['label_optimal_threshold']} "
+                  f"(Youden J={c['label_optimal_youden_j']}, n={c['n_labelled']} labelled)")
 
     out = Path(args.out)
     with out.open("w") as f:
@@ -290,7 +419,10 @@ def main() -> None:
 
     json_out = out.with_suffix(".json")
     json_out.write_text(json.dumps(
-        {"queries": queries, "passes": passes, "results": results}, indent=2))
+        {"queries": queries, "specs": [list(s) for s in specs], "passes": passes,
+         "results": results,
+         "comparisons": {lbl: rows for lbl, rows in comparisons},
+         "calibrations": calibrations}, indent=2))
     print(f"\nWrote {out} and {json_out.name}")
 
 

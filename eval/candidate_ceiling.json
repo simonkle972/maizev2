@@ -1,0 +1,7177 @@
+{
+  "docs=5,chunks=20": [
+    {
+      "row_id": "econ_s1117_real_typeA_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with mathematical question 2 from problem set 2",
+      "labels": [
+        "econ117_pset02_2025B_with_table"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 8006,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 22,
+        "reason": "category_plus_number_unique",
+        "query_number": "2",
+        "top_filename_score": 0.333
+      },
+      "shortlist": [
+        22
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeA_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with mathematical question 1 from problem set 2",
+      "labels": [
+        "econ117_pset02_2025B_with_table"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 5008,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 22,
+        "reason": "category_plus_number_unique",
+        "query_number": "2",
+        "top_filename_score": 0.5
+      },
+      "shortlist": [
+        22
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeA_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with mathematical question 2 from problem set 2",
+      "labels": [
+        "econ117_pset02_2025B_with_table"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4894,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 22,
+        "reason": "category_plus_number_unique",
+        "query_number": "2",
+        "top_filename_score": 0.333
+      },
+      "shortlist": [
+        22
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeB_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with question 14 from extra problems II",
+      "labels": [
+        "extra problems II-1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 5582,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.95,
+        "top_filename_doc_id": 39
+      },
+      "shortlist": [
+        39,
+        38,
+        37,
+        36,
+        25
+      ],
+      "shortlist_size": 5,
+      "pool_size": 20,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": 1,
+      "rank_filename": 0,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeC_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Please help me with question 1 from quiz 1",
+      "labels": [
+        "econometrics quiz 1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 6794,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 18,
+        "reason": "category_plus_number_unique",
+        "query_number": "1",
+        "top_filename_score": 0.767
+      },
+      "shortlist": [
+        18
+      ],
+      "shortlist_size": 1,
+      "pool_size": 4,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    },
+    {
+      "row_id": "econ_s1117_real_typeC_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Please help me with question 1 from quiz 1",
+      "labels": [
+        "econometrics quiz 1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4105,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 18,
+        "reason": "category_plus_number_unique",
+        "query_number": "1",
+        "top_filename_score": 0.767
+      },
+      "shortlist": [
+        18
+      ],
+      "shortlist_size": 1,
+      "pool_size": 4,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    },
+    {
+      "row_id": "econ_s1117_real_typeC_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Please help me with question 1 from econometrics quiz 1",
+      "labels": [
+        "econometrics quiz 1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 3576,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 18,
+        "reason": "category_plus_number_unique",
+        "query_number": "1",
+        "top_filename_score": 1.0
+      },
+      "shortlist": [
+        18
+      ],
+      "shortlist_size": 1,
+      "pool_size": 4,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    },
+    {
+      "row_id": "econ_s1117_real_typeD_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with the proof in question 1 from problem set 3",
+      "labels": [
+        "econ117_pset03"
+      ],
+      "unresolved_labels": [
+        "econ117_pset03"
+      ],
+      "error": null,
+      "ms": 4427,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "3",
+        "top_filename_score": 0.5,
+        "top_filename_doc_id": 82
+      },
+      "shortlist": [
+        22,
+        36,
+        70,
+        39,
+        37
+      ],
+      "shortlist_size": 5,
+      "pool_size": 20,
+      "pool_doc_count": 5,
+      "L0": false,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeD_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with question 1 from problem set 3",
+      "labels": [
+        "econ117_pset03"
+      ],
+      "unresolved_labels": [
+        "econ117_pset03"
+      ],
+      "error": null,
+      "ms": 3985,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "3",
+        "top_filename_score": 0.5,
+        "top_filename_doc_id": 82
+      },
+      "shortlist": [
+        46,
+        20,
+        25,
+        35,
+        36
+      ],
+      "shortlist_size": 5,
+      "pool_size": 20,
+      "pool_doc_count": 5,
+      "L0": false,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeD_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with question 2 from problem set 3",
+      "labels": [
+        "econ117_pset03"
+      ],
+      "unresolved_labels": [
+        "econ117_pset03"
+      ],
+      "error": null,
+      "ms": 4569,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "3",
+        "top_filename_score": 0.333,
+        "top_filename_doc_id": 16
+      },
+      "shortlist": [
+        25,
+        22,
+        34,
+        20,
+        71
+      ],
+      "shortlist_size": 5,
+      "pool_size": 20,
+      "pool_doc_count": 5,
+      "L0": false,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeD_04",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with problem 8 from probabilities practice problems 1",
+      "labels": [
+        "week 1.1. probabilities practice problems-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4453,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 79,
+        "reason": "margin_only_no_number",
+        "query_number": null,
+        "top_filename_score": 1.0
+      },
+      "shortlist": [
+        79
+      ],
+      "shortlist_size": 1,
+      "pool_size": 19,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeD_06",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with question one from extra problem set 2",
+      "labels": [
+        "econ117_pset02_2025B_with_table"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 3274,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 82,
+        "reason": "category_plus_number_unique",
+        "query_number": "2",
+        "top_filename_score": 0.433
+      },
+      "shortlist": [
+        82
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeE_17",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "this is the question i meant",
+      "labels": [
+        "extra problems II-1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 5561,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": null,
+      "shortlist": [
+        161,
+        49,
+        48,
+        20,
+        15
+      ],
+      "shortlist_size": 5,
+      "pool_size": 20,
+      "pool_doc_count": 3,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": 17,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeD_05",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with problem 8 from practice problems 1",
+      "labels": [
+        "week 1.1. probabilities practice problems-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4520,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.8,
+        "top_filename_doc_id": 79
+      },
+      "shortlist": [
+        36,
+        79,
+        76,
+        37,
+        38
+      ],
+      "shortlist_size": 5,
+      "pool_size": 20,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": 4,
+      "rank_filename": 0,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_working_lecture_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "can you explain slide 9 from interactive lecture 3?",
+      "labels": [
+        "Interactive Lecture 3-1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 2987,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 48,
+        "reason": "category_plus_number_disambiguated_by_filename",
+        "query_number": "3",
+        "top_filename_score": 0.95
+      },
+      "shortlist": [
+        48
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_working_lecture_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Can you explain slide 2 from pre-recorded lecture 3?",
+      "labels": [
+        "Pre-recorded lecture 03-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 2919,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 63,
+        "reason": "category_plus_number_disambiguated_by_filename",
+        "query_number": "3",
+        "top_filename_score": 1.0
+      },
+      "shortlist": [
+        63
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_working_lab_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with part 1 4a from lab 4",
+      "labels": [
+        "Lab4-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4599,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "4",
+        "top_filename_score": 0.5,
+        "top_filename_doc_id": 82
+      },
+      "shortlist": [
+        58,
+        46,
+        49,
+        35,
+        48
+      ],
+      "shortlist_size": 5,
+      "pool_size": 20,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": 5,
+      "rank_filename": 2,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_working_pset_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with mathematical question 1 from problem set 2 - discrimination",
+      "labels": [
+        "econ117_pset02_2025B_with_table"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4263,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 22,
+        "reason": "category_plus_number_unique",
+        "query_number": "2",
+        "top_filename_score": 0.5
+      },
+      "shortlist": [
+        22
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_working_quiz_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Please help me with question 1 from quiz 3",
+      "labels": [
+        "Quiz 3 - solutions 2025"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 3386,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 16,
+        "reason": "category_plus_number_disambiguated_by_filename",
+        "query_number": "3",
+        "top_filename_score": 0.767
+      },
+      "shortlist": [
+        16
+      ],
+      "shortlist_size": 1,
+      "pool_size": 5,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    },
+    {
+      "row_id": "econ_s1117_real_working_practice_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with problem 4 from practice problems 1",
+      "labels": [
+        "week 1.1. probabilities practice problems-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4830,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.8,
+        "top_filename_doc_id": 79
+      },
+      "shortlist": [
+        36,
+        79,
+        76,
+        37,
+        38
+      ],
+      "shortlist_size": 5,
+      "pool_size": 20,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": 3,
+      "rank_filename": 0,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_working_practice_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "for P(A+)P(D+\u2223A+) I have (0.02)(0.92) = 0.0184",
+      "labels": [
+        "week 1.1. probabilities practice problems-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4505,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.333,
+        "top_filename_doc_id": 17
+      },
+      "shortlist": [
+        77,
+        61,
+        47,
+        34,
+        62
+      ],
+      "shortlist_size": 5,
+      "pool_size": 20,
+      "pool_doc_count": 4,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": 4,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_working_paste_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with this problem",
+      "labels": [
+        "econS117_summer2024B_pset1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4582,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": null,
+      "shortlist": [
+        25,
+        22,
+        24,
+        161,
+        36
+      ],
+      "shortlist_size": 5,
+      "pool_size": 20,
+      "pool_doc_count": 4,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": 11,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeA_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with problem 1 from lab 2",
+      "labels": [
+        "Lab2"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4719,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 57,
+        "reason": "category_plus_number_unique",
+        "query_number": "2",
+        "top_filename_score": 0.5
+      },
+      "shortlist": [
+        57
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeA_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Can you help me with lab 4 problem 3?",
+      "labels": [
+        "Lab4-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4753,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "4",
+        "top_filename_score": 0.333,
+        "top_filename_doc_id": 15
+      },
+      "shortlist": [
+        58,
+        63,
+        48,
+        49,
+        72
+      ],
+      "shortlist_size": 5,
+      "pool_size": 20,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": 2,
+      "rank_dense": 0,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeA_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "what's the answer to PS1 question 2?",
+      "labels": [
+        "econS117_summer2024B_pset1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4133,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.333,
+        "top_filename_doc_id": 17
+      },
+      "shortlist": [
+        77,
+        71,
+        17,
+        34,
+        79
+      ],
+      "shortlist_size": 5,
+      "pool_size": 20,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeB_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with problem 5 from extra problems I",
+      "labels": [
+        "extra problems I-1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4156,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 37,
+        "reason": "margin_only_no_number",
+        "query_number": null,
+        "top_filename_score": 0.867
+      },
+      "shortlist": [
+        37
+      ],
+      "shortlist_size": 1,
+      "pool_size": 7,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    },
+    {
+      "row_id": "econ_s1117_syn_typeB_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Question 3 from extra problems II please",
+      "labels": [
+        "extra problems II-1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4807,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.95,
+        "top_filename_doc_id": 39
+      },
+      "shortlist": [
+        39,
+        38,
+        37,
+        36,
+        25
+      ],
+      "shortlist_size": 5,
+      "pool_size": 20,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": 1,
+      "rank_filename": 0,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeB_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "How do I do problem 2 in pre-recorded lecture 06?",
+      "labels": [
+        "Pre-recorded lecture 06-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 2723,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 66,
+        "reason": "category_plus_number_unique",
+        "query_number": "06",
+        "top_filename_score": 1.0
+      },
+      "shortlist": [
+        66
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeC_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "help with quiz 2 question 1",
+      "labels": [
+        "Quiz 2 solutions"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4650,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "2",
+        "top_filename_score": 0.767,
+        "top_filename_doc_id": 17
+      },
+      "shortlist": [
+        17,
+        71,
+        15,
+        18,
+        16
+      ],
+      "shortlist_size": 5,
+      "pool_size": 20,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": 1,
+      "rank_filename": 2,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeC_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "midterm 2022 question 3",
+      "labels": [
+        "econ117_summer2022_midterm_Ztable-1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4091,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "2022",
+        "top_filename_score": 0.35,
+        "top_filename_doc_id": 26
+      },
+      "shortlist": [
+        59,
+        31,
+        27,
+        26,
+        28
+      ],
+      "shortlist_size": 5,
+      "pool_size": 20,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": 1,
+      "rank_dense": 7,
+      "rank_filename": 5,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeC_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "final exam 2018 question 1",
+      "labels": [
+        "econ117-final-fall-2018-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4403,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "2018",
+        "top_filename_score": 0.8,
+        "top_filename_doc_id": 32
+      },
+      "shortlist": [
+        42,
+        32,
+        43,
+        44,
+        41
+      ],
+      "shortlist_size": 5,
+      "pool_size": 20,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": false,
+      "rank_bm25": 1,
+      "rank_dense": 4,
+      "rank_filename": 0,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeD_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "show me how to solve question 2 in problem set 2",
+      "labels": [
+        "econ117_pset02_2025B_with_table"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4298,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 22,
+        "reason": "category_plus_number_unique",
+        "query_number": "2",
+        "top_filename_score": 0.333
+      },
+      "shortlist": [
+        22
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeD_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "show me the answer key for problem set 2 question 1",
+      "labels": [
+        "pset2_solutions-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4418,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 22,
+        "reason": "category_plus_number_unique",
+        "query_number": "2",
+        "top_filename_score": 0.5
+      },
+      "shortlist": [
+        22
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeD_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I'm working on practice problem 4 from week 1 probabilities, what's the next step?",
+      "labels": [
+        "week 1.1. probabilities practice problems-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 3038,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 79,
+        "reason": "margin_only_no_number",
+        "query_number": null,
+        "top_filename_score": 1.0
+      },
+      "shortlist": [
+        79
+      ],
+      "shortlist_size": 1,
+      "pool_size": 19,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeE_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "actually I meant lab 4 not lab 2",
+      "labels": [
+        "Lab4-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 5612,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "reason": "multi_doc_query_suppressed",
+        "hints": [
+          [
+            "4",
+            "labs"
+          ],
+          [
+            "2",
+            "labs"
+          ]
+        ]
+      },
+      "shortlist": [
+        49,
+        64,
+        41,
+        61,
+        62
+      ],
+      "shortlist_size": 5,
+      "pool_size": 20,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": 7,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeE_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "wait, I meant Interactive Lecture 5, not 3",
+      "labels": [
+        "Interactive Lecture 5-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 2873,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 50,
+        "reason": "category_plus_number_disambiguated_by_filename",
+        "query_number": "5",
+        "top_filename_score": 0.95
+      },
+      "shortlist": [
+        50
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_working_continuation_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "now help with problem 3",
+      "labels": [
+        "Lab4-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4611,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.333,
+        "top_filename_doc_id": 16
+      },
+      "shortlist": [
+        25,
+        48,
+        72,
+        22,
+        24
+      ],
+      "shortlist_size": 5,
+      "pool_size": 20,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": 8,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeE_04",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "actually let's switch to the central limit theorem from interactive lecture 5",
+      "labels": [
+        "Interactive Lecture 5-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 2931,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 50,
+        "reason": "category_plus_number_disambiguated_by_filename",
+        "query_number": "5",
+        "top_filename_score": 0.95
+      },
+      "shortlist": [
+        50
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_working_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I'm stuck on question 1 in the 2019 final exam",
+      "labels": [
+        "final-fall-2019-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4162,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "2019",
+        "top_filename_score": 0.95,
+        "top_filename_doc_id": 44
+      },
+      "shortlist": [
+        43,
+        44,
+        24,
+        42,
+        25
+      ],
+      "shortlist_size": 5,
+      "pool_size": 20,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": false,
+      "rank_bm25": 0,
+      "rank_dense": 4,
+      "rank_filename": 0,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_working_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "What's the central tendencies practice problem about?",
+      "labels": [
+        "Central Tendencies-2-1"
+      ],
+      "unresolved_labels": [
+        "Central Tendencies-2-1"
+      ],
+      "error": null,
+      "ms": 4871,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.633,
+        "top_filename_doc_id": 76
+      },
+      "shortlist": [
+        76,
+        161,
+        79,
+        62,
+        49
+      ],
+      "shortlist_size": 5,
+      "pool_size": 20,
+      "pool_doc_count": 4,
+      "L0": false,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_working_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Explain Interactive Lecture 9",
+      "labels": [
+        "Interactive Lecture 9 slides-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 3306,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 53,
+        "reason": "category_plus_number_disambiguated_by_filename",
+        "query_number": "9",
+        "top_filename_score": 0.867
+      },
+      "shortlist": [
+        53
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_working_04",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "thanks",
+      "labels": [
+        "Lab4-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4733,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": null,
+      "shortlist": [
+        161,
+        44,
+        32,
+        62,
+        47
+      ],
+      "shortlist_size": 5,
+      "pool_size": 20,
+      "pool_doc_count": 4,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeB_04",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "compare extra problems I to extra problems II",
+      "labels": [
+        "extra problems I-1-1",
+        "extra problems II-1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4598,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.95,
+        "top_filename_doc_id": 39
+      },
+      "shortlist": [
+        39,
+        38,
+        37,
+        36,
+        161
+      ],
+      "shortlist_size": 5,
+      "pool_size": 20,
+      "pool_doc_count": 4,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": 1,
+      "rank_filename": 0,
+      "reranked": true
+    },
+    {
+      "row_id": "ec112_local_working_concept_circular_flow_01",
+      "ta_id": "z_B4fFY6jD1mhy9K",
+      "query": "can you explain circular flow to me?",
+      "labels": [
+        "001.01 Circular Flow Diagram Description",
+        "001.02 Circular Flow Diagram Analysis"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 2469,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.6,
+        "top_filename_doc_id": 113
+      },
+      "shortlist": [
+        114,
+        113,
+        139,
+        132,
+        112
+      ],
+      "shortlist_size": 5,
+      "pool_size": 20,
+      "pool_doc_count": 2,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": 1,
+      "rank_dense": 0,
+      "rank_filename": 0,
+      "reranked": true
+    },
+    {
+      "row_id": "ec112_local_working_homework1_fresh_01",
+      "ta_id": "z_B4fFY6jD1mhy9K",
+      "query": "I need help with questions 2-6 from homework 1",
+      "labels": [
+        "2026 Homework 1 PQ and Other Basics",
+        "001.03 Calculating Percentage Changes",
+        "001.04 PQ_Games",
+        "001.05 Gross Domestic Product",
+        "001.05.1 Current GDP USA Numbers",
+        "Practice Problems 1 PQ and Other Basics"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 2481,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 132,
+        "reason": "category_plus_number_unique",
+        "query_number": "1",
+        "top_filename_score": 0.5
+      },
+      "shortlist": [
+        132
+      ],
+      "shortlist_size": 1,
+      "pool_size": 3,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    },
+    {
+      "row_id": "mgt410_local_working_concept_porter_forces_01",
+      "ta_id": "WBNtFkfPGZaJVQIk",
+      "query": "Please explain the 5 (really 6) forces",
+      "labels": [
+        "Industry_Analysis_Class",
+        "Industry_Analysis_Case"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 2199,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": null,
+      "shortlist": [
+        105,
+        104,
+        106,
+        107,
+        96
+      ],
+      "shortlist_size": 5,
+      "pool_size": 20,
+      "pool_doc_count": 3,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": 0,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "mgt410_local_working_exam_part2_3a_01",
+      "ta_id": "WBNtFkfPGZaJVQIk",
+      "query": "Can you walk me through problem 3a in part 2 of the 2024 exam?",
+      "labels": [
+        "exam_competitor_2024_part_2_solutions",
+        "exam_competitor_2024_without solutions"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 1935,
+      "retrieval_method": "early_hybrid_full_doc",
+      "short_circuit": null,
+      "shortlist": [],
+      "shortlist_size": 0,
+      "pool_size": 0,
+      "pool_doc_count": 0,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    },
+    {
+      "row_id": "mgt410_local_working_exam_part2_3b_fresh_01",
+      "ta_id": "WBNtFkfPGZaJVQIk",
+      "query": "Can you walk me through problem 3b in part 2 of the 2024 exam?",
+      "labels": [
+        "exam_competitor_2024_part_2_solutions",
+        "exam_competitor_2024_without solutions"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 1899,
+      "retrieval_method": "early_hybrid_full_doc",
+      "short_circuit": null,
+      "shortlist": [],
+      "shortlist_size": 0,
+      "pool_size": 0,
+      "pool_doc_count": 0,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    },
+    {
+      "row_id": "mgt410_local_real_typeG1_exam_part1_2a_01",
+      "ta_id": "WBNtFkfPGZaJVQIk",
+      "query": "I need help with problem 2a from part 1 of the 2024 final",
+      "labels": [
+        "exam_competitor_2024_part1_solutions (updated)",
+        "exam_competitor_2024_without solutions"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 1932,
+      "retrieval_method": "early_hybrid_full_doc",
+      "short_circuit": null,
+      "shortlist": [],
+      "shortlist_size": 0,
+      "pool_size": 0,
+      "pool_doc_count": 0,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    }
+  ],
+  "docs=10,chunks=20": [
+    {
+      "row_id": "econ_s1117_real_typeA_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with mathematical question 2 from problem set 2",
+      "labels": [
+        "econ117_pset02_2025B_with_table"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 5375,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 22,
+        "reason": "category_plus_number_unique",
+        "query_number": "2",
+        "top_filename_score": 0.333
+      },
+      "shortlist": [
+        22
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeA_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with mathematical question 1 from problem set 2",
+      "labels": [
+        "econ117_pset02_2025B_with_table"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 5089,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 22,
+        "reason": "category_plus_number_unique",
+        "query_number": "2",
+        "top_filename_score": 0.5
+      },
+      "shortlist": [
+        22
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeA_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with mathematical question 2 from problem set 2",
+      "labels": [
+        "econ117_pset02_2025B_with_table"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4542,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 22,
+        "reason": "category_plus_number_unique",
+        "query_number": "2",
+        "top_filename_score": 0.333
+      },
+      "shortlist": [
+        22
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeB_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with question 14 from extra problems II",
+      "labels": [
+        "extra problems II-1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4766,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.95,
+        "top_filename_doc_id": 39
+      },
+      "shortlist": [
+        39,
+        38,
+        37,
+        36,
+        25,
+        24,
+        76,
+        79,
+        161,
+        77
+      ],
+      "shortlist_size": 10,
+      "pool_size": 20,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": 1,
+      "rank_filename": 0,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeC_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Please help me with question 1 from quiz 1",
+      "labels": [
+        "econometrics quiz 1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 3457,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 18,
+        "reason": "category_plus_number_unique",
+        "query_number": "1",
+        "top_filename_score": 0.767
+      },
+      "shortlist": [
+        18
+      ],
+      "shortlist_size": 1,
+      "pool_size": 4,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    },
+    {
+      "row_id": "econ_s1117_real_typeC_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Please help me with question 1 from quiz 1",
+      "labels": [
+        "econometrics quiz 1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 3462,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 18,
+        "reason": "category_plus_number_unique",
+        "query_number": "1",
+        "top_filename_score": 0.767
+      },
+      "shortlist": [
+        18
+      ],
+      "shortlist_size": 1,
+      "pool_size": 4,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    },
+    {
+      "row_id": "econ_s1117_real_typeC_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Please help me with question 1 from econometrics quiz 1",
+      "labels": [
+        "econometrics quiz 1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 3763,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 18,
+        "reason": "category_plus_number_unique",
+        "query_number": "1",
+        "top_filename_score": 1.0
+      },
+      "shortlist": [
+        18
+      ],
+      "shortlist_size": 1,
+      "pool_size": 4,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    },
+    {
+      "row_id": "econ_s1117_real_typeD_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with the proof in question 1 from problem set 3",
+      "labels": [
+        "econ117_pset03"
+      ],
+      "unresolved_labels": [
+        "econ117_pset03"
+      ],
+      "error": null,
+      "ms": 4238,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "3",
+        "top_filename_score": 0.5,
+        "top_filename_doc_id": 82
+      },
+      "shortlist": [
+        22,
+        36,
+        70,
+        39,
+        37,
+        77,
+        161,
+        35,
+        48,
+        46
+      ],
+      "shortlist_size": 10,
+      "pool_size": 20,
+      "pool_doc_count": 8,
+      "L0": false,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeD_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with question 1 from problem set 3",
+      "labels": [
+        "econ117_pset03"
+      ],
+      "unresolved_labels": [
+        "econ117_pset03"
+      ],
+      "error": null,
+      "ms": 5996,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "3",
+        "top_filename_score": 0.5,
+        "top_filename_doc_id": 82
+      },
+      "shortlist": [
+        46,
+        24,
+        20,
+        25,
+        35,
+        36,
+        22,
+        37,
+        48,
+        79
+      ],
+      "shortlist_size": 10,
+      "pool_size": 20,
+      "pool_doc_count": 8,
+      "L0": false,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeD_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with question 2 from problem set 3",
+      "labels": [
+        "econ117_pset03"
+      ],
+      "unresolved_labels": [
+        "econ117_pset03"
+      ],
+      "error": null,
+      "ms": 4221,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "3",
+        "top_filename_score": 0.333,
+        "top_filename_doc_id": 16
+      },
+      "shortlist": [
+        25,
+        22,
+        34,
+        20,
+        71,
+        77,
+        24,
+        17,
+        72,
+        40
+      ],
+      "shortlist_size": 10,
+      "pool_size": 20,
+      "pool_doc_count": 9,
+      "L0": false,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeD_04",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with problem 8 from probabilities practice problems 1",
+      "labels": [
+        "week 1.1. probabilities practice problems-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4548,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 79,
+        "reason": "margin_only_no_number",
+        "query_number": null,
+        "top_filename_score": 1.0
+      },
+      "shortlist": [
+        79
+      ],
+      "shortlist_size": 1,
+      "pool_size": 19,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeD_06",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with question one from extra problem set 2",
+      "labels": [
+        "econ117_pset02_2025B_with_table"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 2990,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 82,
+        "reason": "category_plus_number_unique",
+        "query_number": "2",
+        "top_filename_score": 0.433
+      },
+      "shortlist": [
+        82
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeE_17",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "this is the question i meant",
+      "labels": [
+        "extra problems II-1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 5097,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": null,
+      "shortlist": [
+        161,
+        49,
+        48,
+        20,
+        15,
+        18,
+        63,
+        17,
+        31,
+        53
+      ],
+      "shortlist_size": 10,
+      "pool_size": 20,
+      "pool_doc_count": 4,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": 17,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeD_05",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with problem 8 from practice problems 1",
+      "labels": [
+        "week 1.1. probabilities practice problems-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4643,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.8,
+        "top_filename_doc_id": 79
+      },
+      "shortlist": [
+        46,
+        53,
+        68,
+        36,
+        79,
+        76,
+        37,
+        38,
+        39,
+        80
+      ],
+      "shortlist_size": 10,
+      "pool_size": 20,
+      "pool_doc_count": 9,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": 4,
+      "rank_filename": 0,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_working_lecture_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "can you explain slide 9 from interactive lecture 3?",
+      "labels": [
+        "Interactive Lecture 3-1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 3001,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 48,
+        "reason": "category_plus_number_disambiguated_by_filename",
+        "query_number": "3",
+        "top_filename_score": 0.95
+      },
+      "shortlist": [
+        48
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_working_lecture_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Can you explain slide 2 from pre-recorded lecture 3?",
+      "labels": [
+        "Pre-recorded lecture 03-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4564,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 63,
+        "reason": "category_plus_number_disambiguated_by_filename",
+        "query_number": "3",
+        "top_filename_score": 1.0
+      },
+      "shortlist": [
+        63
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_working_lab_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with part 1 4a from lab 4",
+      "labels": [
+        "Lab4-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 7815,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "4",
+        "top_filename_score": 0.5,
+        "top_filename_doc_id": 82
+      },
+      "shortlist": [
+        58,
+        46,
+        49,
+        35,
+        15,
+        48,
+        33,
+        77,
+        26,
+        41
+      ],
+      "shortlist_size": 10,
+      "pool_size": 20,
+      "pool_doc_count": 8,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": 5,
+      "rank_filename": 2,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_working_pset_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with mathematical question 1 from problem set 2 - discrimination",
+      "labels": [
+        "econ117_pset02_2025B_with_table"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 6123,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 22,
+        "reason": "category_plus_number_unique",
+        "query_number": "2",
+        "top_filename_score": 0.5
+      },
+      "shortlist": [
+        22
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_working_quiz_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Please help me with question 1 from quiz 3",
+      "labels": [
+        "Quiz 3 - solutions 2025"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 3839,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 16,
+        "reason": "category_plus_number_disambiguated_by_filename",
+        "query_number": "3",
+        "top_filename_score": 0.767
+      },
+      "shortlist": [
+        16
+      ],
+      "shortlist_size": 1,
+      "pool_size": 5,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    },
+    {
+      "row_id": "econ_s1117_real_working_practice_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with problem 4 from practice problems 1",
+      "labels": [
+        "week 1.1. probabilities practice problems-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 5619,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.8,
+        "top_filename_doc_id": 79
+      },
+      "shortlist": [
+        46,
+        36,
+        79,
+        76,
+        37,
+        38,
+        39,
+        49,
+        53,
+        80
+      ],
+      "shortlist_size": 10,
+      "pool_size": 20,
+      "pool_doc_count": 8,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": 3,
+      "rank_filename": 0,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_working_practice_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "for P(A+)P(D+\u2223A+) I have (0.02)(0.92) = 0.0184",
+      "labels": [
+        "week 1.1. probabilities practice problems-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 5587,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.333,
+        "top_filename_doc_id": 17
+      },
+      "shortlist": [
+        77,
+        61,
+        47,
+        34,
+        62,
+        17,
+        40,
+        71,
+        41,
+        79
+      ],
+      "shortlist_size": 10,
+      "pool_size": 20,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": 4,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_working_paste_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with this problem",
+      "labels": [
+        "econS117_summer2024B_pset1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4741,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": null,
+      "shortlist": [
+        25,
+        22,
+        24,
+        161,
+        162,
+        46,
+        20,
+        68,
+        36,
+        39
+      ],
+      "shortlist_size": 10,
+      "pool_size": 20,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": 11,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeA_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with problem 1 from lab 2",
+      "labels": [
+        "Lab2"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4523,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 57,
+        "reason": "category_plus_number_unique",
+        "query_number": "2",
+        "top_filename_score": 0.5
+      },
+      "shortlist": [
+        57
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeA_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Can you help me with lab 4 problem 3?",
+      "labels": [
+        "Lab4-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4627,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "4",
+        "top_filename_score": 0.333,
+        "top_filename_doc_id": 15
+      },
+      "shortlist": [
+        58,
+        63,
+        48,
+        49,
+        16,
+        72,
+        15,
+        64,
+        162,
+        20
+      ],
+      "shortlist_size": 10,
+      "pool_size": 20,
+      "pool_doc_count": 8,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": 2,
+      "rank_dense": 0,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeA_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "what's the answer to PS1 question 2?",
+      "labels": [
+        "econS117_summer2024B_pset1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 7201,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.333,
+        "top_filename_doc_id": 17
+      },
+      "shortlist": [
+        77,
+        71,
+        17,
+        34,
+        41,
+        40,
+        61,
+        79,
+        43,
+        33
+      ],
+      "shortlist_size": 10,
+      "pool_size": 20,
+      "pool_doc_count": 7,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": 23,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeB_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with problem 5 from extra problems I",
+      "labels": [
+        "extra problems I-1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4021,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 37,
+        "reason": "margin_only_no_number",
+        "query_number": null,
+        "top_filename_score": 0.867
+      },
+      "shortlist": [
+        37
+      ],
+      "shortlist_size": 1,
+      "pool_size": 7,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    },
+    {
+      "row_id": "econ_s1117_syn_typeB_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Question 3 from extra problems II please",
+      "labels": [
+        "extra problems II-1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4624,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.95,
+        "top_filename_doc_id": 39
+      },
+      "shortlist": [
+        39,
+        38,
+        37,
+        36,
+        25,
+        24,
+        79,
+        76,
+        72,
+        16
+      ],
+      "shortlist_size": 10,
+      "pool_size": 20,
+      "pool_doc_count": 6,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": 1,
+      "rank_filename": 0,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeB_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "How do I do problem 2 in pre-recorded lecture 06?",
+      "labels": [
+        "Pre-recorded lecture 06-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 2900,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 66,
+        "reason": "category_plus_number_unique",
+        "query_number": "06",
+        "top_filename_score": 1.0
+      },
+      "shortlist": [
+        66
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeC_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "help with quiz 2 question 1",
+      "labels": [
+        "Quiz 2 solutions"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4112,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "2",
+        "top_filename_score": 0.767,
+        "top_filename_doc_id": 17
+      },
+      "shortlist": [
+        17,
+        46,
+        71,
+        15,
+        18,
+        16,
+        14,
+        73,
+        20,
+        77
+      ],
+      "shortlist_size": 10,
+      "pool_size": 20,
+      "pool_doc_count": 9,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": 1,
+      "rank_filename": 2,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeC_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "midterm 2022 question 3",
+      "labels": [
+        "econ117_summer2022_midterm_Ztable-1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 3899,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "2022",
+        "top_filename_score": 0.35,
+        "top_filename_doc_id": 26
+      },
+      "shortlist": [
+        59,
+        31,
+        27,
+        26,
+        28,
+        60,
+        16,
+        48,
+        72,
+        20
+      ],
+      "shortlist_size": 10,
+      "pool_size": 20,
+      "pool_doc_count": 6,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": 1,
+      "rank_dense": 7,
+      "rank_filename": 5,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeC_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "final exam 2018 question 1",
+      "labels": [
+        "econ117-final-fall-2018-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4152,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "2018",
+        "top_filename_score": 0.8,
+        "top_filename_doc_id": 32
+      },
+      "shortlist": [
+        42,
+        32,
+        43,
+        44,
+        41,
+        29,
+        30,
+        40,
+        24,
+        25
+      ],
+      "shortlist_size": 10,
+      "pool_size": 20,
+      "pool_doc_count": 7,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": false,
+      "rank_bm25": 1,
+      "rank_dense": 4,
+      "rank_filename": 0,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeD_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "show me how to solve question 2 in problem set 2",
+      "labels": [
+        "econ117_pset02_2025B_with_table"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4216,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 22,
+        "reason": "category_plus_number_unique",
+        "query_number": "2",
+        "top_filename_score": 0.333
+      },
+      "shortlist": [
+        22
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeD_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "show me the answer key for problem set 2 question 1",
+      "labels": [
+        "pset2_solutions-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4365,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 22,
+        "reason": "category_plus_number_unique",
+        "query_number": "2",
+        "top_filename_score": 0.5
+      },
+      "shortlist": [
+        22
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeD_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I'm working on practice problem 4 from week 1 probabilities, what's the next step?",
+      "labels": [
+        "week 1.1. probabilities practice problems-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 2641,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 79,
+        "reason": "margin_only_no_number",
+        "query_number": null,
+        "top_filename_score": 1.0
+      },
+      "shortlist": [
+        79
+      ],
+      "shortlist_size": 1,
+      "pool_size": 19,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeE_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "actually I meant lab 4 not lab 2",
+      "labels": [
+        "Lab4-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4449,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "reason": "multi_doc_query_suppressed",
+        "hints": [
+          [
+            "4",
+            "labs"
+          ],
+          [
+            "2",
+            "labs"
+          ]
+        ]
+      },
+      "shortlist": [
+        49,
+        64,
+        41,
+        61,
+        62,
+        47,
+        15,
+        73,
+        77,
+        34
+      ],
+      "shortlist_size": 10,
+      "pool_size": 20,
+      "pool_doc_count": 7,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": 7,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeE_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "wait, I meant Interactive Lecture 5, not 3",
+      "labels": [
+        "Interactive Lecture 5-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 2797,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 50,
+        "reason": "category_plus_number_disambiguated_by_filename",
+        "query_number": "5",
+        "top_filename_score": 0.95
+      },
+      "shortlist": [
+        50
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_working_continuation_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "now help with problem 3",
+      "labels": [
+        "Lab4-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4454,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.333,
+        "top_filename_doc_id": 16
+      },
+      "shortlist": [
+        25,
+        48,
+        72,
+        22,
+        24,
+        161,
+        16,
+        20,
+        63,
+        58
+      ],
+      "shortlist_size": 10,
+      "pool_size": 20,
+      "pool_doc_count": 8,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": false,
+      "rank_bm25": 8,
+      "rank_dense": 26,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeE_04",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "actually let's switch to the central limit theorem from interactive lecture 5",
+      "labels": [
+        "Interactive Lecture 5-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 2743,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 50,
+        "reason": "category_plus_number_disambiguated_by_filename",
+        "query_number": "5",
+        "top_filename_score": 0.95
+      },
+      "shortlist": [
+        50
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_working_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I'm stuck on question 1 in the 2019 final exam",
+      "labels": [
+        "final-fall-2019-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4584,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "2019",
+        "top_filename_score": 0.95,
+        "top_filename_doc_id": 44
+      },
+      "shortlist": [
+        43,
+        44,
+        24,
+        42,
+        25,
+        32,
+        41,
+        29,
+        30,
+        40
+      ],
+      "shortlist_size": 10,
+      "pool_size": 20,
+      "pool_doc_count": 7,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": 0,
+      "rank_dense": 4,
+      "rank_filename": 0,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_working_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "What's the central tendencies practice problem about?",
+      "labels": [
+        "Central Tendencies-2-1"
+      ],
+      "unresolved_labels": [
+        "Central Tendencies-2-1"
+      ],
+      "error": null,
+      "ms": 4391,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.633,
+        "top_filename_doc_id": 76
+      },
+      "shortlist": [
+        76,
+        161,
+        79,
+        62,
+        49,
+        57,
+        50,
+        63,
+        28,
+        27
+      ],
+      "shortlist_size": 10,
+      "pool_size": 20,
+      "pool_doc_count": 4,
+      "L0": false,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_working_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Explain Interactive Lecture 9",
+      "labels": [
+        "Interactive Lecture 9 slides-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 2630,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 53,
+        "reason": "category_plus_number_disambiguated_by_filename",
+        "query_number": "9",
+        "top_filename_score": 0.867
+      },
+      "shortlist": [
+        53
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_working_04",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "thanks",
+      "labels": [
+        "Lab4-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4729,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": null,
+      "shortlist": [
+        161,
+        62,
+        44,
+        32,
+        47,
+        42,
+        24,
+        41,
+        66,
+        162
+      ],
+      "shortlist_size": 10,
+      "pool_size": 20,
+      "pool_doc_count": 8,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeB_04",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "compare extra problems I to extra problems II",
+      "labels": [
+        "extra problems I-1-1",
+        "extra problems II-1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4565,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.95,
+        "top_filename_doc_id": 39
+      },
+      "shortlist": [
+        39,
+        38,
+        37,
+        36,
+        161,
+        25,
+        79,
+        76,
+        24,
+        77
+      ],
+      "shortlist_size": 10,
+      "pool_size": 20,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": 1,
+      "rank_filename": 0,
+      "reranked": true
+    },
+    {
+      "row_id": "ec112_local_working_concept_circular_flow_01",
+      "ta_id": "z_B4fFY6jD1mhy9K",
+      "query": "can you explain circular flow to me?",
+      "labels": [
+        "001.01 Circular Flow Diagram Description",
+        "001.02 Circular Flow Diagram Analysis"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 2487,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.6,
+        "top_filename_doc_id": 113
+      },
+      "shortlist": [
+        114,
+        113,
+        139,
+        132,
+        112,
+        111,
+        136,
+        120,
+        125,
+        127
+      ],
+      "shortlist_size": 10,
+      "pool_size": 20,
+      "pool_doc_count": 2,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": 1,
+      "rank_dense": 0,
+      "rank_filename": 0,
+      "reranked": true
+    },
+    {
+      "row_id": "ec112_local_working_homework1_fresh_01",
+      "ta_id": "z_B4fFY6jD1mhy9K",
+      "query": "I need help with questions 2-6 from homework 1",
+      "labels": [
+        "2026 Homework 1 PQ and Other Basics",
+        "001.03 Calculating Percentage Changes",
+        "001.04 PQ_Games",
+        "001.05 Gross Domestic Product",
+        "001.05.1 Current GDP USA Numbers",
+        "Practice Problems 1 PQ and Other Basics"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 2622,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 132,
+        "reason": "category_plus_number_unique",
+        "query_number": "1",
+        "top_filename_score": 0.5
+      },
+      "shortlist": [
+        132
+      ],
+      "shortlist_size": 1,
+      "pool_size": 3,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    },
+    {
+      "row_id": "mgt410_local_working_concept_porter_forces_01",
+      "ta_id": "WBNtFkfPGZaJVQIk",
+      "query": "Please explain the 5 (really 6) forces",
+      "labels": [
+        "Industry_Analysis_Class",
+        "Industry_Analysis_Case"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 2124,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": null,
+      "shortlist": [
+        105,
+        104,
+        106,
+        107,
+        96,
+        108,
+        110,
+        95,
+        93,
+        97
+      ],
+      "shortlist_size": 10,
+      "pool_size": 20,
+      "pool_doc_count": 3,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": 0,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "mgt410_local_working_exam_part2_3a_01",
+      "ta_id": "WBNtFkfPGZaJVQIk",
+      "query": "Can you walk me through problem 3a in part 2 of the 2024 exam?",
+      "labels": [
+        "exam_competitor_2024_part_2_solutions",
+        "exam_competitor_2024_without solutions"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 2732,
+      "retrieval_method": "early_hybrid_full_doc",
+      "short_circuit": null,
+      "shortlist": [],
+      "shortlist_size": 0,
+      "pool_size": 0,
+      "pool_doc_count": 0,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    },
+    {
+      "row_id": "mgt410_local_working_exam_part2_3b_fresh_01",
+      "ta_id": "WBNtFkfPGZaJVQIk",
+      "query": "Can you walk me through problem 3b in part 2 of the 2024 exam?",
+      "labels": [
+        "exam_competitor_2024_part_2_solutions",
+        "exam_competitor_2024_without solutions"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 1666,
+      "retrieval_method": "early_hybrid_full_doc",
+      "short_circuit": null,
+      "shortlist": [],
+      "shortlist_size": 0,
+      "pool_size": 0,
+      "pool_doc_count": 0,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    },
+    {
+      "row_id": "mgt410_local_real_typeG1_exam_part1_2a_01",
+      "ta_id": "WBNtFkfPGZaJVQIk",
+      "query": "I need help with problem 2a from part 1 of the 2024 final",
+      "labels": [
+        "exam_competitor_2024_part1_solutions (updated)",
+        "exam_competitor_2024_without solutions"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 1715,
+      "retrieval_method": "early_hybrid_full_doc",
+      "short_circuit": null,
+      "shortlist": [],
+      "shortlist_size": 0,
+      "pool_size": 0,
+      "pool_doc_count": 0,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    }
+  ],
+  "docs=20,chunks=20": [
+    {
+      "row_id": "econ_s1117_real_typeA_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with mathematical question 2 from problem set 2",
+      "labels": [
+        "econ117_pset02_2025B_with_table"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4018,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 22,
+        "reason": "category_plus_number_unique",
+        "query_number": "2",
+        "top_filename_score": 0.333
+      },
+      "shortlist": [
+        22
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeA_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with mathematical question 1 from problem set 2",
+      "labels": [
+        "econ117_pset02_2025B_with_table"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4000,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 22,
+        "reason": "category_plus_number_unique",
+        "query_number": "2",
+        "top_filename_score": 0.5
+      },
+      "shortlist": [
+        22
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeA_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with mathematical question 2 from problem set 2",
+      "labels": [
+        "econ117_pset02_2025B_with_table"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 3889,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 22,
+        "reason": "category_plus_number_unique",
+        "query_number": "2",
+        "top_filename_score": 0.333
+      },
+      "shortlist": [
+        22
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeB_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with question 14 from extra problems II",
+      "labels": [
+        "extra problems II-1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4594,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.95,
+        "top_filename_doc_id": 39
+      },
+      "shortlist": [
+        39,
+        38,
+        37,
+        36,
+        25,
+        24,
+        76,
+        79,
+        161,
+        77,
+        59,
+        40,
+        43,
+        34,
+        78,
+        28,
+        31,
+        42,
+        20,
+        35
+      ],
+      "shortlist_size": 20,
+      "pool_size": 20,
+      "pool_doc_count": 7,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": 1,
+      "rank_filename": 0,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeC_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Please help me with question 1 from quiz 1",
+      "labels": [
+        "econometrics quiz 1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 3253,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 18,
+        "reason": "category_plus_number_unique",
+        "query_number": "1",
+        "top_filename_score": 0.767
+      },
+      "shortlist": [
+        18
+      ],
+      "shortlist_size": 1,
+      "pool_size": 4,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    },
+    {
+      "row_id": "econ_s1117_real_typeC_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Please help me with question 1 from quiz 1",
+      "labels": [
+        "econometrics quiz 1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 3421,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 18,
+        "reason": "category_plus_number_unique",
+        "query_number": "1",
+        "top_filename_score": 0.767
+      },
+      "shortlist": [
+        18
+      ],
+      "shortlist_size": 1,
+      "pool_size": 4,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    },
+    {
+      "row_id": "econ_s1117_real_typeC_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Please help me with question 1 from econometrics quiz 1",
+      "labels": [
+        "econometrics quiz 1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4087,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 18,
+        "reason": "category_plus_number_unique",
+        "query_number": "1",
+        "top_filename_score": 1.0
+      },
+      "shortlist": [
+        18
+      ],
+      "shortlist_size": 1,
+      "pool_size": 4,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    },
+    {
+      "row_id": "econ_s1117_real_typeD_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with the proof in question 1 from problem set 3",
+      "labels": [
+        "econ117_pset03"
+      ],
+      "unresolved_labels": [
+        "econ117_pset03"
+      ],
+      "error": null,
+      "ms": 4062,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "3",
+        "top_filename_score": 0.5,
+        "top_filename_doc_id": 82
+      },
+      "shortlist": [
+        22,
+        36,
+        70,
+        39,
+        37,
+        77,
+        161,
+        35,
+        48,
+        46,
+        59,
+        79,
+        80,
+        38,
+        63,
+        31,
+        82,
+        58,
+        27,
+        26
+      ],
+      "shortlist_size": 20,
+      "pool_size": 20,
+      "pool_doc_count": 12,
+      "L0": false,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeD_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with question 1 from problem set 3",
+      "labels": [
+        "econ117_pset03"
+      ],
+      "unresolved_labels": [
+        "econ117_pset03"
+      ],
+      "error": null,
+      "ms": 4218,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "3",
+        "top_filename_score": 0.5,
+        "top_filename_doc_id": 82
+      },
+      "shortlist": [
+        46,
+        25,
+        24,
+        53,
+        68,
+        67,
+        69,
+        65,
+        20,
+        35,
+        36,
+        22,
+        37,
+        48,
+        79,
+        39,
+        33,
+        70,
+        80,
+        77
+      ],
+      "shortlist_size": 20,
+      "pool_size": 20,
+      "pool_doc_count": 10,
+      "L0": false,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeD_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with question 2 from problem set 3",
+      "labels": [
+        "econ117_pset03"
+      ],
+      "unresolved_labels": [
+        "econ117_pset03"
+      ],
+      "error": null,
+      "ms": 4171,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "3",
+        "top_filename_score": 0.333,
+        "top_filename_doc_id": 16
+      },
+      "shortlist": [
+        25,
+        22,
+        34,
+        20,
+        71,
+        77,
+        24,
+        17,
+        72,
+        40,
+        76,
+        41,
+        46,
+        48,
+        16,
+        162,
+        161,
+        53,
+        62,
+        63
+      ],
+      "shortlist_size": 20,
+      "pool_size": 20,
+      "pool_doc_count": 12,
+      "L0": false,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeD_04",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with problem 8 from probabilities practice problems 1",
+      "labels": [
+        "week 1.1. probabilities practice problems-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4836,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 79,
+        "reason": "margin_only_no_number",
+        "query_number": null,
+        "top_filename_score": 1.0
+      },
+      "shortlist": [
+        79
+      ],
+      "shortlist_size": 1,
+      "pool_size": 19,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeD_06",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with question one from extra problem set 2",
+      "labels": [
+        "econ117_pset02_2025B_with_table"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 3155,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 82,
+        "reason": "category_plus_number_unique",
+        "query_number": "2",
+        "top_filename_score": 0.433
+      },
+      "shortlist": [
+        82
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeE_17",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "this is the question i meant",
+      "labels": [
+        "extra problems II-1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 5068,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": null,
+      "shortlist": [
+        161,
+        49,
+        48,
+        63,
+        20,
+        53,
+        15,
+        18,
+        17,
+        31,
+        16,
+        14,
+        59,
+        42,
+        43,
+        64,
+        24,
+        25,
+        27,
+        62
+      ],
+      "shortlist_size": 20,
+      "pool_size": 20,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": 17,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeD_05",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with problem 8 from practice problems 1",
+      "labels": [
+        "week 1.1. probabilities practice problems-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4561,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.8,
+        "top_filename_doc_id": 79
+      },
+      "shortlist": [
+        46,
+        53,
+        68,
+        67,
+        65,
+        36,
+        79,
+        76,
+        37,
+        38,
+        39,
+        80,
+        77,
+        162,
+        26,
+        161,
+        27,
+        28,
+        59,
+        78
+      ],
+      "shortlist_size": 20,
+      "pool_size": 20,
+      "pool_doc_count": 11,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": 4,
+      "rank_filename": 0,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_working_lecture_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "can you explain slide 9 from interactive lecture 3?",
+      "labels": [
+        "Interactive Lecture 3-1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 2694,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 48,
+        "reason": "category_plus_number_disambiguated_by_filename",
+        "query_number": "3",
+        "top_filename_score": 0.95
+      },
+      "shortlist": [
+        48
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_working_lecture_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Can you explain slide 2 from pre-recorded lecture 3?",
+      "labels": [
+        "Pre-recorded lecture 03-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 2723,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 63,
+        "reason": "category_plus_number_disambiguated_by_filename",
+        "query_number": "3",
+        "top_filename_score": 1.0
+      },
+      "shortlist": [
+        63
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_working_lab_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with part 1 4a from lab 4",
+      "labels": [
+        "Lab4-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4533,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "4",
+        "top_filename_score": 0.5,
+        "top_filename_doc_id": 82
+      },
+      "shortlist": [
+        58,
+        46,
+        49,
+        35,
+        15,
+        48,
+        33,
+        77,
+        26,
+        82,
+        41,
+        43,
+        37,
+        70,
+        39,
+        53,
+        79,
+        36,
+        59,
+        27
+      ],
+      "shortlist_size": 20,
+      "pool_size": 20,
+      "pool_doc_count": 11,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": 5,
+      "rank_filename": 2,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_working_pset_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with mathematical question 1 from problem set 2 - discrimination",
+      "labels": [
+        "econ117_pset02_2025B_with_table"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4848,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 22,
+        "reason": "category_plus_number_unique",
+        "query_number": "2",
+        "top_filename_score": 0.5
+      },
+      "shortlist": [
+        22
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_working_quiz_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Please help me with question 1 from quiz 3",
+      "labels": [
+        "Quiz 3 - solutions 2025"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 3862,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 16,
+        "reason": "category_plus_number_disambiguated_by_filename",
+        "query_number": "3",
+        "top_filename_score": 0.767
+      },
+      "shortlist": [
+        16
+      ],
+      "shortlist_size": 1,
+      "pool_size": 5,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    },
+    {
+      "row_id": "econ_s1117_real_working_practice_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with problem 4 from practice problems 1",
+      "labels": [
+        "week 1.1. probabilities practice problems-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4659,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.8,
+        "top_filename_doc_id": 79
+      },
+      "shortlist": [
+        46,
+        53,
+        68,
+        67,
+        36,
+        79,
+        65,
+        76,
+        37,
+        38,
+        39,
+        49,
+        80,
+        35,
+        77,
+        161,
+        162,
+        26,
+        15,
+        41
+      ],
+      "shortlist_size": 20,
+      "pool_size": 20,
+      "pool_doc_count": 9,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": 3,
+      "rank_filename": 0,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_working_practice_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "for P(A+)P(D+\u2223A+) I have (0.02)(0.92) = 0.0184",
+      "labels": [
+        "week 1.1. probabilities practice problems-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4815,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.333,
+        "top_filename_doc_id": 17
+      },
+      "shortlist": [
+        77,
+        61,
+        47,
+        34,
+        62,
+        17,
+        71,
+        41,
+        40,
+        54,
+        76,
+        79,
+        50,
+        59,
+        28,
+        64,
+        60,
+        31,
+        38,
+        25
+      ],
+      "shortlist_size": 20,
+      "pool_size": 20,
+      "pool_doc_count": 6,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": 4,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_working_paste_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with this problem",
+      "labels": [
+        "econS117_summer2024B_pset1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4739,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": null,
+      "shortlist": [
+        25,
+        22,
+        24,
+        161,
+        162,
+        46,
+        20,
+        68,
+        53,
+        67,
+        69,
+        65,
+        36,
+        39,
+        38,
+        34,
+        33,
+        77,
+        43,
+        40
+      ],
+      "shortlist_size": 20,
+      "pool_size": 20,
+      "pool_doc_count": 10,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": 11,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeA_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with problem 1 from lab 2",
+      "labels": [
+        "Lab2"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4545,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 57,
+        "reason": "category_plus_number_unique",
+        "query_number": "2",
+        "top_filename_score": 0.5
+      },
+      "shortlist": [
+        57
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeA_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Can you help me with lab 4 problem 3?",
+      "labels": [
+        "Lab4-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4674,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "4",
+        "top_filename_score": 0.333,
+        "top_filename_doc_id": 15
+      },
+      "shortlist": [
+        58,
+        63,
+        48,
+        49,
+        16,
+        72,
+        15,
+        64,
+        162,
+        73,
+        20,
+        46,
+        33,
+        57,
+        77,
+        50,
+        40,
+        56,
+        22,
+        34
+      ],
+      "shortlist_size": 20,
+      "pool_size": 20,
+      "pool_doc_count": 10,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": 2,
+      "rank_dense": 0,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeA_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "what's the answer to PS1 question 2?",
+      "labels": [
+        "econS117_summer2024B_pset1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4862,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.333,
+        "top_filename_doc_id": 17
+      },
+      "shortlist": [
+        77,
+        71,
+        17,
+        34,
+        41,
+        40,
+        61,
+        62,
+        47,
+        76,
+        54,
+        79,
+        43,
+        33,
+        60,
+        24,
+        28,
+        59,
+        18,
+        25
+      ],
+      "shortlist_size": 20,
+      "pool_size": 20,
+      "pool_doc_count": 10,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": 23,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeB_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with problem 5 from extra problems I",
+      "labels": [
+        "extra problems I-1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4139,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 37,
+        "reason": "margin_only_no_number",
+        "query_number": null,
+        "top_filename_score": 0.867
+      },
+      "shortlist": [
+        37
+      ],
+      "shortlist_size": 1,
+      "pool_size": 7,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    },
+    {
+      "row_id": "econ_s1117_syn_typeB_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Question 3 from extra problems II please",
+      "labels": [
+        "extra problems II-1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4633,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.95,
+        "top_filename_doc_id": 39
+      },
+      "shortlist": [
+        39,
+        38,
+        37,
+        36,
+        25,
+        24,
+        79,
+        76,
+        72,
+        16,
+        63,
+        48,
+        161,
+        59,
+        77,
+        43,
+        71,
+        28,
+        31,
+        78
+      ],
+      "shortlist_size": 20,
+      "pool_size": 20,
+      "pool_doc_count": 6,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": 1,
+      "rank_filename": 0,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeB_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "How do I do problem 2 in pre-recorded lecture 06?",
+      "labels": [
+        "Pre-recorded lecture 06-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 2697,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 66,
+        "reason": "category_plus_number_unique",
+        "query_number": "06",
+        "top_filename_score": 1.0
+      },
+      "shortlist": [
+        66
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeC_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "help with quiz 2 question 1",
+      "labels": [
+        "Quiz 2 solutions"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4499,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "2",
+        "top_filename_score": 0.767,
+        "top_filename_doc_id": 17
+      },
+      "shortlist": [
+        17,
+        46,
+        71,
+        15,
+        18,
+        16,
+        14,
+        73,
+        20,
+        77,
+        72,
+        74,
+        34,
+        41,
+        161,
+        27,
+        40,
+        82,
+        58,
+        26
+      ],
+      "shortlist_size": 20,
+      "pool_size": 20,
+      "pool_doc_count": 10,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": 1,
+      "rank_filename": 2,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeC_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "midterm 2022 question 3",
+      "labels": [
+        "econ117_summer2022_midterm_Ztable-1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 3707,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "2022",
+        "top_filename_score": 0.35,
+        "top_filename_doc_id": 26
+      },
+      "shortlist": [
+        59,
+        31,
+        27,
+        26,
+        28,
+        60,
+        16,
+        48,
+        72,
+        63,
+        20,
+        40,
+        41,
+        25,
+        32,
+        24,
+        42,
+        29,
+        43,
+        35
+      ],
+      "shortlist_size": 20,
+      "pool_size": 20,
+      "pool_doc_count": 8,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": 1,
+      "rank_dense": 7,
+      "rank_filename": 5,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeC_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "final exam 2018 question 1",
+      "labels": [
+        "econ117-final-fall-2018-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4463,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "2018",
+        "top_filename_score": 0.8,
+        "top_filename_doc_id": 32
+      },
+      "shortlist": [
+        42,
+        32,
+        43,
+        44,
+        41,
+        29,
+        30,
+        40,
+        24,
+        25,
+        26,
+        27,
+        46,
+        28,
+        59,
+        35,
+        161,
+        31,
+        53,
+        39
+      ],
+      "shortlist_size": 20,
+      "pool_size": 20,
+      "pool_doc_count": 8,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": false,
+      "rank_bm25": 1,
+      "rank_dense": 4,
+      "rank_filename": 0,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeD_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "show me how to solve question 2 in problem set 2",
+      "labels": [
+        "econ117_pset02_2025B_with_table"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4228,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 22,
+        "reason": "category_plus_number_unique",
+        "query_number": "2",
+        "top_filename_score": 0.333
+      },
+      "shortlist": [
+        22
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeD_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "show me the answer key for problem set 2 question 1",
+      "labels": [
+        "pset2_solutions-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4801,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 22,
+        "reason": "category_plus_number_unique",
+        "query_number": "2",
+        "top_filename_score": 0.5
+      },
+      "shortlist": [
+        22
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeD_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I'm working on practice problem 4 from week 1 probabilities, what's the next step?",
+      "labels": [
+        "week 1.1. probabilities practice problems-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 2709,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 79,
+        "reason": "margin_only_no_number",
+        "query_number": null,
+        "top_filename_score": 1.0
+      },
+      "shortlist": [
+        79
+      ],
+      "shortlist_size": 1,
+      "pool_size": 19,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeE_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "actually I meant lab 4 not lab 2",
+      "labels": [
+        "Lab4-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4758,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "reason": "multi_doc_query_suppressed",
+        "hints": [
+          [
+            "4",
+            "labs"
+          ],
+          [
+            "2",
+            "labs"
+          ]
+        ]
+      },
+      "shortlist": [
+        49,
+        64,
+        41,
+        61,
+        62,
+        47,
+        15,
+        73,
+        77,
+        17,
+        34,
+        54,
+        71,
+        40,
+        76,
+        57,
+        56,
+        48,
+        161,
+        58
+      ],
+      "shortlist_size": 20,
+      "pool_size": 20,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": true,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": 7,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeE_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "wait, I meant Interactive Lecture 5, not 3",
+      "labels": [
+        "Interactive Lecture 5-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 2792,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 50,
+        "reason": "category_plus_number_disambiguated_by_filename",
+        "query_number": "5",
+        "top_filename_score": 0.95
+      },
+      "shortlist": [
+        50
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_working_continuation_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "now help with problem 3",
+      "labels": [
+        "Lab4-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 5225,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.333,
+        "top_filename_doc_id": 16
+      },
+      "shortlist": [
+        25,
+        48,
+        72,
+        22,
+        24,
+        161,
+        16,
+        20,
+        63,
+        58,
+        162,
+        55,
+        46,
+        69,
+        53,
+        68,
+        67,
+        65,
+        36,
+        39
+      ],
+      "shortlist_size": 20,
+      "pool_size": 20,
+      "pool_doc_count": 8,
+      "L0": true,
+      "L1": true,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": 8,
+      "rank_dense": 26,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeE_04",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "actually let's switch to the central limit theorem from interactive lecture 5",
+      "labels": [
+        "Interactive Lecture 5-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 2881,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 50,
+        "reason": "category_plus_number_disambiguated_by_filename",
+        "query_number": "5",
+        "top_filename_score": 0.95
+      },
+      "shortlist": [
+        50
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_working_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I'm stuck on question 1 in the 2019 final exam",
+      "labels": [
+        "final-fall-2019-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4943,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "2019",
+        "top_filename_score": 0.95,
+        "top_filename_doc_id": 44
+      },
+      "shortlist": [
+        43,
+        44,
+        24,
+        42,
+        25,
+        32,
+        41,
+        29,
+        30,
+        40,
+        26,
+        27,
+        60,
+        28,
+        46,
+        161,
+        59,
+        37,
+        35,
+        36
+      ],
+      "shortlist_size": 20,
+      "pool_size": 20,
+      "pool_doc_count": 9,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": 0,
+      "rank_dense": 4,
+      "rank_filename": 0,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_working_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "What's the central tendencies practice problem about?",
+      "labels": [
+        "Central Tendencies-2-1"
+      ],
+      "unresolved_labels": [
+        "Central Tendencies-2-1"
+      ],
+      "error": null,
+      "ms": 5138,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.633,
+        "top_filename_doc_id": 76
+      },
+      "shortlist": [
+        76,
+        161,
+        79,
+        62,
+        49,
+        57,
+        50,
+        63,
+        28,
+        27,
+        38,
+        48,
+        78,
+        64,
+        60,
+        25,
+        59,
+        22,
+        39,
+        24
+      ],
+      "shortlist_size": 20,
+      "pool_size": 20,
+      "pool_doc_count": 4,
+      "L0": false,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_working_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Explain Interactive Lecture 9",
+      "labels": [
+        "Interactive Lecture 9 slides-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 2890,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 53,
+        "reason": "category_plus_number_disambiguated_by_filename",
+        "query_number": "9",
+        "top_filename_score": 0.867
+      },
+      "shortlist": [
+        53
+      ],
+      "shortlist_size": 1,
+      "pool_size": 20,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_working_04",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "thanks",
+      "labels": [
+        "Lab4-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4895,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": null,
+      "shortlist": [
+        161,
+        62,
+        44,
+        32,
+        47,
+        42,
+        24,
+        41,
+        66,
+        162,
+        43,
+        53,
+        63,
+        33,
+        20,
+        25,
+        27,
+        31,
+        30,
+        26
+      ],
+      "shortlist_size": 20,
+      "pool_size": 20,
+      "pool_doc_count": 12,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": 41,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeB_04",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "compare extra problems I to extra problems II",
+      "labels": [
+        "extra problems I-1-1",
+        "extra problems II-1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 5382,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.95,
+        "top_filename_doc_id": 39
+      },
+      "shortlist": [
+        39,
+        38,
+        37,
+        36,
+        161,
+        25,
+        79,
+        76,
+        24,
+        77,
+        69,
+        43,
+        23,
+        64,
+        42,
+        59,
+        40,
+        70,
+        50,
+        34
+      ],
+      "shortlist_size": 20,
+      "pool_size": 20,
+      "pool_doc_count": 6,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": 1,
+      "rank_filename": 0,
+      "reranked": true
+    },
+    {
+      "row_id": "ec112_local_working_concept_circular_flow_01",
+      "ta_id": "z_B4fFY6jD1mhy9K",
+      "query": "can you explain circular flow to me?",
+      "labels": [
+        "001.01 Circular Flow Diagram Description",
+        "001.02 Circular Flow Diagram Analysis"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 3276,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.6,
+        "top_filename_doc_id": 113
+      },
+      "shortlist": [
+        114,
+        113,
+        139,
+        132,
+        112,
+        111,
+        136,
+        120,
+        125,
+        127,
+        124,
+        126,
+        121,
+        138,
+        137,
+        128,
+        140,
+        129,
+        130,
+        133
+      ],
+      "shortlist_size": 20,
+      "pool_size": 20,
+      "pool_doc_count": 2,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": 1,
+      "rank_dense": 0,
+      "rank_filename": 0,
+      "reranked": true
+    },
+    {
+      "row_id": "ec112_local_working_homework1_fresh_01",
+      "ta_id": "z_B4fFY6jD1mhy9K",
+      "query": "I need help with questions 2-6 from homework 1",
+      "labels": [
+        "2026 Homework 1 PQ and Other Basics",
+        "001.03 Calculating Percentage Changes",
+        "001.04 PQ_Games",
+        "001.05 Gross Domestic Product",
+        "001.05.1 Current GDP USA Numbers",
+        "Practice Problems 1 PQ and Other Basics"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 2305,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 132,
+        "reason": "category_plus_number_unique",
+        "query_number": "1",
+        "top_filename_score": 0.5
+      },
+      "shortlist": [
+        132
+      ],
+      "shortlist_size": 1,
+      "pool_size": 3,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    },
+    {
+      "row_id": "mgt410_local_working_concept_porter_forces_01",
+      "ta_id": "WBNtFkfPGZaJVQIk",
+      "query": "Please explain the 5 (really 6) forces",
+      "labels": [
+        "Industry_Analysis_Class",
+        "Industry_Analysis_Case"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 2139,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": null,
+      "shortlist": [
+        105,
+        104,
+        106,
+        107,
+        96,
+        108,
+        110,
+        95,
+        93,
+        97,
+        98,
+        101,
+        100,
+        109,
+        94,
+        103,
+        99,
+        92,
+        102
+      ],
+      "shortlist_size": 19,
+      "pool_size": 20,
+      "pool_doc_count": 3,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": 0,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "mgt410_local_working_exam_part2_3a_01",
+      "ta_id": "WBNtFkfPGZaJVQIk",
+      "query": "Can you walk me through problem 3a in part 2 of the 2024 exam?",
+      "labels": [
+        "exam_competitor_2024_part_2_solutions",
+        "exam_competitor_2024_without solutions"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4057,
+      "retrieval_method": "early_hybrid_full_doc",
+      "short_circuit": null,
+      "shortlist": [],
+      "shortlist_size": 0,
+      "pool_size": 0,
+      "pool_doc_count": 0,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    },
+    {
+      "row_id": "mgt410_local_working_exam_part2_3b_fresh_01",
+      "ta_id": "WBNtFkfPGZaJVQIk",
+      "query": "Can you walk me through problem 3b in part 2 of the 2024 exam?",
+      "labels": [
+        "exam_competitor_2024_part_2_solutions",
+        "exam_competitor_2024_without solutions"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 2151,
+      "retrieval_method": "early_hybrid_full_doc",
+      "short_circuit": null,
+      "shortlist": [],
+      "shortlist_size": 0,
+      "pool_size": 0,
+      "pool_doc_count": 0,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    },
+    {
+      "row_id": "mgt410_local_real_typeG1_exam_part1_2a_01",
+      "ta_id": "WBNtFkfPGZaJVQIk",
+      "query": "I need help with problem 2a from part 1 of the 2024 final",
+      "labels": [
+        "exam_competitor_2024_part1_solutions (updated)",
+        "exam_competitor_2024_without solutions"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 3532,
+      "retrieval_method": "early_hybrid_full_doc",
+      "short_circuit": null,
+      "shortlist": [],
+      "shortlist_size": 0,
+      "pool_size": 0,
+      "pool_doc_count": 0,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    }
+  ],
+  "docs=5,chunks=50": [
+    {
+      "row_id": "econ_s1117_real_typeA_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with mathematical question 2 from problem set 2",
+      "labels": [
+        "econ117_pset02_2025B_with_table"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4638,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 22,
+        "reason": "category_plus_number_unique",
+        "query_number": "2",
+        "top_filename_score": 0.333
+      },
+      "shortlist": [
+        22
+      ],
+      "shortlist_size": 1,
+      "pool_size": 25,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeA_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with mathematical question 1 from problem set 2",
+      "labels": [
+        "econ117_pset02_2025B_with_table"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4446,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 22,
+        "reason": "category_plus_number_unique",
+        "query_number": "2",
+        "top_filename_score": 0.5
+      },
+      "shortlist": [
+        22
+      ],
+      "shortlist_size": 1,
+      "pool_size": 25,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeA_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with mathematical question 2 from problem set 2",
+      "labels": [
+        "econ117_pset02_2025B_with_table"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4231,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 22,
+        "reason": "category_plus_number_unique",
+        "query_number": "2",
+        "top_filename_score": 0.333
+      },
+      "shortlist": [
+        22
+      ],
+      "shortlist_size": 1,
+      "pool_size": 25,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeB_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with question 14 from extra problems II",
+      "labels": [
+        "extra problems II-1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4798,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.95,
+        "top_filename_doc_id": 39
+      },
+      "shortlist": [
+        39,
+        38,
+        37,
+        36,
+        25
+      ],
+      "shortlist_size": 5,
+      "pool_size": 50,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": 1,
+      "rank_filename": 0,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeC_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Please help me with question 1 from quiz 1",
+      "labels": [
+        "econometrics quiz 1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 3422,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 18,
+        "reason": "category_plus_number_unique",
+        "query_number": "1",
+        "top_filename_score": 0.767
+      },
+      "shortlist": [
+        18
+      ],
+      "shortlist_size": 1,
+      "pool_size": 4,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    },
+    {
+      "row_id": "econ_s1117_real_typeC_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Please help me with question 1 from quiz 1",
+      "labels": [
+        "econometrics quiz 1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4582,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 18,
+        "reason": "category_plus_number_unique",
+        "query_number": "1",
+        "top_filename_score": 0.767
+      },
+      "shortlist": [
+        18
+      ],
+      "shortlist_size": 1,
+      "pool_size": 4,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    },
+    {
+      "row_id": "econ_s1117_real_typeC_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Please help me with question 1 from econometrics quiz 1",
+      "labels": [
+        "econometrics quiz 1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 3676,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 18,
+        "reason": "category_plus_number_unique",
+        "query_number": "1",
+        "top_filename_score": 1.0
+      },
+      "shortlist": [
+        18
+      ],
+      "shortlist_size": 1,
+      "pool_size": 4,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    },
+    {
+      "row_id": "econ_s1117_real_typeD_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with the proof in question 1 from problem set 3",
+      "labels": [
+        "econ117_pset03"
+      ],
+      "unresolved_labels": [
+        "econ117_pset03"
+      ],
+      "error": null,
+      "ms": 4316,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "3",
+        "top_filename_score": 0.5,
+        "top_filename_doc_id": 82
+      },
+      "shortlist": [
+        22,
+        36,
+        70,
+        39,
+        37
+      ],
+      "shortlist_size": 5,
+      "pool_size": 50,
+      "pool_doc_count": 5,
+      "L0": false,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeD_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with question 1 from problem set 3",
+      "labels": [
+        "econ117_pset03"
+      ],
+      "unresolved_labels": [
+        "econ117_pset03"
+      ],
+      "error": null,
+      "ms": 4561,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "3",
+        "top_filename_score": 0.5,
+        "top_filename_doc_id": 82
+      },
+      "shortlist": [
+        46,
+        20,
+        25,
+        35,
+        36
+      ],
+      "shortlist_size": 5,
+      "pool_size": 50,
+      "pool_doc_count": 5,
+      "L0": false,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeD_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with question 2 from problem set 3",
+      "labels": [
+        "econ117_pset03"
+      ],
+      "unresolved_labels": [
+        "econ117_pset03"
+      ],
+      "error": null,
+      "ms": 4230,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "3",
+        "top_filename_score": 0.333,
+        "top_filename_doc_id": 16
+      },
+      "shortlist": [
+        25,
+        22,
+        34,
+        20,
+        71
+      ],
+      "shortlist_size": 5,
+      "pool_size": 50,
+      "pool_doc_count": 5,
+      "L0": false,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeD_04",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with problem 8 from probabilities practice problems 1",
+      "labels": [
+        "week 1.1. probabilities practice problems-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4295,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 79,
+        "reason": "margin_only_no_number",
+        "query_number": null,
+        "top_filename_score": 1.0
+      },
+      "shortlist": [
+        79
+      ],
+      "shortlist_size": 1,
+      "pool_size": 19,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeD_06",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with question one from extra problem set 2",
+      "labels": [
+        "econ117_pset02_2025B_with_table"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 2900,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 82,
+        "reason": "category_plus_number_unique",
+        "query_number": "2",
+        "top_filename_score": 0.433
+      },
+      "shortlist": [
+        82
+      ],
+      "shortlist_size": 1,
+      "pool_size": 50,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeE_17",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "this is the question i meant",
+      "labels": [
+        "extra problems II-1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 5279,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": null,
+      "shortlist": [
+        161,
+        49,
+        48,
+        20,
+        15
+      ],
+      "shortlist_size": 5,
+      "pool_size": 50,
+      "pool_doc_count": 4,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": 17,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_typeD_05",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with problem 8 from practice problems 1",
+      "labels": [
+        "week 1.1. probabilities practice problems-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 5037,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.8,
+        "top_filename_doc_id": 79
+      },
+      "shortlist": [
+        36,
+        79,
+        76,
+        37,
+        38
+      ],
+      "shortlist_size": 5,
+      "pool_size": 50,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": 4,
+      "rank_filename": 0,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_working_lecture_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "can you explain slide 9 from interactive lecture 3?",
+      "labels": [
+        "Interactive Lecture 3-1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 3045,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 48,
+        "reason": "category_plus_number_disambiguated_by_filename",
+        "query_number": "3",
+        "top_filename_score": 0.95
+      },
+      "shortlist": [
+        48
+      ],
+      "shortlist_size": 1,
+      "pool_size": 42,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_working_lecture_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Can you explain slide 2 from pre-recorded lecture 3?",
+      "labels": [
+        "Pre-recorded lecture 03-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 3169,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 63,
+        "reason": "category_plus_number_disambiguated_by_filename",
+        "query_number": "3",
+        "top_filename_score": 1.0
+      },
+      "shortlist": [
+        63
+      ],
+      "shortlist_size": 1,
+      "pool_size": 50,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_working_lab_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with part 1 4a from lab 4",
+      "labels": [
+        "Lab4-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 5071,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "4",
+        "top_filename_score": 0.5,
+        "top_filename_doc_id": 82
+      },
+      "shortlist": [
+        58,
+        46,
+        49,
+        35,
+        48
+      ],
+      "shortlist_size": 5,
+      "pool_size": 50,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": 5,
+      "rank_filename": 2,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_working_pset_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with mathematical question 1 from problem set 2 - discrimination",
+      "labels": [
+        "econ117_pset02_2025B_with_table"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4082,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 22,
+        "reason": "category_plus_number_unique",
+        "query_number": "2",
+        "top_filename_score": 0.5
+      },
+      "shortlist": [
+        22
+      ],
+      "shortlist_size": 1,
+      "pool_size": 25,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_working_quiz_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Please help me with question 1 from quiz 3",
+      "labels": [
+        "Quiz 3 - solutions 2025"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 3285,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 16,
+        "reason": "category_plus_number_disambiguated_by_filename",
+        "query_number": "3",
+        "top_filename_score": 0.767
+      },
+      "shortlist": [
+        16
+      ],
+      "shortlist_size": 1,
+      "pool_size": 5,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    },
+    {
+      "row_id": "econ_s1117_real_working_practice_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with problem 4 from practice problems 1",
+      "labels": [
+        "week 1.1. probabilities practice problems-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4944,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.8,
+        "top_filename_doc_id": 79
+      },
+      "shortlist": [
+        36,
+        79,
+        76,
+        37,
+        38
+      ],
+      "shortlist_size": 5,
+      "pool_size": 50,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": 3,
+      "rank_filename": 0,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_working_practice_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "for P(A+)P(D+\u2223A+) I have (0.02)(0.92) = 0.0184",
+      "labels": [
+        "week 1.1. probabilities practice problems-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 5191,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.333,
+        "top_filename_doc_id": 17
+      },
+      "shortlist": [
+        77,
+        61,
+        47,
+        34,
+        62
+      ],
+      "shortlist_size": 5,
+      "pool_size": 50,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": 4,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_real_working_paste_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with this problem",
+      "labels": [
+        "econS117_summer2024B_pset1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4863,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": null,
+      "shortlist": [
+        25,
+        22,
+        24,
+        161,
+        36
+      ],
+      "shortlist_size": 5,
+      "pool_size": 50,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": 11,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeA_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with problem 1 from lab 2",
+      "labels": [
+        "Lab2"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4564,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 57,
+        "reason": "category_plus_number_unique",
+        "query_number": "2",
+        "top_filename_score": 0.5
+      },
+      "shortlist": [
+        57
+      ],
+      "shortlist_size": 1,
+      "pool_size": 36,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeA_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Can you help me with lab 4 problem 3?",
+      "labels": [
+        "Lab4-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4670,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "4",
+        "top_filename_score": 0.333,
+        "top_filename_doc_id": 15
+      },
+      "shortlist": [
+        58,
+        63,
+        48,
+        49,
+        72
+      ],
+      "shortlist_size": 5,
+      "pool_size": 50,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": 2,
+      "rank_dense": 0,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeA_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "what's the answer to PS1 question 2?",
+      "labels": [
+        "econS117_summer2024B_pset1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4945,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.333,
+        "top_filename_doc_id": 17
+      },
+      "shortlist": [
+        77,
+        71,
+        17,
+        34,
+        79
+      ],
+      "shortlist_size": 5,
+      "pool_size": 50,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeB_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with problem 5 from extra problems I",
+      "labels": [
+        "extra problems I-1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4229,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 37,
+        "reason": "margin_only_no_number",
+        "query_number": null,
+        "top_filename_score": 0.867
+      },
+      "shortlist": [
+        37
+      ],
+      "shortlist_size": 1,
+      "pool_size": 7,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    },
+    {
+      "row_id": "econ_s1117_syn_typeB_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Question 3 from extra problems II please",
+      "labels": [
+        "extra problems II-1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 6958,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.95,
+        "top_filename_doc_id": 39
+      },
+      "shortlist": [
+        39,
+        38,
+        37,
+        36,
+        25
+      ],
+      "shortlist_size": 5,
+      "pool_size": 50,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": 1,
+      "rank_filename": 0,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeB_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "How do I do problem 2 in pre-recorded lecture 06?",
+      "labels": [
+        "Pre-recorded lecture 06-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 2896,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 66,
+        "reason": "category_plus_number_unique",
+        "query_number": "06",
+        "top_filename_score": 1.0
+      },
+      "shortlist": [
+        66
+      ],
+      "shortlist_size": 1,
+      "pool_size": 50,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeC_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "help with quiz 2 question 1",
+      "labels": [
+        "Quiz 2 solutions"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 6637,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "2",
+        "top_filename_score": 0.767,
+        "top_filename_doc_id": 17
+      },
+      "shortlist": [
+        17,
+        71,
+        15,
+        18,
+        16
+      ],
+      "shortlist_size": 5,
+      "pool_size": 23,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": 1,
+      "rank_filename": 2,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeC_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "midterm 2022 question 3",
+      "labels": [
+        "econ117_summer2022_midterm_Ztable-1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4797,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "2022",
+        "top_filename_score": 0.35,
+        "top_filename_doc_id": 26
+      },
+      "shortlist": [
+        59,
+        31,
+        27,
+        26,
+        28
+      ],
+      "shortlist_size": 5,
+      "pool_size": 50,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": false,
+      "rank_bm25": 1,
+      "rank_dense": 7,
+      "rank_filename": 5,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeC_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "final exam 2018 question 1",
+      "labels": [
+        "econ117-final-fall-2018-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4290,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "2018",
+        "top_filename_score": 0.8,
+        "top_filename_doc_id": 32
+      },
+      "shortlist": [
+        42,
+        32,
+        43,
+        44,
+        41
+      ],
+      "shortlist_size": 5,
+      "pool_size": 50,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": 1,
+      "rank_dense": 4,
+      "rank_filename": 0,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeD_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "show me how to solve question 2 in problem set 2",
+      "labels": [
+        "econ117_pset02_2025B_with_table"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4322,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 22,
+        "reason": "category_plus_number_unique",
+        "query_number": "2",
+        "top_filename_score": 0.333
+      },
+      "shortlist": [
+        22
+      ],
+      "shortlist_size": 1,
+      "pool_size": 25,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeD_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "show me the answer key for problem set 2 question 1",
+      "labels": [
+        "pset2_solutions-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4580,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 22,
+        "reason": "category_plus_number_unique",
+        "query_number": "2",
+        "top_filename_score": 0.5
+      },
+      "shortlist": [
+        22
+      ],
+      "shortlist_size": 1,
+      "pool_size": 25,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeD_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I'm working on practice problem 4 from week 1 probabilities, what's the next step?",
+      "labels": [
+        "week 1.1. probabilities practice problems-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 3002,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 79,
+        "reason": "margin_only_no_number",
+        "query_number": null,
+        "top_filename_score": 1.0
+      },
+      "shortlist": [
+        79
+      ],
+      "shortlist_size": 1,
+      "pool_size": 19,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeE_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "actually I meant lab 4 not lab 2",
+      "labels": [
+        "Lab4-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4609,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": false,
+        "reason": "multi_doc_query_suppressed",
+        "hints": [
+          [
+            "4",
+            "labs"
+          ],
+          [
+            "2",
+            "labs"
+          ]
+        ]
+      },
+      "shortlist": [
+        49,
+        64,
+        41,
+        61,
+        62
+      ],
+      "shortlist_size": 5,
+      "pool_size": 50,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": 7,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeE_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "wait, I meant Interactive Lecture 5, not 3",
+      "labels": [
+        "Interactive Lecture 5-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 3275,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 50,
+        "reason": "category_plus_number_disambiguated_by_filename",
+        "query_number": "5",
+        "top_filename_score": 0.95
+      },
+      "shortlist": [
+        50
+      ],
+      "shortlist_size": 1,
+      "pool_size": 50,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_working_continuation_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "now help with problem 3",
+      "labels": [
+        "Lab4-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 5253,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.333,
+        "top_filename_doc_id": 16
+      },
+      "shortlist": [
+        25,
+        48,
+        72,
+        22,
+        24
+      ],
+      "shortlist_size": 5,
+      "pool_size": 50,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": 8,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeE_04",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "actually let's switch to the central limit theorem from interactive lecture 5",
+      "labels": [
+        "Interactive Lecture 5-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 3187,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 50,
+        "reason": "category_plus_number_disambiguated_by_filename",
+        "query_number": "5",
+        "top_filename_score": 0.95
+      },
+      "shortlist": [
+        50
+      ],
+      "shortlist_size": 1,
+      "pool_size": 50,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_working_01",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I'm stuck on question 1 in the 2019 final exam",
+      "labels": [
+        "final-fall-2019-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 6567,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": "2019",
+        "top_filename_score": 0.95,
+        "top_filename_doc_id": 44
+      },
+      "shortlist": [
+        43,
+        44,
+        24,
+        42,
+        25
+      ],
+      "shortlist_size": 5,
+      "pool_size": 50,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": 0,
+      "rank_dense": 4,
+      "rank_filename": 0,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_working_02",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "What's the central tendencies practice problem about?",
+      "labels": [
+        "Central Tendencies-2-1"
+      ],
+      "unresolved_labels": [
+        "Central Tendencies-2-1"
+      ],
+      "error": null,
+      "ms": 4883,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.633,
+        "top_filename_doc_id": 76
+      },
+      "shortlist": [
+        76,
+        161,
+        79,
+        62,
+        49
+      ],
+      "shortlist_size": 5,
+      "pool_size": 50,
+      "pool_doc_count": 4,
+      "L0": false,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_working_03",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Explain Interactive Lecture 9",
+      "labels": [
+        "Interactive Lecture 9 slides-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 3333,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 53,
+        "reason": "category_plus_number_disambiguated_by_filename",
+        "query_number": "9",
+        "top_filename_score": 0.867
+      },
+      "shortlist": [
+        53
+      ],
+      "shortlist_size": 1,
+      "pool_size": 50,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_working_04",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "thanks",
+      "labels": [
+        "Lab4-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4593,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": null,
+      "shortlist": [
+        161,
+        44,
+        32,
+        62,
+        47
+      ],
+      "shortlist_size": 5,
+      "pool_size": 50,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "econ_s1117_syn_typeB_04",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "compare extra problems I to extra problems II",
+      "labels": [
+        "extra problems I-1-1",
+        "extra problems II-1-1"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 4821,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.95,
+        "top_filename_doc_id": 39
+      },
+      "shortlist": [
+        39,
+        38,
+        37,
+        36,
+        161
+      ],
+      "shortlist_size": 5,
+      "pool_size": 50,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": 1,
+      "rank_filename": 0,
+      "reranked": true
+    },
+    {
+      "row_id": "ec112_local_working_concept_circular_flow_01",
+      "ta_id": "z_B4fFY6jD1mhy9K",
+      "query": "can you explain circular flow to me?",
+      "labels": [
+        "001.01 Circular Flow Diagram Description",
+        "001.02 Circular Flow Diagram Analysis"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 2527,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": {
+        "fired": false,
+        "query_number": null,
+        "top_filename_score": 0.6,
+        "top_filename_doc_id": 113
+      },
+      "shortlist": [
+        114,
+        113,
+        139,
+        132,
+        112
+      ],
+      "shortlist_size": 5,
+      "pool_size": 50,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": 1,
+      "rank_dense": 0,
+      "rank_filename": 0,
+      "reranked": true
+    },
+    {
+      "row_id": "ec112_local_working_homework1_fresh_01",
+      "ta_id": "z_B4fFY6jD1mhy9K",
+      "query": "I need help with questions 2-6 from homework 1",
+      "labels": [
+        "2026 Homework 1 PQ and Other Basics",
+        "001.03 Calculating Percentage Changes",
+        "001.04 PQ_Games",
+        "001.05 Gross Domestic Product",
+        "001.05.1 Current GDP USA Numbers",
+        "Practice Problems 1 PQ and Other Basics"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 2497,
+      "retrieval_method": "hybrid_full_doc",
+      "short_circuit": {
+        "fired": true,
+        "doc_id": 132,
+        "reason": "category_plus_number_unique",
+        "query_number": "1",
+        "top_filename_score": 0.5
+      },
+      "shortlist": [
+        132
+      ],
+      "shortlist_size": 1,
+      "pool_size": 3,
+      "pool_doc_count": 1,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    },
+    {
+      "row_id": "mgt410_local_working_concept_porter_forces_01",
+      "ta_id": "WBNtFkfPGZaJVQIk",
+      "query": "Please explain the 5 (really 6) forces",
+      "labels": [
+        "Industry_Analysis_Class",
+        "Industry_Analysis_Case"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 2384,
+      "retrieval_method": "v2_hybrid_rrf",
+      "short_circuit": null,
+      "shortlist": [
+        105,
+        104,
+        106,
+        107,
+        96
+      ],
+      "shortlist_size": 5,
+      "pool_size": 50,
+      "pool_doc_count": 5,
+      "L0": true,
+      "L1": true,
+      "L2": true,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": 0,
+      "rank_filename": null,
+      "reranked": true
+    },
+    {
+      "row_id": "mgt410_local_working_exam_part2_3a_01",
+      "ta_id": "WBNtFkfPGZaJVQIk",
+      "query": "Can you walk me through problem 3a in part 2 of the 2024 exam?",
+      "labels": [
+        "exam_competitor_2024_part_2_solutions",
+        "exam_competitor_2024_without solutions"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 1778,
+      "retrieval_method": "early_hybrid_full_doc",
+      "short_circuit": null,
+      "shortlist": [],
+      "shortlist_size": 0,
+      "pool_size": 0,
+      "pool_doc_count": 0,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    },
+    {
+      "row_id": "mgt410_local_working_exam_part2_3b_fresh_01",
+      "ta_id": "WBNtFkfPGZaJVQIk",
+      "query": "Can you walk me through problem 3b in part 2 of the 2024 exam?",
+      "labels": [
+        "exam_competitor_2024_part_2_solutions",
+        "exam_competitor_2024_without solutions"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 1821,
+      "retrieval_method": "early_hybrid_full_doc",
+      "short_circuit": null,
+      "shortlist": [],
+      "shortlist_size": 0,
+      "pool_size": 0,
+      "pool_doc_count": 0,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": true,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    },
+    {
+      "row_id": "mgt410_local_real_typeG1_exam_part1_2a_01",
+      "ta_id": "WBNtFkfPGZaJVQIk",
+      "query": "I need help with problem 2a from part 1 of the 2024 final",
+      "labels": [
+        "exam_competitor_2024_part1_solutions (updated)",
+        "exam_competitor_2024_without solutions"
+      ],
+      "unresolved_labels": [],
+      "error": null,
+      "ms": 1639,
+      "retrieval_method": "early_hybrid_full_doc",
+      "short_circuit": null,
+      "shortlist": [],
+      "shortlist_size": 0,
+      "pool_size": 0,
+      "pool_doc_count": 0,
+      "L0": true,
+      "L1": false,
+      "L2": false,
+      "L3": false,
+      "rank_bm25": null,
+      "rank_dense": null,
+      "rank_filename": null,
+      "reranked": false
+    }
+  ]
+}
