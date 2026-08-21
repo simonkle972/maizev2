@@ -772,7 +772,8 @@ def upload_document(ta_id):
     original_filename = file.filename
     file_ext = original_filename.rsplit('.', 1)[-1].lower() if '.' in original_filename else ''
 
-    allowed_extensions = {'pdf', 'docx', 'doc', 'xlsx', 'xls', 'txt', 'pptx', 'ppt'}
+    from src.document_processor import SUPPORTED_UPLOAD_EXTENSIONS
+    allowed_extensions = SUPPORTED_UPLOAD_EXTENSIONS
     if file_ext not in allowed_extensions:
         return jsonify({"error": f"File type .{file_ext} not supported"}), 400
 

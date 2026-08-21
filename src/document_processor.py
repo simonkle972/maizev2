@@ -359,6 +359,22 @@ def extract_jupyter_notebook(file_path: str) -> str:
         return ""
 
 
+# The single source of truth for what may be uploaded. Lives here, beside the
+# dispatch in extract_text_from_file, because the allowlist is only ever correct
+# if it matches what the extractor can actually parse.
+#
+# It used to be written out separately in each upload route, and they drifted:
+# professor.py gained md/py/json/csv/ipynb and the image types while the admin
+# route in app.py kept the original eight. The admin template's file picker had
+# been widened too, so a professor could select a .md, upload it, and get
+# "File type .md not supported" from a server that could parse it perfectly well.
+SUPPORTED_UPLOAD_EXTENSIONS = {
+    'pdf', 'docx', 'doc', 'xlsx', 'xls', 'txt', 'pptx', 'ppt',
+    'png', 'jpg', 'jpeg', 'gif', 'webp',
+    'md', 'py', 'json', 'csv', 'ipynb',
+}
+
+
 def extract_text_from_file(file_path: str, heartbeat=None) -> tuple:
     """
     Extract text from file. Returns (text, page_count) - page_count is 0 for non-PDFs.
