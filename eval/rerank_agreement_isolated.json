@@ -1,0 +1,2781 @@
+{
+  "queries": [
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with mathematical question 2 from problem set 2",
+      "row_id": "econ_s1117_real_typeA_01"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with mathematical question 1 from problem set 2",
+      "row_id": "econ_s1117_real_typeA_02"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with mathematical question 2 from problem set 2",
+      "row_id": "econ_s1117_real_typeA_03"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with question 14 from extra problems II",
+      "row_id": "econ_s1117_real_typeB_01"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Please help me with question 1 from quiz 1",
+      "row_id": "econ_s1117_real_typeC_01"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Please help me with question 1 from quiz 1",
+      "row_id": "econ_s1117_real_typeC_02"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Please help me with question 1 from econometrics quiz 1",
+      "row_id": "econ_s1117_real_typeC_03"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with the proof in question 1 from problem set 3",
+      "row_id": "econ_s1117_real_typeD_01"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with question 1 from problem set 3",
+      "row_id": "econ_s1117_real_typeD_02"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with question 2 from problem set 3",
+      "row_id": "econ_s1117_real_typeD_03"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with problem 8 from probabilities practice problems 1",
+      "row_id": "econ_s1117_real_typeD_04"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with question one from extra problem set 2",
+      "row_id": "econ_s1117_real_typeD_06"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "this is the question i meant",
+      "row_id": "econ_s1117_real_typeE_17"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with problem 8 from practice problems 1",
+      "row_id": "econ_s1117_real_typeD_05"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "can you explain slide 9 from interactive lecture 3?",
+      "row_id": "econ_s1117_real_working_lecture_01"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Can you explain slide 2 from pre-recorded lecture 3?",
+      "row_id": "econ_s1117_real_working_lecture_02"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with part 1 4a from lab 4",
+      "row_id": "econ_s1117_real_working_lab_01"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with mathematical question 1 from problem set 2 - discrimination",
+      "row_id": "econ_s1117_real_working_pset_01"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Please help me with question 1 from quiz 3",
+      "row_id": "econ_s1117_real_working_quiz_01"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with problem 4 from practice problems 1",
+      "row_id": "econ_s1117_real_working_practice_01"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "for P(A+)P(D+\u2223A+) I have (0.02)(0.92) = 0.0184",
+      "row_id": "econ_s1117_real_working_practice_03"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with this problem",
+      "row_id": "econ_s1117_real_working_paste_02"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with problem 1 from lab 2",
+      "row_id": "econ_s1117_syn_typeA_01"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Can you help me with lab 4 problem 3?",
+      "row_id": "econ_s1117_syn_typeA_02"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "what's the answer to PS1 question 2?",
+      "row_id": "econ_s1117_syn_typeA_03"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I need help with problem 5 from extra problems I",
+      "row_id": "econ_s1117_syn_typeB_01"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Question 3 from extra problems II please",
+      "row_id": "econ_s1117_syn_typeB_02"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "How do I do problem 2 in pre-recorded lecture 06?",
+      "row_id": "econ_s1117_syn_typeB_03"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "help with quiz 2 question 1",
+      "row_id": "econ_s1117_syn_typeC_01"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "midterm 2022 question 3",
+      "row_id": "econ_s1117_syn_typeC_02"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "final exam 2018 question 1",
+      "row_id": "econ_s1117_syn_typeC_03"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "show me how to solve question 2 in problem set 2",
+      "row_id": "econ_s1117_syn_typeD_01"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "show me the answer key for problem set 2 question 1",
+      "row_id": "econ_s1117_syn_typeD_02"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I'm working on practice problem 4 from week 1 probabilities, what's the next step?",
+      "row_id": "econ_s1117_syn_typeD_03"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "actually I meant lab 4 not lab 2",
+      "row_id": "econ_s1117_syn_typeE_01"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "wait, I meant Interactive Lecture 5, not 3",
+      "row_id": "econ_s1117_syn_typeE_02"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "now help with problem 3",
+      "row_id": "econ_s1117_syn_working_continuation_01"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "actually let's switch to the central limit theorem from interactive lecture 5",
+      "row_id": "econ_s1117_syn_typeE_04"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "I'm stuck on question 1 in the 2019 final exam",
+      "row_id": "econ_s1117_syn_working_01"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "What's the central tendencies practice problem about?",
+      "row_id": "econ_s1117_syn_working_02"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "Explain Interactive Lecture 9",
+      "row_id": "econ_s1117_syn_working_03"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "thanks",
+      "row_id": "econ_s1117_syn_working_04"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "compare extra problems I to extra problems II",
+      "row_id": "econ_s1117_syn_typeB_04"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "z_B4fFY6jD1mhy9K",
+      "query": "can you explain circular flow to me?",
+      "row_id": "ec112_local_working_concept_circular_flow_01"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "z_B4fFY6jD1mhy9K",
+      "query": "I need help with questions 2-6 from homework 1",
+      "row_id": "ec112_local_working_homework1_fresh_01"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "WBNtFkfPGZaJVQIk",
+      "query": "Please explain the 5 (really 6) forces",
+      "row_id": "mgt410_local_working_concept_porter_forces_01"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "WBNtFkfPGZaJVQIk",
+      "query": "Can you walk me through problem 3a in part 2 of the 2024 exam?",
+      "row_id": "mgt410_local_working_exam_part2_3a_01"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "WBNtFkfPGZaJVQIk",
+      "query": "Can you walk me through problem 3b in part 2 of the 2024 exam?",
+      "row_id": "mgt410_local_working_exam_part2_3b_fresh_01"
+    },
+    {
+      "source": "eval_opener",
+      "ta_id": "WBNtFkfPGZaJVQIk",
+      "query": "I need help with problem 2a from part 1 of the 2024 final",
+      "row_id": "mgt410_local_real_typeG1_exam_part1_2a_01"
+    },
+    {
+      "source": "concept_probe",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "What does OLS actually do \u2014 what is it minimising?",
+      "row_id": "concept_01"
+    },
+    {
+      "source": "concept_probe",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "What are the assumptions behind OLS and which ones matter most in practice?",
+      "row_id": "concept_02"
+    },
+    {
+      "source": "concept_probe",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "What is omitted variable bias and how do I know if I have it?",
+      "row_id": "concept_03"
+    },
+    {
+      "source": "concept_probe",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "What is heteroskedasticity and why is it a problem?",
+      "row_id": "concept_04"
+    },
+    {
+      "source": "concept_probe",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "When should I use robust standard errors instead of regular ones?",
+      "row_id": "concept_05"
+    },
+    {
+      "source": "concept_probe",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "What does endogeneity mean and why does it break OLS?",
+      "row_id": "concept_06"
+    },
+    {
+      "source": "concept_probe",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "How does an instrumental variable fix endogeneity? What makes a good instrument?",
+      "row_id": "concept_07"
+    },
+    {
+      "source": "concept_probe",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "What does R\u00b2 actually tell me, and why shouldn't I just maximise it?",
+      "row_id": "concept_08"
+    },
+    {
+      "source": "concept_probe",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "How do I interpret a p-value on a regression coefficient?",
+      "row_id": "concept_09"
+    },
+    {
+      "source": "concept_probe",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "What is multicollinearity and does it always need fixing?",
+      "row_id": "concept_10"
+    },
+    {
+      "source": "concept_probe",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "How do I interpret a dummy variable coefficient?",
+      "row_id": "concept_11"
+    },
+    {
+      "source": "concept_probe",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "What does an interaction term mean in a regression?",
+      "row_id": "concept_12"
+    },
+    {
+      "source": "concept_probe",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "How do I interpret coefficients when the dependent variable is logged?",
+      "row_id": "concept_13"
+    },
+    {
+      "source": "concept_probe",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "What is the difference between correlation and causation in a regression context?",
+      "row_id": "concept_14"
+    },
+    {
+      "source": "concept_probe",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "What are fixed effects and when do I need them?",
+      "row_id": "concept_15"
+    },
+    {
+      "source": "concept_probe",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "How does difference-in-differences identify a causal effect?",
+      "row_id": "concept_16"
+    },
+    {
+      "source": "concept_probe",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "What is the difference between a standard error and a standard deviation?",
+      "row_id": "concept_17"
+    },
+    {
+      "source": "concept_probe",
+      "ta_id": "EgZ14pvqEYzfQRTM",
+      "query": "How do I read a confidence interval on a coefficient?",
+      "row_id": "concept_18"
+    }
+  ],
+  "passes": [
+    {
+      "econ_s1117_real_typeA_01": {
+        "keys": [
+          "econ117_pset02_2025B_with_table#9e0b1bdd58860236",
+          "Interactive Lecture 5-1#a9f10fc7f7280301",
+          "Pre-recorded lecture 02-2-1#d8a8b358da60acb8",
+          "Pre-recorded lecture 02-2-1#1ff0b0c63dacaf51",
+          "Pre-recorded lecture 03-1#d37022282a39e670"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": true,
+        "ms": 28191
+      },
+      "econ_s1117_real_typeA_02": {
+        "keys": [
+          "econ117_pset02_2025B_with_table#9e0b1bdd58860236",
+          "Interactive Lecture 5-1#a9f10fc7f7280301",
+          "Pre-recorded lecture 02-2-1#d8a8b358da60acb8",
+          "Pre-recorded lecture 02-2-1#1ff0b0c63dacaf51",
+          "Pre-recorded lecture 03-1#d37022282a39e670"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": true,
+        "ms": 16172
+      },
+      "econ_s1117_real_typeA_03": {
+        "keys": [
+          "econ117_pset02_2025B_with_table#9e0b1bdd58860236",
+          "Interactive Lecture 5-1#a9f10fc7f7280301",
+          "Interactive Lecture 5-1#1790db3bba4a60af",
+          "Interactive Lecture 5-1#8d2bcc6992d488c8",
+          "Interactive Lecture 5-1#7ab4975f7f13a5ed"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": true,
+        "ms": 19966
+      },
+      "econ_s1117_real_typeB_01": {
+        "keys": [
+          "extra problems II - solutions-1-1#f177c9579747d763"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": false,
+        "ms": 16197
+      },
+      "econ_s1117_real_typeC_01": {
+        "keys": [
+          "econometrics quiz 1#158aa448d433d67a",
+          "Pre-recorded lecture 01-2#bee5d0147a1b925f",
+          "Pre-recorded lecture 01-2#00ccc66e830248e4",
+          "Pre-recorded lecture 01-2#c7738c5d6ac0d17b",
+          "Pre-recorded lecture 01-2#650a89a1a991cb0d"
+        ],
+        "reranked": false,
+        "method": "hybrid_full_doc",
+        "supp": true,
+        "ms": 4981
+      },
+      "econ_s1117_real_typeC_02": {
+        "keys": [
+          "econometrics quiz 1#158aa448d433d67a",
+          "Pre-recorded lecture 05 -2025-1#4c368fdc0cfb43eb",
+          "Pre-recorded lecture 01-2#bee5d0147a1b925f",
+          "Pre-recorded lecture 05 -2025-1#dd06cd41215f8eb1",
+          "Interactive Lecture 1-1#96721265e300b13e"
+        ],
+        "reranked": false,
+        "method": "hybrid_full_doc",
+        "supp": true,
+        "ms": 4318
+      },
+      "econ_s1117_real_typeC_03": {
+        "keys": [
+          "econometrics quiz 1#158aa448d433d67a",
+          "Pre-recorded lecture 01-2#00ccc66e830248e4",
+          "Pre-recorded lecture 01-2#bee5d0147a1b925f",
+          "Interactive Lecture 2-slides-1#3bc67905ea203413",
+          "Pre-recorded lecture 01-2#c7738c5d6ac0d17b"
+        ],
+        "reranked": false,
+        "method": "hybrid_full_doc",
+        "supp": true,
+        "ms": 4791
+      },
+      "econ_s1117_real_typeD_01": {
+        "keys": [
+          "econ117_pset02_2025B_with_table#9e0b1bdd58860236",
+          "Interactive Lecture 5-1#a9f10fc7f7280301",
+          "Pre-recorded lecture 02-2-1#d8a8b358da60acb8",
+          "Pre-recorded lecture 02-2-1#1ff0b0c63dacaf51",
+          "Pre-recorded lecture 03-1#d37022282a39e670"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": true,
+        "ms": 19948
+      },
+      "econ_s1117_real_typeD_02": {
+        "keys": [
+          "econS117_summer2024B_pset1-1#394d51b6ea12817e"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": false,
+        "ms": 14413
+      },
+      "econ_s1117_real_typeD_03": {
+        "keys": [
+          "econ117_pset02_2025B_with_table#9e0b1bdd58860236",
+          "Interactive Lecture 5-1#25e1fa3a87fe17dd",
+          "Interactive Lecture 5-1#7b1dffa197ef15be",
+          "Interactive Lecture 5-1#df93d7df49eda1a4",
+          "Interactive Lecture 5-1#7ab4975f7f13a5ed"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": true,
+        "ms": 17293
+      },
+      "econ_s1117_real_typeD_04": {
+        "keys": [
+          "week 1.1. probabilities practice problems-1#48683e7fa19a2db9",
+          "week 1.1. probabilities practice problems-1#7344c5bfff8076d7",
+          "week 1.1. probabilities practice problems-1#c376db299343546b",
+          "week 1.1. probabilities practice problems-1#22684437567e47a7",
+          "week 1.1. probabilities practice problems-1#9da415de1876fe80",
+          "week 1.1. probabilities practice problems-1#d78e168522919ebb",
+          "week 1.1. probabilities practice problems-1#b249856164c57679",
+          "week 1.1. probabilities practice problems-1#be76dcf97a4ee932"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 14704
+      },
+      "econ_s1117_real_typeD_06": {
+        "keys": [
+          "week2-1#3802f08d2867ff77",
+          "week2-1#a2b04da2a4bc30af",
+          "week2-1#0a8e6362b78675a4",
+          "week2-1#a25c5be9be7eb26f",
+          "week2-1#d451e5f83309ec0e",
+          "week2-1#c10a8f98af364895",
+          "week2-1#f24be97a557a7cfe",
+          "week2-1#2d5de38480ab688f"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 20144
+      },
+      "econ_s1117_real_typeE_17": {
+        "keys": [
+          "econometrics quiz 4#ea62cf50bf0f2f83",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#5fedd9651cba088c",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#b2ae871a1e757c50",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#cdf0f262a2f10872",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#f337b66f9cdde324",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#bd2d930c80b44b04",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#579c015225d82a04",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#f0e9b0b3c2bbeb20"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 15636
+      },
+      "econ_s1117_real_typeD_05": {
+        "keys": [
+          "week 1 practice problems - Random Variable, Central Tendencies-2-1#037df8db549df7e4",
+          "extra problems I - solutions-1#6eb8888b0f352044",
+          "week 1 practice problems - Random Variable, Central Tendencies-2-1#cecd728c7d06e678",
+          "week 1 practice problems - Random Variable, Central Tendencies-2-1#11b8173634773a4e",
+          "week 1.1. probabilities practice problems-1#c376db299343546b",
+          "week 1 practice problems - Random Variable, Central Tendencies-2-1#d4325d2e6888d486",
+          "week 1 practice problems - Random Variable, Central Tendencies-2-1#10543994ad09892a",
+          "week 1 practice problems - Random Variable, Central Tendencies-2-1#579b991471cfa402"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 19808
+      },
+      "econ_s1117_real_working_lecture_01": {
+        "keys": [
+          "Interactive Lecture 3-1-1#fefb7824df9e4923",
+          "Interactive Lecture 3-1-1#ac4e9276aa9cc835",
+          "Interactive Lecture 3-1-1#c6b0ead27b38864e",
+          "Interactive Lecture 3-1-1#006a16e4cb34ce2f",
+          "Interactive Lecture 3-1-1#08351e0655c67411",
+          "Interactive Lecture 3-1-1#a4dc12f7d9ed23a1",
+          "Interactive Lecture 3-1-1#b5dc4f24ef186b3a",
+          "Interactive Lecture 3-1-1#091fb34dde639bd5"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 11109
+      },
+      "econ_s1117_real_working_lecture_02": {
+        "keys": [
+          "Pre-recorded lecture 03-1#5c0c7873958a5414"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": false,
+        "ms": 12743
+      },
+      "econ_s1117_real_working_lab_01": {
+        "keys": [
+          "Lab4-1#fd67d3b5fd029b93",
+          "Lab4-1#e322724e148f02b7",
+          "Lab4-1#78f66066aa0ad429",
+          "Interactive Lecture 4-1#1c64f5d975f0dbd6",
+          "Interactive Lecture 4-1#24cede07a5871c17",
+          "econS117_summer2024B_pset1-1#140dbcdb7d159217",
+          "econS117_summer2024B_pset1-1#b758063a0af2e7ee",
+          "Interactive Lecture 1-1#668cb45d6f04f089"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 14676
+      },
+      "econ_s1117_real_working_pset_01": {
+        "keys": [
+          "econ117_pset02_2025B_with_table#9e0b1bdd58860236",
+          "Interactive Lecture 5-1#a9f10fc7f7280301",
+          "Pre-recorded lecture 02-2-1#d8a8b358da60acb8",
+          "Pre-recorded lecture 02-2-1#1ff0b0c63dacaf51",
+          "Pre-recorded lecture 03-1#d37022282a39e670"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": true,
+        "ms": 16421
+      },
+      "econ_s1117_real_working_quiz_01": {
+        "keys": [
+          "econometrics quiz 3#5a9be3339ba5b0ce",
+          "ECON 117 syllabus, session B, 2025#6af20e2a24822c27",
+          "pre-recorded lecture 04 - 2025#67bcbeba5b3f6a38",
+          "pre-recorded lecture 04 - 2025#1efda9b15441746f",
+          "pre-recorded lecture 04 - 2025#103a8c8d80fa944e"
+        ],
+        "reranked": false,
+        "method": "hybrid_full_doc",
+        "supp": true,
+        "ms": 3283
+      },
+      "econ_s1117_real_working_practice_01": {
+        "keys": [
+          "week 1 practice problems - Random Variable, Central Tendencies-2-1#f89cff469d10ddb1"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": false,
+        "ms": 16624
+      },
+      "econ_s1117_real_working_practice_03": {
+        "keys": [
+          "week 1 solutions - Probabilities-2-1#7f5a78dd8c80ce45",
+          "Pre-recorded lecture 01-2#969f4d51106ab31c",
+          "Interactive Lecture 2-slides-1#5e294522910bca9a",
+          "week 1 solutions - Probabilities-2-1#9beeec58806181fa",
+          "Interactive Lecture 2-slides-1#aef130f7ece11b20",
+          "Interactive Lecture 2-slides-1#3bc67905ea203413",
+          "Pre-recorded lecture 01-2#c7738c5d6ac0d17b",
+          "Pre-recorded lecture 01-2#848687df5db41ffa"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 15842
+      },
+      "econ_s1117_real_working_paste_02": {
+        "keys": [
+          "econ117_pset02_2025B_with_table#968e55407db9de13",
+          "econ117_pset02_2025B_with_table#5156a03a40ff1292",
+          "econ117_pset02_2025B_with_table#ac6af6f6b291e725",
+          "econ117_pset02_2025B_with_table#0a6eb226b2143be0",
+          "econ117_pset02_2025B_with_table#a3f2c6c5997dbf9a",
+          "econ117_pset02_2025B_with_table#c72cfa21ae9cd5cb",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#446f74c77deb53fb",
+          "extra problems I - solutions-1#6eb8888b0f352044"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 16660
+      },
+      "econ_s1117_syn_typeA_01": {
+        "keys": [
+          "Lab2#3f568680e5e95abf"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": false,
+        "ms": 15549
+      },
+      "econ_s1117_syn_typeA_02": {
+        "keys": [
+          "Lab4-1#25497466193a11e5"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": false,
+        "ms": 13959
+      },
+      "econ_s1117_syn_typeA_03": {
+        "keys": [
+          "week 1.1. probabilities practice problems-1#b249856164c57679",
+          "week 1.1. probabilities practice problems-1#be76dcf97a4ee932",
+          "week 1 solutions - Probabilities-2-1#294b8ab05538db88",
+          "week 1.1. probabilities practice problems-1#544fdc29887a1e08",
+          "week 1 solutions - Probabilities-2-1#ecec1469196aeb10",
+          "week 1.1. probabilities practice problems-1#d78e168522919ebb",
+          "week 1 solutions - Probabilities-2-1#b44c6fd3e547c552",
+          "econS117_pset1_section2_solution-2-1#c326ddbc42667b06",
+          "Pre-recorded lecture 01-2#00ccc66e830248e4",
+          "Interactive Lecture 5-1#7b1dffa197ef15be",
+          "Interactive Lecture 5-1#1790db3bba4a60af",
+          "Interactive Lecture 5-1#8d2bcc6992d488c8"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": true,
+        "ms": 18407
+      },
+      "econ_s1117_syn_typeB_01": {
+        "keys": [
+          "extra problems I-1-1#b50de91adc6bb0c7"
+        ],
+        "reranked": false,
+        "method": "hybrid_full_doc",
+        "supp": false,
+        "ms": 3210
+      },
+      "econ_s1117_syn_typeB_02": {
+        "keys": [
+          "extra problems II-1-1#65279be220fecad6"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": false,
+        "ms": 17363
+      },
+      "econ_s1117_syn_typeB_03": {
+        "keys": [
+          "Pre-recorded lecture 06-1#c781525d2a9084cc"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": false,
+        "ms": 17592
+      },
+      "econ_s1117_syn_typeC_01": {
+        "keys": [
+          "econometrics quiz 2#ffb784cdb4e22b71",
+          "econometrics quiz 2#624f80e49977ef83",
+          "Quiz 2 solutions#039ff50ec7e75972",
+          "Quiz 2 solutions#dc0acb5e7f25b08c",
+          "econometrics quiz 2#89387b65bc30ff63",
+          "Quiz 2 solutions#7c97d282d3c22d14",
+          "econometrics quiz 2#04a1f5ee054e2e7a",
+          "econometrics quiz 2#0abb5aebfaed6802",
+          "Pre-recorded lecture 03-1#4f3310fd73cb46d7",
+          "Interactive Lecture 5-1#676fd6760858df0b",
+          "Interactive Lecture 5-1#c7d3ad4308db53dd",
+          "Interactive Lecture 5-1#0346defd156762e1"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": true,
+        "ms": 13045
+      },
+      "econ_s1117_syn_typeC_02": {
+        "keys": [
+          "Midterm 2022A solutions-1#eb091d26c3d8dd6a",
+          "Midterm 2022A solutions-1#a35368b4bf3cde9e",
+          "econ117_summer2022_midterm_Ztable-1-1#51311a4650395c22",
+          "econ117_s2020_midterm-1#fa5f8663ec3545e1",
+          "econ117_s2020_midterm-solutions-1#e97645d50aa1332b",
+          "Midterm 2022A solutions-1#a47d119d31536e2f",
+          "Midterm 2022A solutions-1#ca8fe8e09f6dd916",
+          "econ117_s2020_midterm-1#2882e30f59773b92",
+          "pre-recorded lecture 04 - 2025#895afb54fa6489a1",
+          "pre-recorded lecture 04 - 2025#748cc4018b85f849",
+          "pre-recorded lecture 04 - 2025#091342fbd4e2fd16",
+          "pre-recorded lecture 04 - 2025#4a8b833b6164e979"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": true,
+        "ms": 24372
+      },
+      "econ_s1117_syn_typeC_03": {
+        "keys": [
+          "econ117-final-fall-2018-1#9a8a068bd33b98ff",
+          "ECON 117 syllabus, session B, 2025#6ae08c975a00e698",
+          "ECON 117 syllabus, session B, 2025#76e88b3d30e7644c",
+          "ECON 117 syllabus, session B, 2025#9aec7a37a1830a5b",
+          "ECON 117 syllabus, session B, 2025#a9a156c00909b681"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": true,
+        "ms": 14099
+      },
+      "econ_s1117_syn_typeD_01": {
+        "keys": [
+          "econ117_pset02_2025B_with_table#9e0b1bdd58860236",
+          "Pre-recorded lecture 02-2-1#1ff0b0c63dacaf51",
+          "Interactive Lecture 5-1#a9f10fc7f7280301",
+          "Interactive Lecture 3-1-1#70cf0b7645f390d1",
+          "Interactive Lecture 7-1#8317086d33dbd680"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": true,
+        "ms": 26951
+      },
+      "econ_s1117_syn_typeD_02": {
+        "keys": [
+          "econ117_pset02_2025B_with_table#9e0b1bdd58860236",
+          "Interactive Lecture 5-1#a9f10fc7f7280301",
+          "Pre-recorded lecture 02-2-1#d8a8b358da60acb8",
+          "Pre-recorded lecture 02-2-1#1ff0b0c63dacaf51",
+          "Pre-recorded lecture 03-1#d37022282a39e670"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": true,
+        "ms": 18269
+      },
+      "econ_s1117_syn_typeD_03": {
+        "keys": [
+          "week 1.1. probabilities practice problems-1#df4743dd42aeb462",
+          "week 1.1. probabilities practice problems-1#c376db299343546b",
+          "week 1.1. probabilities practice problems-1#0ee2ef8c16c3b369",
+          "week 1.1. probabilities practice problems-1#d78e168522919ebb",
+          "week 1.1. probabilities practice problems-1#22684437567e47a7",
+          "week 1.1. probabilities practice problems-1#48683e7fa19a2db9",
+          "week 1.1. probabilities practice problems-1#1efa13edc715960c",
+          "week 1.1. probabilities practice problems-1#7bf648d88b96a002"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 20047
+      },
+      "econ_s1117_syn_typeE_01": {
+        "keys": [
+          "pre-recorded lecture 04 - 2025#eeb943d0381ac648"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": false,
+        "ms": 15388
+      },
+      "econ_s1117_syn_typeE_02": {
+        "keys": [
+          "Interactive Lecture 5-1#ab357d3d8a6a3ee5",
+          "Interactive Lecture 5-1#c748e166ff82280a",
+          "Interactive Lecture 5-1#0854af7d08a3270c",
+          "Interactive Lecture 5-1#25e1fa3a87fe17dd",
+          "Interactive Lecture 5-1#b08e094871ea3492",
+          "Interactive Lecture 5-1#92f923e5bf04e555",
+          "Interactive Lecture 5-1#7b1dffa197ef15be",
+          "Interactive Lecture 5-1#1790db3bba4a60af"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 14781
+      },
+      "econ_s1117_syn_working_continuation_01": {
+        "keys": [
+          "Quiz 3 - solutions 2025#86b13536bea37d34"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": false,
+        "ms": 15838
+      },
+      "econ_s1117_syn_typeE_04": {
+        "keys": [
+          "Interactive Lecture 5-1#24f3f5d8f44be9f1",
+          "Interactive Lecture 5-1#c695fa3456afb8d6",
+          "Interactive Lecture 5-1#9a87e73f9889305c",
+          "Interactive Lecture 5-1#fac53d2cb82d58f3",
+          "Interactive Lecture 5-1#46cf2b496057fbd0",
+          "Interactive Lecture 5-1#afcef14e2832da3c",
+          "Interactive Lecture 5-1#78feae510ea617cd",
+          "Interactive Lecture 5-1#b130830f2417b46e"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 12715
+      },
+      "econ_s1117_syn_working_01": {
+        "keys": [
+          "econ117_s2019_final_complete-1#078b3adef8e823bf",
+          "Interactive Lecture 9 slides-1#8c81e3ef75fdddf1",
+          "Interactive Lecture 9 slides-1#5d213452548d15df",
+          "Interactive Lecture 9 slides-1#11fc3cb7d11538fd",
+          "ECON 117 syllabus, session B, 2025#3e7b4e4b4bb41e1d"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": true,
+        "ms": 20712
+      },
+      "econ_s1117_syn_working_02": {
+        "keys": [
+          "week 1 practice problems - Random Variable, Central Tendencies-2-1#11b8173634773a4e",
+          "week 1 practice problems - Random Variable, Central Tendencies-2-1#08ba5ebb50ec3724",
+          "week 1 practice problems - Random Variable, Central Tendencies-2-1#b7bca1c9b944899d",
+          "week 1 practice problems - Random Variable, Central Tendencies-2-1#579b991471cfa402",
+          "week 1 practice problems - Random Variable, Central Tendencies-2-1#d4325d2e6888d486",
+          "week 1 practice problems - Random Variable, Central Tendencies-2-1#037df8db549df7e4",
+          "week 1 practice problems - Random Variable, Central Tendencies-2-1#cecd728c7d06e678",
+          "week 1 practice problems - Random Variable, Central Tendencies-2-1#6fd854f6a2acebc7"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 15687
+      },
+      "econ_s1117_syn_working_03": {
+        "keys": [
+          "Interactive Lecture 9 slides-1#0bbeb2f12ab016e4",
+          "Interactive Lecture 9 slides-1#41e9c8c4073a8199",
+          "Interactive Lecture 9 slides-1#54e2a162c3a34ee3",
+          "Interactive Lecture 9 slides-1#5d213452548d15df",
+          "Interactive Lecture 9 slides-1#11fc3cb7d11538fd",
+          "Interactive Lecture 9 slides-1#ff5846378c3c2161",
+          "Interactive Lecture 9 slides-1#8c81e3ef75fdddf1",
+          "Interactive Lecture 9 slides-1#67874c2596620367"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 17621
+      },
+      "econ_s1117_syn_working_04": {
+        "keys": [
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#bdddce1514c8ef2b",
+          "Interactive Lecture 2-slides-1#38ff32e6c0e579d1",
+          "Interactive Lecture 2-slides-1#c90962b6ebd930ea",
+          "final-fall-2019-1#c953b0becb7ae21f",
+          "econ117-final-fall-2018-1#c953b0becb7ae21f",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#3aff15b4f0f45b19",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#8389873abc97e8a3",
+          "final-fall-2019-1#4f705dbb4aa16c87"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 12962
+      },
+      "econ_s1117_syn_typeB_04": {
+        "keys": [
+          "extra problems I-1-1#240018989a7ef471",
+          "extra problems II-1-1#cf346a2577273bb1",
+          "extra problems II-1-1#9fbf04b045c53f65",
+          "extra problems II-1-1#72487632cd6492c1",
+          "extra problems II-1-1#425d77be95d13172",
+          "extra problems I-1-1#ab4e5eb8d74dda44",
+          "extra problems I - solutions-1#04d661857977fd39",
+          "extra problems II - solutions-1-1#014998d66487bf34"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 19607
+      },
+      "ec112_local_working_concept_circular_flow_01": {
+        "keys": [
+          "001.01 Circular Flow Diagram Description#0ca5960c8e9c6cf8",
+          "001.01 Circular Flow Diagram Description#9b765a62724406ef",
+          "001.02 Circular Flow Diagram Analysis#adf9c348932563ce",
+          "001.01 Circular Flow Diagram Description#2890146f5c293191",
+          "001.02 Circular Flow Diagram Analysis#957e59762b52f748",
+          "001.02 Circular Flow Diagram Analysis#4570020378849919",
+          "001.02 Circular Flow Diagram Analysis#eaed20d8ca4b41b7",
+          "001.02 Circular Flow Diagram Analysis#26eb3bfafee1b056"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 14979
+      },
+      "ec112_local_working_homework1_fresh_01": {
+        "keys": [
+          "2026 Homework 1 PQ and Other Basics#e574b5b449ac573e",
+          "001.05 Gross Domestic Product#b001f1b2405f75b6",
+          "001.04 PQ_Games#5f5f2f37da08ed92",
+          "001.04 PQ_Games#c1732bd5f864dba7",
+          "001.04 PQ_Games#1d0fc94a57e0213d"
+        ],
+        "reranked": false,
+        "method": "hybrid_full_doc",
+        "supp": true,
+        "ms": 3123
+      },
+      "mgt410_local_working_concept_porter_forces_01": {
+        "keys": [
+          "Industry_Analysis_Class#fe3c28ed8fbe9c38",
+          "Industry_Analysis_Case#47f432f6b539a9b3",
+          "Industry_Analysis_Case#312d83334b3ff21f",
+          "Industry_Analysis_Class#8baaff4567c3cf82",
+          "Industry_Analysis_Class#c677858084d65b0e",
+          "Industry_Analysis_Case#c6412eac5d605e39",
+          "Industry_Analysis_Case#1978d8a17db48b87",
+          "Industry_Analysis_Class#c91c94c746c40847"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 13279
+      },
+      "mgt410_local_working_exam_part2_3a_01": {
+        "keys": [
+          "exam_competitor_2024_part_2_solutions#fd96aa634960a0ce",
+          "Industry_Analysis_Class#fe3c28ed8fbe9c38",
+          "Industry_Analysis_Class#8baaff4567c3cf82",
+          "Industry_Analysis_Class#78affdad361229ac",
+          "Industry_Analysis_Class#8613a6cf9424fe11"
+        ],
+        "reranked": false,
+        "method": "early_hybrid_full_doc",
+        "supp": true,
+        "ms": 1981
+      },
+      "mgt410_local_working_exam_part2_3b_fresh_01": {
+        "keys": [
+          "exam_competitor_2024_part_2_solutions#fd96aa634960a0ce",
+          "Industry_Analysis_Class#fe3c28ed8fbe9c38",
+          "Industry_Analysis_Class#8baaff4567c3cf82",
+          "Industry_Analysis_Class#78affdad361229ac",
+          "Industry_Analysis_Class#8613a6cf9424fe11"
+        ],
+        "reranked": false,
+        "method": "early_hybrid_full_doc",
+        "supp": true,
+        "ms": 1903
+      },
+      "mgt410_local_real_typeG1_exam_part1_2a_01": {
+        "keys": [
+          "exam_competitor_2024_part_2_solutions#fd96aa634960a0ce",
+          "Industry_Analysis_Class#fe3c28ed8fbe9c38",
+          "Industry_Analysis_Class#8baaff4567c3cf82",
+          "Industry_Analysis_Class#78affdad361229ac",
+          "Industry_Analysis_Class#8613a6cf9424fe11"
+        ],
+        "reranked": false,
+        "method": "early_hybrid_full_doc",
+        "supp": true,
+        "ms": 1840
+      },
+      "concept_01": {
+        "keys": [
+          "Pre-recorded lecture 06-1#684149c3cc19949c",
+          "Interactive Lecture 9 slides-1#3ba39263d7b36dee",
+          "Interactive Lecture 9 slides-1#48ad3e16acd410e6",
+          "Interactive Lecture 9 slides-1#f7c4b178cfc44d0e",
+          "URfIE_web#6c06e0c3eeb8c234",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#03bd4bb65ed928ac",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#a97e2b515f0c3d22",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#f39cf50dd6bed6eb"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 19270
+      },
+      "concept_02": {
+        "keys": [
+          "URfIE_web#3425ae780daf2ea5",
+          "Interactive Lecture 7-1#09c9bff4d243c949",
+          "URfIE_web#ee402ed4134904ab",
+          "URfIE_web#eafb760e6813b77b",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#dc0e00a45edfafd9",
+          "URfIE_web#00badfa92b692acb",
+          "Interactive Lecture 7-1#8317086d33dbd680",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#f46d60118c1f96ad"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 19809
+      },
+      "concept_03": {
+        "keys": [
+          "Interactive Lecture 9 slides-1#1b14237ebdc69d83",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#3cf8828a8aa59f32",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#4e994ca63f289c82",
+          "Interactive Lecture 8-1#581c3ef9394de181",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#773bb6c823551346",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#c68187f9f46324a2",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#ef4e7bcc02af7c2d",
+          "Quiz 5 solutions - 2025#a3796fb85bbd84b4"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 16826
+      },
+      "concept_04": {
+        "keys": [
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#8428d9e119c76853",
+          "URfIE_web#005f8215e69b93d8",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#a6b633e30bccf1b4",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#171638c27591287c",
+          "URfIE_web#56224f5d49bf4cb6",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#bfba00c3a4a7afdc",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#79285357b6d1ac47",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#e778e4b9bb82e547"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 17819
+      },
+      "concept_05": {
+        "keys": [
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#2cfc231d565f514f",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#6e6a1334599e975b",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#a6b633e30bccf1b4",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#a2a657e762d81682",
+          "URfIE_web#1cd06d9a16399349",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#3eee230ffc4830ab",
+          "URfIE_web#26121bcee435df1b",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#2b1f69f2c513c24b"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 17455
+      },
+      "concept_06": {
+        "keys": [
+          "Interactive Lecture 9 slides-1#ff5846378c3c2161",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#3cf8828a8aa59f32",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#c68187f9f46324a2",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#95c57fdee89d2eba",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#73e15e3f5e7a0aa1",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#67e7bc9ac12252b7",
+          "Interactive Lecture 9 slides-1#35ad3a059b13ad75",
+          "Interactive Lecture 7-1#e9a1e58eaa9065cb"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 15425
+      },
+      "concept_07": {
+        "keys": [
+          "URfIE_web#9b58986843c4fa5a",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#a86cbcedf3e57bff",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#c5a257573e4d0841",
+          "econ117_s2019_final_v7_suggested_solutions-1#c818795d82155550",
+          "econ117_s2019_final_v7_suggested_solutions-1#fb1d4dac818881d0",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#3cf8828a8aa59f32",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#c68187f9f46324a2",
+          "econ117_s2019_final_v7_suggested_solutions-1#5e80e3880634d52a"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 17469
+      },
+      "concept_08": {
+        "keys": [
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#35659abdf7190d2f",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#9ded26c98a75239b",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#2e41484d98689bf1",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#238922413c2be221",
+          "URfIE_web#af0065ef4ee56422",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#2dc80a65bd19d830",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#7af08876063763d8",
+          "final-fall-2019_Solutions-1#86871b568a7c5ee0"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 17995
+      },
+      "concept_09": {
+        "keys": [
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#98f1d6b60c78f24d",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#56ac3f82788884b6",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#19d7e86720a4354a",
+          "URfIE_web#95073f4b341f8931",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#6f356ed39fa4b483",
+          "URfIE_web#6c44974cfc5ed48d",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#8c89e87621d8649b",
+          "URfIE_web#a05c33c597a6b4c0"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 21250
+      },
+      "concept_10": {
+        "keys": [
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#c476d02280d5b576",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#c7b258c5972c5c4d",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#1a0dc77a9f553c71",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#959bd4ca57ff02c0",
+          "URfIE_web#9909521100cbd6b4",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#a83fc69b71411ce5",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#09a179bd56bf6e32",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#ffb12743d73585b4"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 20295
+      },
+      "concept_11": {
+        "keys": [
+          "URfIE_web#6ff0467fa206cf0a",
+          "Pre-recorded lecture 07-1#8ae698dbd3fdd515",
+          "URfIE_web#ebb55e2d842fdbae",
+          "URfIE_web#f501fd5bfb0b3b61",
+          "URfIE_web#91778e214ad16d7f",
+          "URfIE_web#37a647cce797defd",
+          "URfIE_web#bcc492904fbdc19c",
+          "econ117-final-fall-2018-1#6b9ca38a2e6617c6"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 16945
+      },
+      "concept_12": {
+        "keys": [
+          "URfIE_web#d29b8b949001edf9",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#8b295e8f178c3575",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#a1af1c1e44532d4e",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#174941e71b6e2ac2",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#c14d128c639b91d9",
+          "URfIE_web#37a647cce797defd",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#c623d66e1eeeaae8",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#4c25fee059289ff0"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 17015
+      },
+      "concept_13": {
+        "keys": [
+          "how_to_intepret_beta_coefficients-1#39024b9362a9ea00",
+          "how_to_intepret_beta_coefficients-1#ea924f6271222720",
+          "Pre-recorded lecture 07-1#a52e905013404523",
+          "URfIE_web#064e1aa34b56280f",
+          "URfIE_web#262b75beda566b07",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#f900c21e462799cc",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#328e0b4ec05daeab",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#3c4ba36ecd5d5604"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 16342
+      },
+      "concept_14": {
+        "keys": [
+          "Pre-recorded lecture 05 -2025-1#5b53bfcf4cea8f9c",
+          "Pre-recorded lecture 05 -2025-1#79757ec0db8b74d8",
+          "Pre-recorded lecture 05 -2025-1#2125050d4ecd85f2",
+          "Pre-recorded lecture 05 -2025-1#77db9d87fb5a6200",
+          "Pre-recorded lecture 08-1#afbf6f52c312650b",
+          "Interactive Lecture 9 slides-1#23f605fe7ab545f9",
+          "Interactive Lecture 9 slides-1#1b14237ebdc69d83",
+          "Interactive Lecture 9 slides-1#ff5846378c3c2161"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 16149
+      },
+      "concept_15": {
+        "keys": [
+          "URfIE_web#e4a7a97b959daa2f",
+          "URfIE_web#4d3b79ea3cbd89e9",
+          "URfIE_web#c853ccc058ac6958",
+          "URfIE_web#5fb128d7b3612c90",
+          "URfIE_web#a40969a3777af2fb",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#392168a5f2f2977b",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#fc4a54d9090ee85b",
+          "ECON 117 syllabus, session B, 2025#27ba7f0f00cfb0e9"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 19613
+      },
+      "concept_16": {
+        "keys": [
+          "Pre-recorded lecture 09-1#c7f9a3636e20ff17",
+          "Interactive Lecture 9 slides-1#a8db938396ec30aa",
+          "URfIE_web#5fcb7d5b3325003a",
+          "Pre-recorded lecture 09-1#90f7b23bf4d83eaa",
+          "Pre-recorded lecture 09-1#b5f5d6724ff976e3",
+          "Interactive Lecture 9 slides-1#c386a8fa37709da8",
+          "Pre-recorded lecture 09-1#b1324f8094be037e",
+          "Final 2024 - suggested solutions-2-1#2dafc0e9f77040b8"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 19521
+      },
+      "concept_17": {
+        "keys": [
+          "pre-recorded lecture 04 - 2025#437872803651b9cf",
+          "Interactive Lecture 5-1#0920d0bb780ef9ac",
+          "pre-recorded lecture 04 - 2025#2b7edb51f714c6da",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#6cd37e0a822e6ecb",
+          "pre-recorded lecture 04 - 2025#0ba9737d27cf01cf",
+          "Pre-recorded lecture 06-1#19f8f21c92953257",
+          "Interactive Lecture 5-1#c390f890c3716cce",
+          "Pre-recorded lecture 06-1#6b321a8526f45f63"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 19221
+      },
+      "concept_18": {
+        "keys": [
+          "Pre-recorded lecture 06-1#3efe511647a59c6a",
+          "Pre-recorded lecture 06-1#49169cd228636544",
+          "Pre-recorded lecture 07-1#8eb0f1d129890843",
+          "URfIE_web#b950482d196d77f9",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#c0ce11f6a5782773",
+          "URfIE_web#dde61ae5e9306ef6",
+          "URfIE_web#7589d2ef7e69e6d4",
+          "URfIE_web#bbefb18b4b4e9c8b"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 14477
+      }
+    },
+    {
+      "econ_s1117_real_typeA_01": {
+        "keys": [
+          "econ117_pset02_2025B_with_table#9e0b1bdd58860236",
+          "pre-recorded lecture 04 - 2025#060a8eb3e28e98ac",
+          "pre-recorded lecture 04 - 2025#103a8c8d80fa944e",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#96f9cf7319d3bbff",
+          "Pre-recorded lecture 07-1#d69cba343b4bcce4"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": true,
+        "ms": 25936
+      },
+      "econ_s1117_real_typeA_02": {
+        "keys": [
+          "econ117_pset02_2025B_with_table#9e0b1bdd58860236",
+          "Interactive Lecture 5-1#a9f10fc7f7280301",
+          "Pre-recorded lecture 02-2-1#d8a8b358da60acb8",
+          "Pre-recorded lecture 02-2-1#1ff0b0c63dacaf51",
+          "Pre-recorded lecture 03-1#d37022282a39e670"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": true,
+        "ms": 14049
+      },
+      "econ_s1117_real_typeA_03": {
+        "keys": [
+          "econ117_pset02_2025B_with_table#9e0b1bdd58860236",
+          "pre-recorded lecture 04 - 2025#060a8eb3e28e98ac",
+          "pre-recorded lecture 04 - 2025#103a8c8d80fa944e",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#96f9cf7319d3bbff",
+          "Pre-recorded lecture 07-1#d69cba343b4bcce4"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": true,
+        "ms": 20102
+      },
+      "econ_s1117_real_typeB_01": {
+        "keys": [
+          "extra problems II - solutions-1-1#f177c9579747d763"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": false,
+        "ms": 19108
+      },
+      "econ_s1117_real_typeC_01": {
+        "keys": [
+          "econometrics quiz 1#158aa448d433d67a",
+          "Pre-recorded lecture 01-2#bee5d0147a1b925f",
+          "Pre-recorded lecture 01-2#00ccc66e830248e4",
+          "Pre-recorded lecture 01-2#c7738c5d6ac0d17b",
+          "Pre-recorded lecture 01-2#650a89a1a991cb0d"
+        ],
+        "reranked": false,
+        "method": "hybrid_full_doc",
+        "supp": true,
+        "ms": 3585
+      },
+      "econ_s1117_real_typeC_02": {
+        "keys": [
+          "econometrics quiz 1#158aa448d433d67a",
+          "Pre-recorded lecture 01-2#bee5d0147a1b925f",
+          "Pre-recorded lecture 01-2#00ccc66e830248e4",
+          "Pre-recorded lecture 01-2#c7738c5d6ac0d17b",
+          "Pre-recorded lecture 01-2#650a89a1a991cb0d"
+        ],
+        "reranked": false,
+        "method": "hybrid_full_doc",
+        "supp": true,
+        "ms": 3485
+      },
+      "econ_s1117_real_typeC_03": {
+        "keys": [
+          "econometrics quiz 1#158aa448d433d67a",
+          "Pre-recorded lecture 01-2#bee5d0147a1b925f",
+          "Pre-recorded lecture 01-2#00ccc66e830248e4",
+          "Pre-recorded lecture 01-2#c7738c5d6ac0d17b",
+          "Interactive Lecture 2-slides-1#3bc67905ea203413"
+        ],
+        "reranked": false,
+        "method": "hybrid_full_doc",
+        "supp": true,
+        "ms": 2811
+      },
+      "econ_s1117_real_typeD_01": {
+        "keys": [
+          "econ117_pset02_2025B_with_table#9e0b1bdd58860236",
+          "Interactive Lecture 5-1#a9f10fc7f7280301",
+          "Pre-recorded lecture 02-2-1#d8a8b358da60acb8",
+          "Pre-recorded lecture 02-2-1#1ff0b0c63dacaf51",
+          "Pre-recorded lecture 03-1#d37022282a39e670"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": true,
+        "ms": 15836
+      },
+      "econ_s1117_real_typeD_02": {
+        "keys": [
+          "econS117_summer2024B_pset1-1#394d51b6ea12817e",
+          "URfIE_web#f12f701ca334e238",
+          "URfIE_web#46d070d02a07b3f5",
+          "URfIE_web#d6c4f93cdea23d9f",
+          "URfIE_web#775096599df8dc07"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": true,
+        "ms": 14899
+      },
+      "econ_s1117_real_typeD_03": {
+        "keys": [
+          "econ117_pset02_2025B_with_table#9e0b1bdd58860236",
+          "Interactive Lecture 5-1#1790db3bba4a60af",
+          "Interactive Lecture 5-1#df93d7df49eda1a4",
+          "Interactive Lecture 5-1#8d2bcc6992d488c8",
+          "Interactive Lecture 5-1#25e1fa3a87fe17dd"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": true,
+        "ms": 17348
+      },
+      "econ_s1117_real_typeD_04": {
+        "keys": [
+          "week 1.1. probabilities practice problems-1#7344c5bfff8076d7",
+          "week 1.1. probabilities practice problems-1#48683e7fa19a2db9",
+          "week 1.1. probabilities practice problems-1#c376db299343546b",
+          "week 1.1. probabilities practice problems-1#22684437567e47a7",
+          "week 1.1. probabilities practice problems-1#9da415de1876fe80",
+          "week 1.1. probabilities practice problems-1#c8839600a93a04ec",
+          "week 1.1. probabilities practice problems-1#0ee2ef8c16c3b369",
+          "week 1.1. probabilities practice problems-1#d78e168522919ebb"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 13414
+      },
+      "econ_s1117_real_typeD_06": {
+        "keys": [
+          "week2-1#3802f08d2867ff77",
+          "week2-1#a25c5be9be7eb26f",
+          "week2-1#0a8e6362b78675a4",
+          "week2-1#a2b04da2a4bc30af",
+          "week2-1#d451e5f83309ec0e",
+          "week2-1#e233660262b258ea",
+          "week2-1#f24be97a557a7cfe",
+          "week2-1#c10a8f98af364895"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 18001
+      },
+      "econ_s1117_real_typeE_17": {
+        "keys": [
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#b2ae871a1e757c50",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#5fedd9651cba088c",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#acff18dd002436de",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#f337b66f9cdde324",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#cdf0f262a2f10872",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#59270fb63c9dc829",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#f0e9b0b3c2bbeb20",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#bd2d930c80b44b04"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 14582
+      },
+      "econ_s1117_real_typeD_05": {
+        "keys": [
+          "week 1 practice problems - Random Variable, Central Tendencies-2-1#037df8db549df7e4",
+          "week 1.1. probabilities practice problems-1#c376db299343546b",
+          "week 1 practice problems - Random Variable, Central Tendencies-2-1#cecd728c7d06e678",
+          "week 1 practice problems - Random Variable, Central Tendencies-2-1#11b8173634773a4e",
+          "extra problems I - solutions-1#6eb8888b0f352044",
+          "week 1 practice problems - Random Variable, Central Tendencies-2-1#d4325d2e6888d486",
+          "week 1 practice problems - Random Variable, Central Tendencies-2-1#579b991471cfa402",
+          "week 1.1. probabilities practice problems-1#1efa13edc715960c"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 15577
+      },
+      "econ_s1117_real_working_lecture_01": {
+        "keys": [
+          "Interactive Lecture 3-1-1#fefb7824df9e4923",
+          "Interactive Lecture 3-1-1#ac4e9276aa9cc835",
+          "Interactive Lecture 3-1-1#c6b0ead27b38864e",
+          "Interactive Lecture 3-1-1#006a16e4cb34ce2f",
+          "Interactive Lecture 3-1-1#08351e0655c67411",
+          "Interactive Lecture 3-1-1#83519e0fd18024bf",
+          "Interactive Lecture 3-1-1#a4dc12f7d9ed23a1",
+          "Interactive Lecture 3-1-1#b5dc4f24ef186b3a"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 11172
+      },
+      "econ_s1117_real_working_lecture_02": {
+        "keys": [
+          "Pre-recorded lecture 03-1#5c0c7873958a5414"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": false,
+        "ms": 14452
+      },
+      "econ_s1117_real_working_lab_01": {
+        "keys": [
+          "Lab4-1#25497466193a11e5"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": false,
+        "ms": 20590
+      },
+      "econ_s1117_real_working_pset_01": {
+        "keys": [
+          "econ117_pset02_2025B_with_table#9e0b1bdd58860236",
+          "Pre-recorded lecture 02-2-1#1ff0b0c63dacaf51",
+          "Interactive Lecture 5-1#a9f10fc7f7280301",
+          "Pre-recorded lecture 02-2-1#d8a8b358da60acb8",
+          "Pre-recorded lecture 03-1#d37022282a39e670"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": true,
+        "ms": 14406
+      },
+      "econ_s1117_real_working_quiz_01": {
+        "keys": [
+          "econometrics quiz 3#5a9be3339ba5b0ce",
+          "ECON 117 syllabus, session B, 2025#6af20e2a24822c27",
+          "pre-recorded lecture 04 - 2025#67bcbeba5b3f6a38",
+          "pre-recorded lecture 04 - 2025#1efda9b15441746f",
+          "pre-recorded lecture 04 - 2025#103a8c8d80fa944e"
+        ],
+        "reranked": false,
+        "method": "hybrid_full_doc",
+        "supp": true,
+        "ms": 3064
+      },
+      "econ_s1117_real_working_practice_01": {
+        "keys": [
+          "week 1 practice problems - Random Variable, Central Tendencies-2-1#f89cff469d10ddb1"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": false,
+        "ms": 15588
+      },
+      "econ_s1117_real_working_practice_03": {
+        "keys": [
+          "week 1 solutions - Probabilities-2-1#7f5a78dd8c80ce45",
+          "Pre-recorded lecture 01-2#969f4d51106ab31c",
+          "Interactive Lecture 2-slides-1#5e294522910bca9a",
+          "week 1 solutions - Probabilities-2-1#9beeec58806181fa",
+          "Pre-recorded lecture 01-2#c7738c5d6ac0d17b",
+          "Interactive Lecture 2-slides-1#aef130f7ece11b20",
+          "Interactive Lecture 2-slides-1#3bc67905ea203413",
+          "Pre-recorded lecture 01-2#1731edc451a7e062"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 14545
+      },
+      "econ_s1117_real_working_paste_02": {
+        "keys": [
+          "econ117_pset02_2025B_with_table#968e55407db9de13",
+          "econ117_pset02_2025B_with_table#5156a03a40ff1292",
+          "econ117_pset02_2025B_with_table#ac6af6f6b291e725",
+          "econ117_pset02_2025B_with_table#0a6eb226b2143be0",
+          "econ117_pset02_2025B_with_table#a3f2c6c5997dbf9a",
+          "econ117_pset02_2025B_with_table#c72cfa21ae9cd5cb",
+          "econ117_s2019_final_v7_suggested_solutions-1#72412dc497e97803",
+          "econ117_s2019_final_v7_suggested_solutions-1#49fa40b99980139f"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 16358
+      },
+      "econ_s1117_syn_typeA_01": {
+        "keys": [
+          "Lab2#3f568680e5e95abf"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": false,
+        "ms": 15690
+      },
+      "econ_s1117_syn_typeA_02": {
+        "keys": [
+          "Lab4-1#25497466193a11e5"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": false,
+        "ms": 13290
+      },
+      "econ_s1117_syn_typeA_03": {
+        "keys": [
+          "econS117_pset1_section2_solution-2-1#c326ddbc42667b06",
+          "econS117_pset1_section2_solution-2-1#433aa6765ff02b27",
+          "week 1.1. probabilities practice problems-1#d78e168522919ebb",
+          "week 1.1. probabilities practice problems-1#be76dcf97a4ee932",
+          "week 1.1. probabilities practice problems-1#b249856164c57679",
+          "week 1.1. probabilities practice problems-1#544fdc29887a1e08",
+          "week 1.1. probabilities practice problems-1#22684437567e47a7",
+          "week 1 solutions - Probabilities-2-1#294b8ab05538db88",
+          "Pre-recorded lecture 01-2#27d4e5747a063ed0",
+          "Interactive Lecture 5-1#e63a004c5a1a8df3",
+          "Interactive Lecture 3-1-1#83519e0fd18024bf",
+          "Pre-recorded lecture 01-2#92607ed93a592708"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": true,
+        "ms": 20659
+      },
+      "econ_s1117_syn_typeB_01": {
+        "keys": [
+          "extra problems I-1-1#b50de91adc6bb0c7"
+        ],
+        "reranked": false,
+        "method": "hybrid_full_doc",
+        "supp": false,
+        "ms": 3387
+      },
+      "econ_s1117_syn_typeB_02": {
+        "keys": [
+          "extra problems II-1-1#65279be220fecad6"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": false,
+        "ms": 20456
+      },
+      "econ_s1117_syn_typeB_03": {
+        "keys": [
+          "Pre-recorded lecture 06-1#c781525d2a9084cc"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": false,
+        "ms": 16276
+      },
+      "econ_s1117_syn_typeC_01": {
+        "keys": [
+          "econometrics quiz 2#ffb784cdb4e22b71",
+          "econometrics quiz 2#624f80e49977ef83",
+          "Quiz 2 solutions#039ff50ec7e75972",
+          "Quiz 2 solutions#7c97d282d3c22d14",
+          "Quiz 2 solutions#dc0acb5e7f25b08c",
+          "econometrics quiz 2#89387b65bc30ff63",
+          "econometrics quiz 2#04a1f5ee054e2e7a",
+          "econometrics quiz 2#0abb5aebfaed6802",
+          "Pre-recorded lecture 03-1#4f3310fd73cb46d7",
+          "Interactive Lecture 5-1#676fd6760858df0b",
+          "Interactive Lecture 5-1#c7d3ad4308db53dd",
+          "Interactive Lecture 5-1#0346defd156762e1"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": true,
+        "ms": 13932
+      },
+      "econ_s1117_syn_typeC_02": {
+        "keys": [
+          "Midterm 2022A solutions-1#eb091d26c3d8dd6a",
+          "Midterm 2022A solutions-1#a35368b4bf3cde9e",
+          "econ117_summer2022_midterm_Ztable-1-1#51311a4650395c22",
+          "Midterm 2022A solutions-1#ca8fe8e09f6dd916",
+          "Midterm 2022A solutions-1#a47d119d31536e2f",
+          "econ117_s2020_midterm-1#1368d800996cf62d",
+          "econ117_s2020_midterm-1#d0e5d53b6d9c7a81",
+          "econ117_s2020_midterm-solutions-1#b43f9591bf570b1d",
+          "pre-recorded lecture 04 - 2025#895afb54fa6489a1",
+          "pre-recorded lecture 04 - 2025#748cc4018b85f849",
+          "pre-recorded lecture 04 - 2025#091342fbd4e2fd16",
+          "pre-recorded lecture 04 - 2025#4a8b833b6164e979"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": true,
+        "ms": 14845
+      },
+      "econ_s1117_syn_typeC_03": {
+        "keys": [
+          "final-fall-2018-solutions-1#348ccf6826216524",
+          "Interactive Lecture 9 slides-1#8c81e3ef75fdddf1",
+          "Interactive Lecture 9 slides-1#11fc3cb7d11538fd",
+          "Interactive Lecture 9 slides-1#5d213452548d15df",
+          "ECON 117 syllabus, session B, 2025#76e88b3d30e7644c"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": true,
+        "ms": 16803
+      },
+      "econ_s1117_syn_typeD_01": {
+        "keys": [
+          "econ117_pset02_2025B_with_table#9e0b1bdd58860236",
+          "pre-recorded lecture 04 - 2025#b27a92c45a10b6e3",
+          "pre-recorded lecture 04 - 2025#060a8eb3e28e98ac",
+          "pre-recorded lecture 04 - 2025#7aa8e5b17aee1a1f",
+          "Pre-recorded lecture 07-1#d69cba343b4bcce4"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": true,
+        "ms": 25471
+      },
+      "econ_s1117_syn_typeD_02": {
+        "keys": [
+          "econ117_pset02_2025B_with_table#9e0b1bdd58860236",
+          "Interactive Lecture 5-1#a9f10fc7f7280301",
+          "Pre-recorded lecture 02-2-1#d8a8b358da60acb8",
+          "Pre-recorded lecture 02-2-1#1ff0b0c63dacaf51",
+          "Pre-recorded lecture 03-1#d37022282a39e670"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": true,
+        "ms": 18588
+      },
+      "econ_s1117_syn_typeD_03": {
+        "keys": [
+          "week 1.1. probabilities practice problems-1#d78e168522919ebb",
+          "week 1.1. probabilities practice problems-1#c376db299343546b",
+          "week 1.1. probabilities practice problems-1#0ee2ef8c16c3b369",
+          "week 1.1. probabilities practice problems-1#df4743dd42aeb462",
+          "week 1.1. probabilities practice problems-1#b249856164c57679",
+          "week 1.1. probabilities practice problems-1#544fdc29887a1e08",
+          "week 1.1. probabilities practice problems-1#be76dcf97a4ee932",
+          "week 1.1. probabilities practice problems-1#22684437567e47a7"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 22264
+      },
+      "econ_s1117_syn_typeE_01": {
+        "keys": [
+          "pre-recorded lecture 04 - 2025#eeb943d0381ac648"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": false,
+        "ms": 12532
+      },
+      "econ_s1117_syn_typeE_02": {
+        "keys": [
+          "Interactive Lecture 5-1#ab357d3d8a6a3ee5",
+          "Interactive Lecture 5-1#c748e166ff82280a",
+          "Interactive Lecture 5-1#0854af7d08a3270c",
+          "Interactive Lecture 5-1#25e1fa3a87fe17dd",
+          "Interactive Lecture 5-1#7b1dffa197ef15be",
+          "Interactive Lecture 5-1#df93d7df49eda1a4",
+          "Interactive Lecture 5-1#8d2bcc6992d488c8",
+          "Interactive Lecture 5-1#b08e094871ea3492"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 13542
+      },
+      "econ_s1117_syn_working_continuation_01": {
+        "keys": [
+          "econ117_pset02_2025B_with_table#9e0b1bdd58860236"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": false,
+        "ms": 15490
+      },
+      "econ_s1117_syn_typeE_04": {
+        "keys": [
+          "Interactive Lecture 5-1#24f3f5d8f44be9f1",
+          "Interactive Lecture 5-1#c695fa3456afb8d6",
+          "Interactive Lecture 5-1#9a87e73f9889305c",
+          "Interactive Lecture 5-1#46cf2b496057fbd0",
+          "Interactive Lecture 5-1#c748e166ff82280a",
+          "Interactive Lecture 5-1#1790db3bba4a60af",
+          "Interactive Lecture 5-1#df93d7df49eda1a4",
+          "Interactive Lecture 5-1#25e1fa3a87fe17dd"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 11450
+      },
+      "econ_s1117_syn_working_01": {
+        "keys": [
+          "econ117_s2019_final_complete-1#078b3adef8e823bf",
+          "Interactive Lecture 9 slides-1#8c81e3ef75fdddf1",
+          "Interactive Lecture 9 slides-1#5d213452548d15df",
+          "Interactive Lecture 9 slides-1#11fc3cb7d11538fd",
+          "ECON 117 syllabus, session B, 2025#3e7b4e4b4bb41e1d"
+        ],
+        "reranked": true,
+        "method": "hybrid_full_doc",
+        "supp": true,
+        "ms": 19999
+      },
+      "econ_s1117_syn_working_02": {
+        "keys": [
+          "week 1 practice problems - Random Variable, Central Tendencies-2-1#11b8173634773a4e",
+          "week 1 practice problems - Random Variable, Central Tendencies-2-1#08ba5ebb50ec3724",
+          "week 1 practice problems - Random Variable, Central Tendencies-2-1#b7bca1c9b944899d",
+          "week 1 practice problems - Random Variable, Central Tendencies-2-1#579b991471cfa402",
+          "week 1 practice problems - Random Variable, Central Tendencies-2-1#cecd728c7d06e678",
+          "week 1 practice problems - Random Variable, Central Tendencies-2-1#d4325d2e6888d486",
+          "week 1 practice problems - Random Variable, Central Tendencies-2-1#037df8db549df7e4",
+          "week 1 practice problems - Random Variable, Central Tendencies-2-1#6fd854f6a2acebc7"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 17686
+      },
+      "econ_s1117_syn_working_03": {
+        "keys": [
+          "Interactive Lecture 9 slides-1#0bbeb2f12ab016e4",
+          "Interactive Lecture 9 slides-1#41e9c8c4073a8199",
+          "Interactive Lecture 9 slides-1#54e2a162c3a34ee3",
+          "Interactive Lecture 9 slides-1#67874c2596620367",
+          "Interactive Lecture 9 slides-1#6b5a0d505bfaa17c",
+          "Interactive Lecture 9 slides-1#ff5846378c3c2161",
+          "Interactive Lecture 9 slides-1#35ad3a059b13ad75",
+          "Interactive Lecture 9 slides-1#11fc3cb7d11538fd"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 14110
+      },
+      "econ_s1117_syn_working_04": {
+        "keys": [
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#bdddce1514c8ef2b",
+          "Interactive Lecture 2-slides-1#38ff32e6c0e579d1",
+          "Interactive Lecture 2-slides-1#c90962b6ebd930ea",
+          "final-fall-2019-1#c953b0becb7ae21f",
+          "econ117-final-fall-2018-1#c953b0becb7ae21f",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#3aff15b4f0f45b19",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#8389873abc97e8a3",
+          "final-fall-2019-1#4f705dbb4aa16c87"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 12419
+      },
+      "econ_s1117_syn_typeB_04": {
+        "keys": [
+          "extra problems II-1-1#9fbf04b045c53f65",
+          "extra problems I-1-1#240018989a7ef471",
+          "extra problems II-1-1#cf346a2577273bb1",
+          "extra problems II-1-1#425d77be95d13172",
+          "extra problems II-1-1#72487632cd6492c1",
+          "extra problems I-1-1#ab4e5eb8d74dda44",
+          "extra problems II-1-1#72ab41c478cda70b",
+          "extra problems II-1-1#cb49d4729ca75b60"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 15199
+      },
+      "ec112_local_working_concept_circular_flow_01": {
+        "keys": [
+          "001.01 Circular Flow Diagram Description#9b765a62724406ef",
+          "001.01 Circular Flow Diagram Description#0ca5960c8e9c6cf8",
+          "001.01 Circular Flow Diagram Description#2890146f5c293191",
+          "001.02 Circular Flow Diagram Analysis#957e59762b52f748",
+          "001.02 Circular Flow Diagram Analysis#adf9c348932563ce",
+          "001.02 Circular Flow Diagram Analysis#eaed20d8ca4b41b7",
+          "001.02 Circular Flow Diagram Analysis#4570020378849919",
+          "001.02 Circular Flow Diagram Analysis#26eb3bfafee1b056"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 15297
+      },
+      "ec112_local_working_homework1_fresh_01": {
+        "keys": [
+          "2026 Homework 1 PQ and Other Basics#e574b5b449ac573e",
+          "001.05 Gross Domestic Product#b001f1b2405f75b6",
+          "001.04 PQ_Games#5f5f2f37da08ed92",
+          "001.04 PQ_Games#c1732bd5f864dba7",
+          "001.04 PQ_Games#1d0fc94a57e0213d"
+        ],
+        "reranked": false,
+        "method": "hybrid_full_doc",
+        "supp": true,
+        "ms": 2363
+      },
+      "mgt410_local_working_concept_porter_forces_01": {
+        "keys": [
+          "Industry_Analysis_Class#fe3c28ed8fbe9c38",
+          "Industry_Analysis_Case#47f432f6b539a9b3",
+          "Industry_Analysis_Case#312d83334b3ff21f",
+          "Industry_Analysis_Class#8baaff4567c3cf82",
+          "Industry_Analysis_Class#c677858084d65b0e",
+          "Industry_Analysis_Case#c6412eac5d605e39",
+          "Industry_Analysis_Case#1978d8a17db48b87",
+          "Industry_Analysis_Class#c91c94c746c40847"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 13374
+      },
+      "mgt410_local_working_exam_part2_3a_01": {
+        "keys": [
+          "exam_competitor_2024_part_2_solutions#fd96aa634960a0ce",
+          "Industry_Analysis_Class#fe3c28ed8fbe9c38",
+          "Industry_Analysis_Class#8baaff4567c3cf82",
+          "Industry_Analysis_Class#78affdad361229ac",
+          "Industry_Analysis_Class#8613a6cf9424fe11"
+        ],
+        "reranked": false,
+        "method": "early_hybrid_full_doc",
+        "supp": true,
+        "ms": 2198
+      },
+      "mgt410_local_working_exam_part2_3b_fresh_01": {
+        "keys": [
+          "exam_competitor_2024_part_2_solutions#fd96aa634960a0ce",
+          "Industry_Analysis_Class#fe3c28ed8fbe9c38",
+          "Industry_Analysis_Class#8baaff4567c3cf82",
+          "Industry_Analysis_Class#78affdad361229ac",
+          "Industry_Analysis_Class#8613a6cf9424fe11"
+        ],
+        "reranked": false,
+        "method": "early_hybrid_full_doc",
+        "supp": true,
+        "ms": 1616
+      },
+      "mgt410_local_real_typeG1_exam_part1_2a_01": {
+        "keys": [
+          "exam_competitor_2024_part_2_solutions#fd96aa634960a0ce",
+          "Industry_Analysis_Class#fe3c28ed8fbe9c38",
+          "Industry_Analysis_Class#8baaff4567c3cf82",
+          "Industry_Analysis_Class#78affdad361229ac",
+          "Industry_Analysis_Class#8613a6cf9424fe11"
+        ],
+        "reranked": false,
+        "method": "early_hybrid_full_doc",
+        "supp": true,
+        "ms": 1971
+      },
+      "concept_01": {
+        "keys": [
+          "Pre-recorded lecture 06-1#684149c3cc19949c",
+          "Interactive Lecture 9 slides-1#3ba39263d7b36dee",
+          "Interactive Lecture 9 slides-1#48ad3e16acd410e6",
+          "Interactive Lecture 9 slides-1#f7c4b178cfc44d0e",
+          "URfIE_web#6c06e0c3eeb8c234",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#f39cf50dd6bed6eb",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#03bd4bb65ed928ac",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#71ad9b809cde6f96"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 15774
+      },
+      "concept_02": {
+        "keys": [
+          "URfIE_web#3425ae780daf2ea5",
+          "URfIE_web#ee402ed4134904ab",
+          "Interactive Lecture 7-1#09c9bff4d243c949",
+          "URfIE_web#eafb760e6813b77b",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#dc0e00a45edfafd9",
+          "URfIE_web#00badfa92b692acb",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#f46d60118c1f96ad",
+          "Interactive Lecture 7-1#8317086d33dbd680"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 20105
+      },
+      "concept_03": {
+        "keys": [
+          "Interactive Lecture 9 slides-1#1b14237ebdc69d83",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#3cf8828a8aa59f32",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#773bb6c823551346",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#c68187f9f46324a2",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#4e994ca63f289c82",
+          "Interactive Lecture 8-1#581c3ef9394de181",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#cd96f99f4a9bb765",
+          "Quiz 5 solutions - 2025#a3796fb85bbd84b4"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 17750
+      },
+      "concept_04": {
+        "keys": [
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#8428d9e119c76853",
+          "URfIE_web#005f8215e69b93d8",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#bfba00c3a4a7afdc",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#a6b633e30bccf1b4",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#171638c27591287c",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#79285357b6d1ac47",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#e778e4b9bb82e547",
+          "URfIE_web#56224f5d49bf4cb6"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 16503
+      },
+      "concept_05": {
+        "keys": [
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#2cfc231d565f514f",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#a6b633e30bccf1b4",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#6e6a1334599e975b",
+          "URfIE_web#1cd06d9a16399349",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#a2a657e762d81682",
+          "URfIE_web#56224f5d49bf4cb6",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#3eee230ffc4830ab",
+          "URfIE_web#ca136f6c619168f7"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 19479
+      },
+      "concept_06": {
+        "keys": [
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#c68187f9f46324a2",
+          "Interactive Lecture 9 slides-1#ff5846378c3c2161",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#3cf8828a8aa59f32",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#67e7bc9ac12252b7",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#73e15e3f5e7a0aa1",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#95c57fdee89d2eba",
+          "Interactive Lecture 9 slides-1#35ad3a059b13ad75",
+          "Interactive Lecture 7-1#e9a1e58eaa9065cb"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 19040
+      },
+      "concept_07": {
+        "keys": [
+          "URfIE_web#9b58986843c4fa5a",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#a86cbcedf3e57bff",
+          "econ117_s2019_final_v7_suggested_solutions-1#c818795d82155550",
+          "econ117_s2019_final_v7_suggested_solutions-1#fb1d4dac818881d0",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#c5a257573e4d0841",
+          "econ117_s2019_final_v7_suggested_solutions-1#5e80e3880634d52a",
+          "econ117_s2019_final_v7_suggested_solutions-1#140e99ba27d341c7",
+          "URfIE_web#581f5299b40ed938"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 18575
+      },
+      "concept_08": {
+        "keys": [
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#35659abdf7190d2f",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#9ded26c98a75239b",
+          "URfIE_web#af0065ef4ee56422",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#2e41484d98689bf1",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#2dc80a65bd19d830",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#238922413c2be221",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#7af08876063763d8",
+          "final-fall-2019_Solutions-1#e6f64f595234b429"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 18762
+      },
+      "concept_09": {
+        "keys": [
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#98f1d6b60c78f24d",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#19d7e86720a4354a",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#8c89e87621d8649b",
+          "URfIE_web#6c44974cfc5ed48d",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#6f356ed39fa4b483",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#56ac3f82788884b6",
+          "URfIE_web#95073f4b341f8931",
+          "URfIE_web#f858c1bf0c09197e"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 18745
+      },
+      "concept_10": {
+        "keys": [
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#c7b258c5972c5c4d",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#c476d02280d5b576",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#1a0dc77a9f553c71",
+          "URfIE_web#9909521100cbd6b4",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#ffb12743d73585b4",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#09a179bd56bf6e32",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#a83fc69b71411ce5",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#959bd4ca57ff02c0"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 16162
+      },
+      "concept_11": {
+        "keys": [
+          "Pre-recorded lecture 07-1#8ae698dbd3fdd515",
+          "URfIE_web#6ff0467fa206cf0a",
+          "URfIE_web#ebb55e2d842fdbae",
+          "URfIE_web#37a647cce797defd",
+          "URfIE_web#f501fd5bfb0b3b61",
+          "URfIE_web#7fbcf173db6c5d68",
+          "URfIE_web#bcc492904fbdc19c",
+          "URfIE_web#91778e214ad16d7f"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 15340
+      },
+      "concept_12": {
+        "keys": [
+          "URfIE_web#d29b8b949001edf9",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#a1af1c1e44532d4e",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#8b295e8f178c3575",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#174941e71b6e2ac2",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#c14d128c639b91d9",
+          "URfIE_web#37a647cce797defd",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#c623d66e1eeeaae8",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#4c25fee059289ff0"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 15027
+      },
+      "concept_13": {
+        "keys": [
+          "how_to_intepret_beta_coefficients-1#ea924f6271222720",
+          "how_to_intepret_beta_coefficients-1#39024b9362a9ea00",
+          "Pre-recorded lecture 07-1#a52e905013404523",
+          "URfIE_web#064e1aa34b56280f",
+          "URfIE_web#262b75beda566b07",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#328e0b4ec05daeab",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#f900c21e462799cc",
+          "URfIE_web#0844fa7caaa7b5c5"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 17507
+      },
+      "concept_14": {
+        "keys": [
+          "Pre-recorded lecture 05 -2025-1#79757ec0db8b74d8",
+          "Pre-recorded lecture 05 -2025-1#5b53bfcf4cea8f9c",
+          "Pre-recorded lecture 08-1#afbf6f52c312650b",
+          "Pre-recorded lecture 05 -2025-1#2125050d4ecd85f2",
+          "Pre-recorded lecture 05 -2025-1#77db9d87fb5a6200",
+          "Pre-recorded lecture 08-1#98f2196d1e518e34",
+          "Interactive Lecture 9 slides-1#1b14237ebdc69d83",
+          "Interactive Lecture 9 slides-1#ff5846378c3c2161"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 16058
+      },
+      "concept_15": {
+        "keys": [
+          "URfIE_web#e4a7a97b959daa2f",
+          "URfIE_web#4d3b79ea3cbd89e9",
+          "URfIE_web#c853ccc058ac6958",
+          "URfIE_web#a40969a3777af2fb",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#fc4a54d9090ee85b",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#392168a5f2f2977b",
+          "URfIE_web#5fb128d7b3612c90",
+          "URfIE_web#0da1677e1896bf74"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 15346
+      },
+      "concept_16": {
+        "keys": [
+          "Pre-recorded lecture 09-1#c7f9a3636e20ff17",
+          "Final 2024 - suggested solutions-2-1#2dafc0e9f77040b8",
+          "Interactive Lecture 9 slides-1#a8db938396ec30aa",
+          "Pre-recorded lecture 09-1#90f7b23bf4d83eaa",
+          "Pre-recorded lecture 09-1#b5f5d6724ff976e3",
+          "Interactive Lecture 9 slides-1#c386a8fa37709da8",
+          "Interactive Lecture 9 slides-1#02e13b887c6f33e1",
+          "URfIE_web#5fcb7d5b3325003a"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 21633
+      },
+      "concept_17": {
+        "keys": [
+          "pre-recorded lecture 04 - 2025#437872803651b9cf",
+          "Interactive Lecture 5-1#0920d0bb780ef9ac",
+          "pre-recorded lecture 04 - 2025#2b7edb51f714c6da",
+          "Interactive Lecture 5-1#c390f890c3716cce",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#6cd37e0a822e6ecb",
+          "pre-recorded lecture 04 - 2025#0ba9737d27cf01cf",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#1b66f783932a044e",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#c3633c7f2c073282"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 20024
+      },
+      "concept_18": {
+        "keys": [
+          "Pre-recorded lecture 06-1#3efe511647a59c6a",
+          "Pre-recorded lecture 06-1#49169cd228636544",
+          "Pre-recorded lecture 07-1#8eb0f1d129890843",
+          "URfIE_web#b950482d196d77f9",
+          "URfIE_web#dde61ae5e9306ef6",
+          "URfIE_web#7589d2ef7e69e6d4",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#c0ce11f6a5782773",
+          "625807794-Nick-Huntington-Klein-The-Effect-Routledge-2021#6f356ed39fa4b483"
+        ],
+        "reranked": true,
+        "method": "v2_hybrid_rrf",
+        "supp": false,
+        "ms": 15246
+      }
+    }
+  ],
+  "results": [
+    {
+      "row_id": "econ_s1117_real_typeA_01",
+      "rbo": 0.4965617445239432,
+      "ov5": 0.2,
+      "ov8": 0.2,
+      "top1": 1.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "econ_s1117_real_typeA_02",
+      "rbo": 1.0,
+      "ov5": 1.0,
+      "ov8": 1.0,
+      "top1": 1.0,
+      "identical": 1.0
+    },
+    {
+      "row_id": "econ_s1117_real_typeA_03",
+      "rbo": 0.4965617445239432,
+      "ov5": 0.2,
+      "ov8": 0.2,
+      "top1": 1.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "econ_s1117_real_typeB_01",
+      "rbo": 1.0,
+      "ov5": 1.0,
+      "ov8": 1.0,
+      "top1": 1.0,
+      "identical": 1.0
+    },
+    {
+      "row_id": "econ_s1117_real_typeD_01",
+      "rbo": 1.0,
+      "ov5": 1.0,
+      "ov8": 1.0,
+      "top1": 1.0,
+      "identical": 1.0
+    },
+    {
+      "row_id": "econ_s1117_real_typeD_02",
+      "rbo": 0.4965617445239432,
+      "ov5": 1.0,
+      "ov8": 1.0,
+      "top1": 1.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "econ_s1117_real_typeD_03",
+      "rbo": 0.6051524993284658,
+      "ov5": 0.6,
+      "ov8": 0.6,
+      "top1": 1.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "econ_s1117_real_typeD_04",
+      "rbo": 0.7594818885293179,
+      "ov5": 1.0,
+      "ov8": 0.75,
+      "top1": 0.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "econ_s1117_real_typeD_06",
+      "rbo": 0.8324728141891281,
+      "ov5": 1.0,
+      "ov8": 0.875,
+      "top1": 1.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "econ_s1117_real_typeE_17",
+      "rbo": 0.515412509686856,
+      "ov5": 0.8,
+      "ov8": 0.75,
+      "top1": 0.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "econ_s1117_real_typeD_05",
+      "rbo": 0.8177528539915774,
+      "ov5": 1.0,
+      "ov8": 0.875,
+      "top1": 1.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "econ_s1117_real_working_lecture_01",
+      "rbo": 0.9588922254402344,
+      "ov5": 1.0,
+      "ov8": 0.875,
+      "top1": 1.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "econ_s1117_real_working_lecture_02",
+      "rbo": 1.0,
+      "ov5": 1.0,
+      "ov8": 1.0,
+      "top1": 1.0,
+      "identical": 1.0
+    },
+    {
+      "row_id": "econ_s1117_real_working_lab_01",
+      "rbo": 0.0,
+      "ov5": 0.0,
+      "ov8": 0.0,
+      "top1": 0.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "econ_s1117_real_working_pset_01",
+      "rbo": 0.8241801177016433,
+      "ov5": 1.0,
+      "ov8": 1.0,
+      "top1": 1.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "econ_s1117_real_working_practice_01",
+      "rbo": 1.0,
+      "ov5": 1.0,
+      "ov8": 1.0,
+      "top1": 1.0,
+      "identical": 1.0
+    },
+    {
+      "row_id": "econ_s1117_real_working_practice_03",
+      "rbo": 0.9491825374093036,
+      "ov5": 0.8,
+      "ov8": 0.875,
+      "top1": 1.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "econ_s1117_real_working_paste_02",
+      "rbo": 0.9656746071008233,
+      "ov5": 1.0,
+      "ov8": 0.75,
+      "top1": 1.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "econ_s1117_syn_typeA_01",
+      "rbo": 1.0,
+      "ov5": 1.0,
+      "ov8": 1.0,
+      "top1": 1.0,
+      "identical": 1.0
+    },
+    {
+      "row_id": "econ_s1117_syn_typeA_02",
+      "rbo": 1.0,
+      "ov5": 1.0,
+      "ov8": 1.0,
+      "top1": 1.0,
+      "identical": 1.0
+    },
+    {
+      "row_id": "econ_s1117_syn_typeA_03",
+      "rbo": 0.3299017083728441,
+      "ov5": 0.4,
+      "ov8": 0.75,
+      "top1": 0.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "econ_s1117_syn_typeB_02",
+      "rbo": 1.0,
+      "ov5": 1.0,
+      "ov8": 1.0,
+      "top1": 1.0,
+      "identical": 1.0
+    },
+    {
+      "row_id": "econ_s1117_syn_typeB_03",
+      "rbo": 1.0,
+      "ov5": 1.0,
+      "ov8": 1.0,
+      "top1": 1.0,
+      "identical": 1.0
+    },
+    {
+      "row_id": "econ_s1117_syn_typeC_01",
+      "rbo": 0.9563150915573186,
+      "ov5": 0.8,
+      "ov8": 1.0,
+      "top1": 1.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "econ_s1117_syn_typeC_02",
+      "rbo": 0.8040633386623738,
+      "ov5": 0.6,
+      "ov8": 0.625,
+      "top1": 1.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "econ_s1117_syn_typeC_03",
+      "rbo": 0.03204317354887549,
+      "ov5": 0.2,
+      "ov8": 0.2,
+      "top1": 0.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "econ_s1117_syn_typeD_01",
+      "rbo": 0.4965617445239432,
+      "ov5": 0.2,
+      "ov8": 0.2,
+      "top1": 1.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "econ_s1117_syn_typeD_02",
+      "rbo": 1.0,
+      "ov5": 1.0,
+      "ov8": 1.0,
+      "top1": 1.0,
+      "identical": 1.0
+    },
+    {
+      "row_id": "econ_s1117_syn_typeD_03",
+      "rbo": 0.5689147650179319,
+      "ov5": 0.8,
+      "ov8": 0.625,
+      "top1": 0.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "econ_s1117_syn_typeE_01",
+      "rbo": 1.0,
+      "ov5": 1.0,
+      "ov8": 1.0,
+      "top1": 1.0,
+      "identical": 1.0
+    },
+    {
+      "row_id": "econ_s1117_syn_typeE_02",
+      "rbo": 0.8947445131799547,
+      "ov5": 0.8,
+      "ov8": 0.75,
+      "top1": 1.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "econ_s1117_syn_working_continuation_01",
+      "rbo": 0.0,
+      "ov5": 0.0,
+      "ov8": 0.0,
+      "top1": 0.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "econ_s1117_syn_typeE_04",
+      "rbo": 0.8284192068078419,
+      "ov5": 0.8,
+      "ov8": 0.5,
+      "top1": 1.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "econ_s1117_syn_working_01",
+      "rbo": 1.0,
+      "ov5": 1.0,
+      "ov8": 1.0,
+      "top1": 1.0,
+      "identical": 1.0
+    },
+    {
+      "row_id": "econ_s1117_syn_working_02",
+      "rbo": 0.9596801090241004,
+      "ov5": 0.8,
+      "ov8": 1.0,
+      "top1": 1.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "econ_s1117_syn_working_03",
+      "rbo": 0.8263744123369212,
+      "ov5": 0.6,
+      "ov8": 0.75,
+      "top1": 1.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "econ_s1117_syn_working_04",
+      "rbo": 1.0,
+      "ov5": 1.0,
+      "ov8": 1.0,
+      "top1": 1.0,
+      "identical": 1.0
+    },
+    {
+      "row_id": "econ_s1117_syn_typeB_04",
+      "rbo": 0.679080045969409,
+      "ov5": 1.0,
+      "ov8": 0.75,
+      "top1": 0.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "ec112_local_working_concept_circular_flow_01",
+      "rbo": 0.7277303384059766,
+      "ov5": 1.0,
+      "ov8": 1.0,
+      "top1": 0.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "mgt410_local_working_concept_porter_forces_01",
+      "rbo": 1.0,
+      "ov5": 1.0,
+      "ov8": 1.0,
+      "top1": 1.0,
+      "identical": 1.0
+    },
+    {
+      "row_id": "concept_01",
+      "rbo": 0.9588922254402344,
+      "ov5": 1.0,
+      "ov8": 0.875,
+      "top1": 1.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "concept_02",
+      "rbo": 0.9076576182984754,
+      "ov5": 1.0,
+      "ov8": 1.0,
+      "top1": 1.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "concept_03",
+      "rbo": 0.8417251348500684,
+      "ov5": 0.8,
+      "ov8": 0.875,
+      "top1": 1.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "concept_04",
+      "rbo": 0.8669426666624158,
+      "ov5": 0.8,
+      "ov8": 1.0,
+      "top1": 1.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "concept_05",
+      "rbo": 0.8373826083205599,
+      "ov5": 1.0,
+      "ov8": 0.75,
+      "top1": 1.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "concept_06",
+      "rbo": 0.6903655011680715,
+      "ov5": 0.8,
+      "ov8": 1.0,
+      "top1": 0.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "concept_07",
+      "rbo": 0.8556572114637533,
+      "ov5": 1.0,
+      "ov8": 0.75,
+      "top1": 1.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "concept_08",
+      "rbo": 0.887055297992588,
+      "ov5": 0.8,
+      "ov8": 0.875,
+      "top1": 1.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "concept_09",
+      "rbo": 0.7357233615118104,
+      "ov5": 0.6,
+      "ov8": 0.875,
+      "top1": 1.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "concept_10",
+      "rbo": 0.7214874769796586,
+      "ov5": 0.8,
+      "ov8": 1.0,
+      "top1": 0.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "concept_11",
+      "rbo": 0.7282698586402474,
+      "ov5": 0.8,
+      "ov8": 0.875,
+      "top1": 0.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "concept_12",
+      "rbo": 0.9209878679680586,
+      "ov5": 1.0,
+      "ov8": 1.0,
+      "top1": 1.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "concept_13",
+      "rbo": 0.7966399594832809,
+      "ov5": 1.0,
+      "ov8": 0.875,
+      "top1": 0.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "concept_14",
+      "rbo": 0.7039025171215967,
+      "ov5": 1.0,
+      "ov8": 0.875,
+      "top1": 0.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "concept_15",
+      "rbo": 0.9171826239363672,
+      "ov5": 0.8,
+      "ov8": 0.875,
+      "top1": 1.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "concept_16",
+      "rbo": 0.7641027133460945,
+      "ov5": 0.8,
+      "ov8": 0.875,
+      "top1": 1.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "concept_17",
+      "rbo": 0.8933548026519873,
+      "ov5": 0.8,
+      "ov8": 0.75,
+      "top1": 1.0,
+      "identical": 0.0
+    },
+    {
+      "row_id": "concept_18",
+      "rbo": 0.9491825374093036,
+      "ov5": 0.8,
+      "ov8": 0.875,
+      "top1": 1.0,
+      "identical": 0.0
+    }
+  ]
+}

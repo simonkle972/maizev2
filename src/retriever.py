@@ -344,11 +344,21 @@ def assess_retrieval_confidence(chunks: list, rerank_info: dict) -> dict:
     
     # Confidence thresholds are calibrated to the incumbent's 0-10 scale. Cohere's
     # scores are scaled x10 onto that scale, but scaling is not calibration — the
-    # vendor-specific override exists so the threshold can be re-derived from real
+    # vendor-specific overrides exist so the thresholds can be re-derived from real
     # score distributions rather than assumed equivalent.
-    threshold = (Config.HYBRID_CONFIDENCE_THRESHOLD_COHERE
-                 if (Config.RERANKER_VENDOR or "").lower() == "cohere"
+    #
+    # ALL THREE must move together. Cohere's top-8 cluster far more tightly than
+    # gpt-5.2's (median spread 1.21 vs 5.00), so leaving the spread rule on the
+    # incumbent's numbers while moving only the top-1 threshold hands the spread
+    # rule a job it was never calibrated for: measured on 58 queries, unchanged
+    # values give 0% top-1 / 14% spread against the incumbent's 12% / 2%.
+    _is_cohere = (Config.RERANKER_VENDOR or "").lower() == "cohere"
+    threshold = (Config.HYBRID_CONFIDENCE_THRESHOLD_COHERE if _is_cohere
                  else Config.HYBRID_CONFIDENCE_THRESHOLD)
+    spread_threshold = (Config.HYBRID_SCORE_SPREAD_THRESHOLD_COHERE if _is_cohere
+                        else Config.HYBRID_SCORE_SPREAD_THRESHOLD)
+    spread_top_cutoff = (Config.HYBRID_SPREAD_TOP_SCORE_CUTOFF_COHERE if _is_cohere
+                         else Config.HYBRID_SPREAD_TOP_SCORE_CUTOFF)
 
     if not rerank_info.get("reranked", False):
         vector_scores = [c.get("score", 0) for c in chunks]
@@ -378,7 +388,7 @@ def assess_retrieval_confidence(chunks: list, rerank_info: dict) -> dict:
     if top_score < threshold:
         is_low_confidence = True
         reason = f"top_score_{top_score}_below_threshold_{threshold}"
-    elif score_spread < Config.HYBRID_SCORE_SPREAD_THRESHOLD and top_score < 8:
+    elif score_spread < spread_threshold and top_score < spread_top_cutoff:
         is_low_confidence = True
         reason = f"low_spread_{score_spread}_and_moderate_top_{top_score}"
     
@@ -851,7 +861,28 @@ def cohere_rerank(query: str, chunks: list, top_k: int = FINAL_K) -> tuple:
             raise RuntimeError("COHERE_API_KEY is not set")
 
         client = cohere.ClientV2(api_key=Config.COHERE_API_KEY)
-        documents = [c.get("text", "") for c in chunks]
+
+        # Give Cohere the SAME metadata the LLM reranker gets. llm_rerank shows each
+        # candidate as "[category: problem_sets] econ117_pset02_2025B_with_table: <preview>",
+        # so when a student asks about "problem set 2" the LLM can read the pset
+        # number straight off the filename. Passing bare chunk text denied Cohere
+        # that signal entirely — and a chunk body frequently does not state which
+        # pset it belongs to.
+        #
+        # The first comparison run made exactly that mistake and scored Cohere ~7pp
+        # below gpt-5.2 on retrieving the labelled-correct document. That measured
+        # the integration, not the model.
+        #
+        # Unlike the LLM path there is no preview truncation here: that exists to
+        # save LLM tokens, while v3.5 accepts 4096 tokens per document and chunks
+        # are far smaller. So Cohere now gets strictly more than the LLM does —
+        # full text AND metadata.
+        documents = []
+        for c in chunks:
+            cat = c.get("doc_category")
+            prefix = f"[category: {cat}] " if cat else ""
+            name = c.get("file_name") or ""
+            documents.append(f"{prefix}{name}: {c.get('text', '')}".strip())
 
         response = client.rerank(
             model=Config.COHERE_RERANK_MODEL,

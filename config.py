@@ -122,6 +122,18 @@ class Config:
     HYBRID_CONFIDENCE_THRESHOLD = 6
     HYBRID_MAX_DOC_TOKENS = 80000
     HYBRID_SCORE_SPREAD_THRESHOLD = 2
+    # Companion to the spread rule: a narrow spread only signals low confidence
+    # when the top score is also unremarkable. Was hardcoded in
+    # assess_retrieval_confidence; promoted to config because it sits on the
+    # reranker's score scale and therefore has to move with the vendor.
+    HYBRID_SPREAD_TOP_SCORE_CUTOFF = 8
+
+    # NOT VALIDATED — measured 2026-08-19. The value that best separates "correct
+    # document retrieved" from "not retrieved" on gpt-5.2's own scores is 9.00
+    # (Youden J=0.634), not the 6 above. So the incumbent's top-1 rule has been
+    # under-firing all along. Left alone deliberately: re-deriving it is a
+    # vendor-independent change that needs its own before/after, and bundling it
+    # into the Cohere swap would make any regression unattributable.
 
     # --- Reranker vendor -------------------------------------------------------
     # "gpt-5.2" (default, incumbent) | "cohere". Defaults to the incumbent so the
@@ -139,7 +151,12 @@ class Config:
     # assess_retrieval_confidence, since that thresholds directly on these scores.
     RERANKER_VENDOR = os.getenv("RERANKER_VENDOR", "gpt-5.2")
     COHERE_API_KEY = os.getenv("COHERE_API_KEY")
-    COHERE_RERANK_MODEL = os.getenv("COHERE_RERANK_MODEL", "rerank-v3.5")
+    # rerank-v4.0-pro, NOT v3.5. On the 27 queries where the reranker had a real
+    # decision to make (the correct document reached the candidate pool), measured
+    # 2026-08-19: gpt-5.2 23/27, v4.0-pro 23/27, v3.5 21/27, v4.0-fast 20/27.
+    # The Cohere models are not interchangeable — only -pro reaches parity with the
+    # incumbent, and the cheaper variants give back real accuracy.
+    COHERE_RERANK_MODEL = os.getenv("COHERE_RERANK_MODEL", "rerank-v4.0-pro")
     COHERE_TIMEOUT_S = float(os.getenv("COHERE_TIMEOUT_S", "10"))
 
     # Cohere returns relevance in [0,1]; gpt-5.2 returns 0-10. Scores are scaled
@@ -150,10 +167,34 @@ class Config:
     # means, and the two Cohere models differ from each other too — on one probe
     # rerank-v3.5 scored a correct answer 0.82 where rerank-english-v3.0 scored it
     # 0.9995. So HYBRID_CONFIDENCE_THRESHOLD must be re-derived from real score
-    # distributions before Cohere is enabled in prod; this override exists to hold
-    # that value once measured.
+    # distributions before Cohere is enabled in prod.
+    #
+    # DERIVED 2026-08-19 for rerank-v4.0-pro over 58 real queries
+    # (eval/rerank_vendor_comparison_fair.json). These three values together
+    # reproduce the incumbent's behaviour rule-by-rule, not just in aggregate:
+    #
+    #                        top-1 rule   spread rule   combined
+    #   gpt-5.2 today             12%           2%        14%
+    #   v4.0-pro, values below    12%           2%        14%
+    #   v4.0-pro, UNCHANGED        0%          14%        14%
+    #
+    # That last row is why this cannot be skipped. Flip the vendor without
+    # recalibrating and the combined rate still lands on 14%, so every aggregate
+    # says nothing changed — while the top-1 rule has gone completely dead and the
+    # spread rule has silently absorbed its entire job. The "is the best result
+    # actually good enough" check would stop existing.
+    #
+    # Rate-matched rather than label-optimal, deliberately. The label-optimal top-1
+    # is 8.81, which fires on 47% of queries and would push half of all traffic
+    # down the full-document path — giving back most of the latency this swap buys.
+    # Matching today's rate changes one thing at a time, so a regression after the
+    # flip is attributable to ranking.
     HYBRID_CONFIDENCE_THRESHOLD_COHERE = float(
-        os.getenv("HYBRID_CONFIDENCE_THRESHOLD_COHERE", str(HYBRID_CONFIDENCE_THRESHOLD)))
+        os.getenv("HYBRID_CONFIDENCE_THRESHOLD_COHERE", "7.7"))
+    HYBRID_SCORE_SPREAD_THRESHOLD_COHERE = float(
+        os.getenv("HYBRID_SCORE_SPREAD_THRESHOLD_COHERE", "0.63"))
+    HYBRID_SPREAD_TOP_SCORE_CUTOFF_COHERE = float(
+        os.getenv("HYBRID_SPREAD_TOP_SCORE_CUTOFF_COHERE", "8.4"))
 
     # Ceiling on the context assembled for a session-cache follow-up turn. That
     # path concatenates up to four sources (cached document + solution doc +
