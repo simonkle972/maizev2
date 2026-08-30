@@ -9,7 +9,33 @@ echo "🚀 Starting Maize deployment..."
 # Variables
 DOMAIN="getmaize.ai"
 APP_DIR="/opt/maize"
-DB_URL="postgres://vultradmin:AVNS_6V1BH0tYL23lFjsjGRL@vultr-prod-72d325ef-c651-4219-8d54-35da77e71244-vultr-prod-9472.vultrdb.com:16751/defaultdb"
+
+# ---- Required configuration -------------------------------------------------
+# Secrets are NEVER hardcoded in this file: it is committed to a public
+# repository. Supply them in the environment and run with `sudo -E`, which
+# preserves them across the sudo boundary:
+#
+#   export OPENAI_API_KEY='sk-...'
+#   export DATABASE_URL='postgresql://user:password@host:port/dbname'
+#   export ADMIN_ID='your-admin-username'
+#   export ADMIN_PW='your-admin-password'
+#   sudo -E ./deploy.sh
+#
+# SESSION_SECRET and ADMIN_SECRET_KEY are generated here if not supplied.
+REQUIRED_VARS=(OPENAI_API_KEY DATABASE_URL ADMIN_ID ADMIN_PW)
+missing=()
+for v in "${REQUIRED_VARS[@]}"; do
+    [ -n "${!v:-}" ] || missing+=("$v")
+done
+if [ ${#missing[@]} -gt 0 ]; then
+    echo "ERROR: missing required environment variables: ${missing[*]}" >&2
+    echo "See the comment block at the top of this script." >&2
+    exit 1
+fi
+
+DB_URL="$DATABASE_URL"
+SESSION_SECRET="${SESSION_SECRET:-$(openssl rand -hex 32)}"
+ADMIN_SECRET_KEY="${ADMIN_SECRET_KEY:-$(openssl rand -hex 32)}"
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -39,19 +65,31 @@ sudo -u maize ./venv/bin/pip install --upgrade pip
 sudo -u maize ./venv/bin/pip install -r requirements.txt
 
 echo -e "${YELLOW}⚙️  Configuring environment variables...${NC}"
-SESSION_SECRET=$(openssl rand -hex 32)
-sudo -u maize cat > $APP_DIR/.env << EOF
-OPENAI_API_KEY=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
-DATABASE_URL=postgresql://vultradmin:AVNS_6V1BH0tYL23lFjsjGRL@vultr-prod-72d325ef-c651-4219-8d54-35da77e71244-vultr-prod-9472.vultrdb.com:16751/defaultdb
+# Never regenerate an existing .env. On a live host it holds configuration this
+# script does not know about (Auth0, Stripe, SMTP, and any hand-added keys), and
+# overwriting it would silently revert production to this script's assumptions.
+if [ -f "$APP_DIR/.env" ]; then
+    echo -e "${YELLOW}   $APP_DIR/.env already exists — leaving it untouched.${NC}"
+    echo -e "${YELLOW}   Move it aside first if you genuinely want to regenerate it.${NC}"
+else
+    umask 027
+    cat > "$APP_DIR/.env" << EOF
+OPENAI_API_KEY=$OPENAI_API_KEY
+DATABASE_URL=$DATABASE_URL
 SESSION_SECRET=$SESSION_SECRET
-admin_id=simonkleffner
-admin_pw=@KLEFFNER98
-ADMIN_SECRET_KEY=maize-admin-2024
+admin_id=$ADMIN_ID
+admin_pw=$ADMIN_PW
+ADMIN_SECRET_KEY=$ADMIN_SECRET_KEY
 SMTP_HOST=
 SMTP_PORT=587
 SMTP_USER=
 SMTP_PASS=
 EOF
+    # The app loads this file directly at import time as the `maize` user, so it
+    # must stay group-readable. 600 locks the app out of its own config.
+    chown root:maize "$APP_DIR/.env"
+    chmod 640 "$APP_DIR/.env"
+fi
 
 echo -e "${YELLOW}🗄️  Setting up database (enabling pgvector)...${NC}"
 chmod +x setup_database.sh
