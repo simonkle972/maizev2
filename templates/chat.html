@@ -2,15 +2,15 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <link rel="icon" type="image/png" sizes="32x32" href="/static/images/favicon-32.png">
     <link rel="apple-touch-icon" sizes="180x180" href="/static/images/apple-touch-icon.png">
     <title>{{ ta.name }} - Maize</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=13">
-    <link rel="stylesheet" href="/static/css/chat-brand.css?v=13">
+    <link rel="stylesheet" href="/static/css/style.css?v=14">
+    <link rel="stylesheet" href="/static/css/chat-brand.css?v=14">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
@@ -51,6 +51,26 @@
                         <p>How can I help you today?</p>
                     </div>
                 </div>
+                <div id="onboarding-panel" class="onboarding-panel">
+                    <p class="onboarding-title">Getting the best answers</p>
+                    {% if starter_prompts %}
+                    <p class="onboarding-lead">Name the document you are working from, the way these examples do. It finds the right material far more reliably than asking about &ldquo;question 3&rdquo; on its own.</p>
+                    <div class="onboarding-chips">
+                        {% for prompt in starter_prompts %}
+                        <button type="button" class="onboarding-chip" onclick="useStarterPrompt(this)">{{ prompt }}</button>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="onboarding-lead">Name the document you are working from. A question that says which material it is about finds the right content far more reliably than one that does not.</p>
+                    {% endif %}
+                    <ul class="onboarding-keys">
+                        <li><span class="onboarding-key-icon" aria-hidden="true">&#8635;</span> <strong>New conversation</strong> &mdash; clears the chat and starts fresh. You&rsquo;ll be asked to confirm.</li>
+                        {% if ta.image_upload_enabled %}
+                        <li><span class="onboarding-key-icon" aria-hidden="true">&#128206;</span> <strong>Attach an image</strong> &mdash; photograph your work and ask about it. JPG, PNG or HEIC, up to 5&nbsp;MB.</li>
+                        {% endif %}
+                        <li><span class="onboarding-key-icon" aria-hidden="true">&#8595;</span> <strong>Export transcript</strong> &mdash; downloads this conversation as a CSV, for attaching to an assignment.</li>
+                    </ul>
+                </div>
             </div>
         </main>
         
@@ -63,20 +83,32 @@
                 </div>
                 {% endif %}
                 <div class="input-group">
-                    <button type="button" id="clear-btn" class="btn-clear" onclick="clearHistory()" title="Start new conversation">
+                    <button type="button" id="clear-btn" class="btn-clear composer-action" onclick="requestClearHistory()" title="Start new conversation" aria-label="Start new conversation">
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
                             <path d="M3 3v5h5"/>
                         </svg>
                     </button>
                     {% if ta.image_upload_enabled %}
-                    <button type="button" id="image-btn" class="btn-clear" onclick="document.getElementById('image-input').click()" title="Attach an image of your work">
+                    <button type="button" id="image-btn" class="btn-clear composer-action" onclick="document.getElementById('image-input').click()" title="Attach an image of your work" aria-label="Attach an image of your work">
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
                         </svg>
                     </button>
                     <input type="file" id="image-input" accept="image/jpeg,image/png,image/heic,image/heif" capture="environment" multiple style="display:none" onchange="handleImageSelected(event)">
                     {% endif %}
+                    <button type="button" id="export-btn" class="btn-clear composer-action" onclick="exportTranscript()" title="Export this conversation as a CSV" aria-label="Export this conversation as a CSV" disabled>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <path d="M7 10l5 5 5-5"/>
+                            <path d="M12 15V3"/>
+                        </svg>
+                    </button>
+                    <button type="button" id="overflow-btn" class="btn-clear composer-overflow" onclick="toggleOverflowMenu(event)" title="More actions" aria-label="More actions" aria-haspopup="true" aria-expanded="false">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>
+                        </svg>
+                    </button>
                     <textarea
                         id="query-input"
                         placeholder="Ask a question about the course..."
@@ -86,6 +118,19 @@
                     <button type="submit" id="send-btn" class="btn btn-primary">Send</button>
                 </div>
             </form>
+            <div id="overflow-menu" class="overflow-menu" role="menu" hidden>
+                <button type="button" role="menuitem" onclick="overflowAction('clear')">
+                    <span class="overflow-icon" aria-hidden="true">&#8635;</span> New conversation
+                </button>
+                {% if ta.image_upload_enabled %}
+                <button type="button" role="menuitem" onclick="overflowAction('image')">
+                    <span class="overflow-icon" aria-hidden="true">&#128206;</span> Attach an image
+                </button>
+                {% endif %}
+                <button type="button" role="menuitem" id="overflow-export" onclick="overflowAction('export')">
+                    <span class="overflow-icon" aria-hidden="true">&#8595;</span> Export transcript
+                </button>
+            </div>
             <p class="disclaimer">This TA helps explain concepts but won't give direct homework answers.</p>
             <p class="chat-footer-links">
                 <a href="https://getmaize.ai">Powered by Maize</a>
@@ -95,11 +140,25 @@
                 <a href="https://getmaize.ai/privacy" target="_blank">Privacy</a>
             </p>
         </footer>
+        <div id="clear-confirm" class="modal-backdrop" hidden>
+            <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="clear-confirm-title">
+                <h2 id="clear-confirm-title">Clear this conversation?</h2>
+                <p>This cannot be undone. Once cleared, this transcript can no longer be exported &mdash; download a copy first if you need it for an assignment.</p>
+                <div class="modal-actions">
+                    <button type="button" class="btn-modal btn-modal-ghost" onclick="closeClearConfirm()">Cancel</button>
+                    <button type="button" class="btn-modal btn-modal-danger" onclick="confirmClearHistory()">Clear anyway</button>
+                    <button type="button" class="btn-modal btn-modal-secondary" onclick="exportThenClear()">Download &amp; clear</button>
+                </div>
+            </div>
+        </div>
     </div>
     
     <script>
         let sessionId = '';
         const taSlug = '{{ ta.slug }}';
+        // Captured before anything is appended, so "clear" restores exactly what the
+        // server rendered — greeting and onboarding panel — with no duplicated markup.
+        const INITIAL_MESSAGES_HTML = document.getElementById('messages').innerHTML;
         const imageUploadEnabled = {{ 'true' if ta.image_upload_enabled else 'false' }};
         // Array of {file: File, dataUrl: string, id: string} in display order
         let stagedImages = [];
@@ -316,33 +375,118 @@
             }
         }
         
-        function generateSessionId() {
-            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-                const r = Math.random() * 16 | 0;
-                const v = c === 'x' ? r : (r & 0x3 | 0x8);
-                return v.toString(16);
-            });
+        // ---- Transcript export -------------------------------------------------
+        // sessionId is empty until the server returns one on the first 'done' event,
+        // and goes empty again on clear, so the export controls track it.
+        function updateExportState() {
+            const enabled = Boolean(sessionId);
+            const btn = document.getElementById('export-btn');
+            if (btn) btn.disabled = !enabled;
+            const item = document.getElementById('overflow-export');
+            if (item) item.disabled = !enabled;
         }
-        
-        function clearHistory() {
-            const messagesEl = document.getElementById('messages');
-            messagesEl.innerHTML = `
-                <div class="message assistant">
-                    <img src="/static/images/maize-logo.png" alt="Maize" class="ta-avatar">
-                    <div class="message-content">
-                        <p>Hello! I'm your teaching assistant for <strong>{{ ta.course_name }}</strong>. I'm here to help you understand course concepts, work through problems, and prepare for exams.</p>
-                        <p>How can I help you today?</p>
-                    </div>
-                </div>
-            `;
 
-            sessionId = generateSessionId();
+        function exportTranscript() {
+            if (!sessionId) return;
+            window.location.href = `/${taSlug}/api/session/${encodeURIComponent(sessionId)}/export.csv`;
+        }
+
+        // ---- Clear, behind a confirmation ---------------------------------------
+        // Clearing is destructive and irreversible, and now also destroys the record
+        // a student may be about to submit, so it asks first once there is anything
+        // to lose. An empty conversation clears silently.
+        function requestClearHistory() {
+            const hasExchange = document.querySelectorAll('#messages .message.user').length > 0;
+            if (!hasExchange) {
+                confirmClearHistory();
+                return;
+            }
+            const modal = document.getElementById('clear-confirm');
+            modal.hidden = false;
+            modal.querySelector('.btn-modal-ghost').focus();
+        }
+
+        function closeClearConfirm() {
+            document.getElementById('clear-confirm').hidden = true;
+        }
+
+        function exportThenClear() {
+            exportTranscript();
+            // Let the download commit before tearing down the conversation it names.
+            setTimeout(confirmClearHistory, 600);
+        }
+
+        function confirmClearHistory() {
+            closeClearConfirm();
+            document.getElementById('messages').innerHTML = INITIAL_MESSAGES_HTML;
+
+            // Empty, not a generated id: the server mints the real one on next send.
+            sessionId = '';
+            updateExportState();
             clearStagedImage();
 
             const input = document.getElementById('query-input');
             input.value = '';
             input.focus();
         }
+
+        // ---- Mobile overflow menu ------------------------------------------------
+        // Touch devices never fire title tooltips, so the icon row collapses to a
+        // single labelled menu below the mobile breakpoint.
+        function toggleOverflowMenu(e) {
+            e.stopPropagation();
+            const menu = document.getElementById('overflow-menu');
+            const btn = document.getElementById('overflow-btn');
+            const open = menu.hidden;
+            menu.hidden = !open;
+            btn.setAttribute('aria-expanded', String(open));
+        }
+
+        function closeOverflowMenu() {
+            const menu = document.getElementById('overflow-menu');
+            if (menu && !menu.hidden) {
+                menu.hidden = true;
+                document.getElementById('overflow-btn').setAttribute('aria-expanded', 'false');
+            }
+        }
+
+        function overflowAction(action) {
+            closeOverflowMenu();
+            if (action === 'clear') requestClearHistory();
+            else if (action === 'image') document.getElementById('image-input').click();
+            else if (action === 'export') exportTranscript();
+        }
+
+        document.addEventListener('click', closeOverflowMenu);
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') return;
+            closeOverflowMenu();
+            if (!document.getElementById('clear-confirm').hidden) closeClearConfirm();
+        });
+
+        function useStarterPrompt(btn) {
+            const input = document.getElementById('query-input');
+            input.value = btn.textContent.trim();
+            autoResize(input);
+            input.focus();
+        }
+
+        updateExportState();
+
+        // The full placeholder wraps to two lines in the narrow mobile composer and
+        // is clipped by the single-row textarea. CSS cannot set placeholder text, so
+        // swap in a short one below the breakpoint.
+        const PLACEHOLDER_FULL = 'Ask a question about the course...';
+        const PLACEHOLDER_SHORT = 'Ask a question...';
+        function syncPlaceholder() {
+            const input = document.getElementById('query-input');
+            if (input) {
+                input.placeholder = window.matchMedia('(max-width: 768px)').matches
+                    ? PLACEHOLDER_SHORT : PLACEHOLDER_FULL;
+            }
+        }
+        window.addEventListener('resize', syncPlaceholder);
+        syncPlaceholder();
         
         function autoResize(el) {
             el.style.height = 'auto';
@@ -678,6 +822,9 @@
             const submittingImages = stagedImages.slice();  // shallow copy
             const submittingDataUrls = submittingImages.map(i => i.dataUrl);
 
+            const onboarding = document.getElementById('onboarding-panel');
+            if (onboarding) onboarding.remove();
+
             addMessage('user', query, [], submittingDataUrls);
             input.value = '';
             autoResize(input);
@@ -753,6 +900,7 @@
                                             break;
                                         case 'done':
                                             sessionId = data.session_id;
+                                            updateExportState();
                                             finalizeStreamingMessage(sources);
                                             break;
                                         case 'error':

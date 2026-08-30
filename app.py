@@ -1,10 +1,11 @@
 import os
 import logging
+import re
 import secrets
 import threading
 import time
 from datetime import datetime, timedelta
-from flask import Flask, request, jsonify, render_template, session, redirect, url_for, send_from_directory, flash
+from flask import Flask, request, jsonify, render_template, session, redirect, url_for, send_from_directory, flash, Response
 from flask_migrate import Migrate
 from flask_login import LoginManager, login_required, current_user
 from config import Config
@@ -1444,6 +1445,119 @@ def test_qa_logging():
     result = test_connection()
     return jsonify(result)
 
+_STARTER_SOLUTION_RE = re.compile(r'\b(solution|solutions|answer|answers|key|marking\s*scheme)\b', re.I)
+_STARTER_VERSION_SUFFIX_RE = re.compile(r'(?:[\s_-]*\(\d{1,2}\))+\s*$|(?:-\d{1,2}){1,3}\s*$')
+
+
+def _tidy_doc_name(raw: str) -> str:
+    """Make an uploaded filename presentable without breaking retrieval.
+
+    Only cosmetic: drop the extension, turn underscores into spaces, and strip the
+    "-1" / "-2-1" / "(1) (1)" duplicate-upload suffixes. Filename matching in
+    hybrid_doc_search tokenises on [a-z0-9]+, so none of this changes which tokens
+    a query built from the name will match on. The 1-2 digit bound on the suffix
+    is deliberate — it must not eat a year, e.g. "...-Routledge-2021".
+    """
+    name = (raw or '').rsplit('.', 1)[0] if '.' in (raw or '')[-6:] else (raw or '')
+    name = name.replace('_', ' ')
+    # Drop a leading upload/catalogue id, e.g. "625807794-Nick-Huntington-Klein-...".
+    # 6+ digits, so real prefixes like "001.02 Circular Flow" and "2026 Homework 1"
+    # are left alone.
+    name = re.sub(r'^\d{6,}[\s._-]+', '', name)
+    name = _STARTER_VERSION_SUFFIX_RE.sub('', name)
+    name = re.sub(r'\s+', ' ', name).strip(' .-')
+    return name[:70]
+
+
+def _tidy_doc_title(raw: str) -> str:
+    """Normalise an LLM-extracted content_title for use inside a sentence."""
+    t = re.sub(r'\s*\|\s*', ', ', (raw or '').strip())
+    t = re.sub(r'\s*(?:--|\u2013|\u2014)\s*', ': ', t)
+    return re.sub(r'\s+', ' ', t).strip(' .:,-')
+
+
+def _doc_label(row) -> str:
+    """Prefer the extracted content title over the filename.
+
+    content_title is what the document calls itself ("Problem Set 2: Discrimination"),
+    which reads like something a student would actually type. Filenames are upload
+    artefacts ("econ117_pset02_2025B_with_table") and only used when no usable title
+    exists.
+    """
+    title = _tidy_doc_title(row.content_title or '')
+    if 3 <= len(title) <= 60:
+        return title
+    return _tidy_doc_name(row.display_name or row.original_filename or '')
+
+
+def _starter_prompts(ta):
+    """Example questions built from documents this TA actually has.
+
+    Every prompt names a real document. There is deliberately no generic fallback:
+    a prompt like "I'm stuck on this problem" refers to nothing on a fresh page, and
+    on a readings-only corpus there are no problems to be stuck on. A TA with one
+    usable document gets one example; a TA with none gets none, and the template
+    hides the examples entirely.
+
+    No dashes in the phrasing — these are meant to read like something a student
+    would type.
+    """
+    try:
+        rows = (db.session.query(
+                    Document.id, Document.display_name, Document.original_filename,
+                    Document.content_title, Document.doc_type,
+                    Document.assignment_number, Document.instructional_unit_number)
+                .filter(Document.ta_id == ta.id)
+                .all())
+    except Exception as e:
+        logger.warning(f"[{ta.id}] starter prompts query failed: {e}")
+        return []
+
+    def _num(v):
+        try:
+            return int(str(v))
+        except (TypeError, ValueError):
+            return 10 ** 6
+
+    usable = []
+    for r in rows:
+        # Check both the filename and the extracted title: an answer key is worth
+        # excluding whichever of the two gives it away.
+        if _STARTER_SOLUTION_RE.search(f"{r.display_name or r.original_filename or ''} {r.content_title or ''}"):
+            continue
+        label = _doc_label(r)
+        if len(label) >= 3:
+            usable.append((r, label))
+
+    def pool(types, key):
+        return sorted([(r, n) for r, n in usable if (r.doc_type or '') in types],
+                      key=lambda t: (key(t[0]), t[0].id))
+
+    assignments = pool(('homework', 'exam'), lambda r: _num(r.assignment_number))
+    lectures = pool(('lecture',), lambda r: _num(r.instructional_unit_number))
+    readings = pool(('reading', 'syllabus'), lambda r: _num(r.instructional_unit_number))
+
+    prompts, used = [], set()
+
+    def take(candidates, template):
+        for r, name in candidates:
+            if r.id in used:
+                continue
+            used.add(r.id)
+            prompts.append(template.format(name=name))
+            return True
+        return False
+
+    take(assignments, "Help me with question 1 from {name}")
+    (take(lectures, "Can you explain {name}?")
+     or take(readings, "What are the key points in {name}?"))
+    (take(lectures, "What are the key points in {name}?")
+     or take(readings, "Can you explain {name}?")
+     or take(assignments, "I'm stuck on question 2 of {name}"))
+
+    return prompts[:3]
+
+
 # Slug routes: accessible to admin users (for demos) and anonymous-enabled TAs
 @app.route('/<slug>')
 def ta_chat(slug):
@@ -1459,7 +1573,7 @@ def ta_chat(slug):
     if not ta.allow_anonymous_chat and not is_admin:
         return render_template('404.html'), 404
 
-    return render_template('chat.html', ta=ta)
+    return render_template('chat.html', ta=ta, starter_prompts=_starter_prompts(ta))
 
 # @app.route('/<slug>/api/chat', methods=['POST'])
 # def chat_api(slug):
@@ -1610,6 +1724,96 @@ def chat_stream_api(slug):
         is_anonymous=True,
         images=images,
     )
+
+@app.route('/<slug>/api/session/<session_id>/export.csv')
+def export_session_csv(slug, session_id):
+    """Student-facing transcript export for the public slug chat.
+
+    Professors increasingly ask students to attach the prompts they used to their
+    submissions, so students need a copy of their own conversation. Scope is one
+    session: whatever the student has done since the page loaded or since they last
+    cleared. The session id is an unguessable bearer token minted by
+    stream_chat_response (secrets.token_urlsafe(16)) and is already sufficient to
+    replay the whole conversation through the chat endpoint, so exporting it grants
+    no capability that did not already exist.
+
+    Deliberately only timestamp/query/response — no sources, scores, diagnostics or
+    any other retrieval internals. A short preamble carries the TA, session id and
+    export time so the file can be cross-checked against our own records if a
+    student and professor ever disagree about what was asked. It is NOT tamper-proof:
+    the file is a CSV the student can edit.
+    """
+    import csv
+    import io
+
+    ta = TeachingAssistant.query.filter_by(slug=slug, is_active=True).first()
+    if not ta:
+        return jsonify({"error": "Not found"}), 404
+
+    is_admin = current_user.is_authenticated and current_user.role == 'admin'
+    if not ta.allow_anonymous_chat and not is_admin:
+        return jsonify({"error": "Not found"}), 404
+
+    chat_session = ChatSession.query.filter_by(id=session_id, ta_id=ta.id).first()
+    if not chat_session:
+        return jsonify({"error": "Session not found"}), 404
+
+    messages = (ChatMessage.query
+                .filter_by(session_id=session_id)
+                .order_by(ChatMessage.created_at, ChatMessage.id)
+                .all())
+
+    # Storage is one row per message; a transcript reads far better as one row per
+    # exchange. Pair each user message with the assistant reply that follows it.
+    # A trailing user message with no reply (generation failed, or the student
+    # navigated away mid-stream) still gets a row, with an empty response.
+    exchanges = []
+    pending = None
+    for m in messages:
+        if m.role == 'user':
+            if pending is not None:
+                exchanges.append(pending)
+            text = m.content or ''
+            image_count = len(m.images or [])
+            if image_count:
+                label = f"[{image_count} image{'s' if image_count > 1 else ''} attached]"
+                text = f"{text}\n{label}" if text else label
+            pending = {"ts": m.created_at, "query": text, "response": ""}
+        elif m.role == 'assistant':
+            if pending is None:
+                # Assistant turn with no preceding user turn — shouldn't happen, but
+                # drop it rather than silently attributing it to an unrelated query.
+                continue
+            pending["response"] = m.content or ''
+            exchanges.append(pending)
+            pending = None
+    if pending is not None:
+        exchanges.append(pending)
+
+    def _iso(dt):
+        return dt.strftime('%Y-%m-%dT%H:%M:%SZ') if dt else ''
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(['# Maize TA session export'])
+    writer.writerow(['TA', f'{ta.name} ({ta.id})'])
+    writer.writerow(['Session ID', session_id])
+    writer.writerow(['Exported', _iso(datetime.utcnow())])
+    writer.writerow([])
+    writer.writerow(['timestamp', 'query', 'response'])
+    for ex in exchanges:
+        writer.writerow([_iso(ex['ts']), ex['query'], ex['response']])
+
+    # UTF-8 BOM so Excel opens the file in Unicode rather than the local codepage.
+    # Without it, LaTeX and any accented characters in the transcript arrive mangled.
+    body = '\ufeff' + buf.getvalue()
+    filename = f"maize-{ta.slug}-{datetime.utcnow().strftime('%Y-%m-%d')}.csv"
+    return Response(
+        body,
+        content_type='text/csv; charset=utf-8',
+        headers={'Content-Disposition': f'attachment; filename="{filename}"'},
+    )
+
 
 @app.cli.command('cleanup-images')
 def cleanup_images_cmd():

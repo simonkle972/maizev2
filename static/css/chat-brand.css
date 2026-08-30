@@ -262,12 +262,299 @@
     color: var(--maize-cocoa);
 }
 
+/* ---------------------------------------------------------------------------
+   Public slug chat only. Every rule below is scoped to .chat-page, which is set
+   on templates/chat.html and nowhere else — student/dashboard.html links this
+   same stylesheet but carries no body class, so none of this reaches it.
+   --------------------------------------------------------------------------- */
+
+/* 100vh is the *largest* viewport on mobile, so the composer sits underneath the
+   browser's own bottom bar in Chrome/Safari on iOS. dvh tracks the visible area.
+   The vh line stays as the fallback for browsers without dvh. */
+.chat-page {
+    height: 100vh;
+    height: 100dvh;
+}
+
+.chat-page .chat-container {
+    height: 100vh;
+    height: 100dvh;
+}
+
+/* Footer clears the iOS home indicator (viewport-fit=cover is set on the page). */
+.chat-page .chat-footer {
+    position: relative;
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* ---- Empty-state onboarding ---------------------------------------------- */
+/* Occupies the void between the greeting and the composer before a conversation
+   exists, and is removed on the first message. The starter prompts are not just
+   decoration: naming a document is what makes retrieval land, so the examples
+   model that shape. */
+.chat-page .onboarding-panel {
+    margin: 0.5rem 0 0 2.75rem;
+    padding: 1rem 1.125rem;
+    max-width: 85%;
+    background: var(--maize-light-cream);
+    border: 1px solid rgba(74, 51, 40, 0.1);
+    border-radius: 0.75rem;
+}
+
+.chat-page .onboarding-title {
+    margin: 0 0 0.25rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--maize-cocoa);
+}
+
+.chat-page .onboarding-lead {
+    margin: 0 0 0.75rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: var(--maize-charcoal);
+}
+
+.chat-page .onboarding-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.875rem;
+}
+
+.chat-page .onboarding-chip {
+    font: inherit;
+    font-size: 0.8125rem;
+    text-align: left;
+    padding: 0.4rem 0.7rem;
+    border-radius: 999px;
+    border: 1px solid rgba(74, 51, 40, 0.18);
+    background: var(--maize-white);
+    color: var(--maize-cocoa);
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.chat-page .onboarding-chip:hover {
+    border-color: var(--maize-amber);
+    background: rgba(242, 169, 59, 0.08);
+    color: var(--maize-charcoal);
+}
+
+.chat-page .onboarding-keys {
+    list-style: none;
+    margin: 0;
+    padding: 0.75rem 0 0;
+    border-top: 1px solid rgba(74, 51, 40, 0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.chat-page .onboarding-keys li {
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    color: var(--maize-cocoa);
+}
+
+.chat-page .onboarding-keys strong {
+    color: var(--maize-charcoal);
+    font-weight: 600;
+}
+
+.chat-page .onboarding-key-icon {
+    display: inline-block;
+    width: 1.25rem;
+    text-align: center;
+    margin-right: 0.15rem;
+}
+
+/* ---- Composer actions ----------------------------------------------------- */
+.chat-page .btn-clear:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.chat-page .btn-clear:disabled:hover {
+    background: transparent;
+    color: var(--maize-cocoa);
+}
+
+/* The overflow trigger is the mobile affordance; desktop shows the real buttons. */
+.chat-page .composer-overflow {
+    display: none;
+}
+
+/* ---- Overflow menu -------------------------------------------------------- */
+.chat-page .overflow-menu {
+    position: absolute;
+    right: 1rem;
+    bottom: calc(100% - 0.5rem);
+    z-index: 60;
+    min-width: 13rem;
+    padding: 0.35rem;
+    background: var(--maize-white);
+    border: 1px solid rgba(74, 51, 40, 0.15);
+    border-radius: 0.6rem;
+    box-shadow: 0 8px 24px rgba(43, 31, 26, 0.16);
+}
+
+.chat-page .overflow-menu[hidden] {
+    display: none;
+}
+
+.chat-page .overflow-menu button {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.6rem 0.65rem;
+    font: inherit;
+    font-size: 0.9375rem;
+    text-align: left;
+    border: none;
+    border-radius: 0.4rem;
+    background: transparent;
+    color: var(--maize-charcoal);
+    cursor: pointer;
+}
+
+.chat-page .overflow-menu button:hover:not(:disabled) {
+    background: rgba(242, 169, 59, 0.12);
+}
+
+.chat-page .overflow-menu button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.chat-page .overflow-icon {
+    width: 1.25rem;
+    text-align: center;
+}
+
+/* ---- Clear confirmation --------------------------------------------------- */
+.chat-page .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25rem;
+    background: rgba(43, 31, 26, 0.55);
+}
+
+.chat-page .modal-backdrop[hidden] {
+    display: none;
+}
+
+.chat-page .modal-card {
+    width: 100%;
+    max-width: 26rem;
+    padding: 1.5rem;
+    background: var(--maize-white);
+    border-radius: 0.85rem;
+    box-shadow: 0 16px 48px rgba(43, 31, 26, 0.28);
+}
+
+.chat-page .modal-card h2 {
+    margin: 0 0 0.5rem;
+    font-size: 1.0625rem;
+    font-weight: 600;
+    color: var(--maize-charcoal);
+}
+
+.chat-page .modal-card p {
+    margin: 0 0 1.25rem;
+    font-size: 0.875rem;
+    line-height: 1.55;
+    color: var(--maize-cocoa);
+}
+
+.chat-page .modal-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.chat-page .btn-modal {
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 500;
+    padding: 0.55rem 0.9rem;
+    border-radius: 0.5rem;
+    border: 1px solid transparent;
+    cursor: pointer;
+}
+
+.chat-page .btn-modal-ghost {
+    background: transparent;
+    border-color: rgba(74, 51, 40, 0.2);
+    color: var(--maize-cocoa);
+}
+
+.chat-page .btn-modal-secondary {
+    background: var(--maize-amber);
+    color: var(--maize-charcoal);
+    font-weight: 600;
+}
+
+.chat-page .btn-modal-secondary:hover {
+    background: var(--maize-orange);
+    color: var(--maize-white);
+}
+
+.chat-page .btn-modal-danger {
+    background: transparent;
+    border-color: rgba(217, 122, 138, 0.5);
+    color: #b04a5c;
+}
+
+.chat-page .btn-modal-danger:hover {
+    background: rgba(217, 122, 138, 0.1);
+}
+
 @media (max-width: 768px) {
     .chat-page .logo-text {
         display: none;
     }
-    
+
     .chat-page .chat-header {
         padding: 0.875rem 1rem;
+    }
+
+    /* Three 40px buttons plus Send left almost nothing for the textarea on a
+       phone. Collapse them into one menu so the input keeps the width. */
+    .chat-page .composer-action {
+        display: none;
+    }
+
+    .chat-page .composer-overflow {
+        display: flex;
+    }
+
+    .chat-page .chat-footer {
+        padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
+    }
+
+    .chat-page .chat-main {
+        padding: 1rem;
+    }
+
+    .chat-page .onboarding-panel {
+        margin-left: 0;
+        max-width: 100%;
+    }
+
+    .chat-page .modal-actions {
+        flex-direction: column-reverse;
+    }
+
+    .chat-page .btn-modal {
+        width: 100%;
     }
 }
