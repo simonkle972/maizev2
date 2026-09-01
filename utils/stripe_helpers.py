@@ -72,6 +72,10 @@ def create_checkout_session(professor, tier, ta_name, course_name, system_prompt
                 'quantity': 1,
             }],
             mode='subscription',
+            # Show the "Add promotion code" field on the Checkout page. Codes
+            # themselves are created in the Stripe Dashboard (Product catalogue →
+            # Coupons); this only controls whether customers can enter one.
+            allow_promotion_codes=True,
             success_url=f"{base_url}/professor/ta/create/success?session_id={{CHECKOUT_SESSION_ID}}",
             cancel_url=f"{base_url}/professor/ta/create?canceled=true",
             metadata={
@@ -370,6 +374,7 @@ def create_publish_checkout_session(ta, tier, base_url):
                 'quantity': 1,
             }],
             mode='subscription',
+            allow_promotion_codes=True,
             success_url=f"{base_url}/professor/ta/{ta.id}/publish/success?session_id={{CHECKOUT_SESSION_ID}}",
             cancel_url=f"{base_url}/professor/ta/{ta.id}/publish?canceled=true",
             metadata={
