@@ -173,9 +173,6 @@ def manage_ta(ta_id):
 
     tier_info = Config.BILLING_TIERS.get(ta.billing_tier, {})
 
-    today = datetime.utcnow().strftime('%Y-%m-%d')
-    test_chat_used = session.get(f'tc_{ta_id}_{today}', 0)
-
     # Re-index affordance: button styling + banner depend on whether anything
     # actually needs indexing right now. Pending = docs uploaded but not yet
     # indexed (`last_indexed_at IS NULL`). Warnings = prior run had per-doc
@@ -192,10 +189,49 @@ def manage_ta(ta_id):
                          documents=documents,
                          tier_info=tier_info,
                          billing_tiers=Config.BILLING_TIERS,
-                         test_chat_used=test_chat_used,
                          needs_reindex=needs_reindex,
                          pending_docs_count=pending_docs_count,
                          indexing_warnings=indexing_warnings)
+
+
+@professor_bp.route('/ta/<ta_id>/test')
+@professor_required
+@professor_owns_ta
+def test_ta(ta_id):
+    """Test tab — the professor-facing preview chat.
+
+    Its own route rather than a tab rendered client-side on the manage page: the
+    chat holds streaming state and is rate-limited, and analytics next door runs
+    expensive aggregates. Separate routes keep each tab's cost to the tab, and
+    give the tabs working deep links and back/forward.
+    """
+    ta = TeachingAssistant.query.get_or_404(ta_id)
+    today = datetime.utcnow().strftime('%Y-%m-%d')
+    test_chat_used = session.get(f'tc_{ta_id}_{today}', 0)
+    return render_template('professor/test_ta.html',
+                           ta=ta,
+                           test_chat_used=test_chat_used)
+
+
+@professor_bp.route('/ta/<ta_id>/settings', methods=['PATCH'])
+@professor_required
+@professor_owns_ta
+def update_ta_settings(ta_id):
+    """Professor-facing TA settings.
+
+    Mirrors the admin PUT /admin/api/tas/<id> handler for the one field professors
+    need. That route is @admin_api_required, so professors could not reach it and
+    the image-upload toggle was admin-only even though the student-facing chat
+    already honoured the flag on professor-owned TAs.
+    """
+    ta = TeachingAssistant.query.get_or_404(ta_id)
+    data = request.get_json(silent=True) or {}
+
+    if 'image_upload_enabled' in data:
+        ta.image_upload_enabled = bool(data['image_upload_enabled'])
+
+    db.session.commit()
+    return jsonify(success=True, image_upload_enabled=ta.image_upload_enabled)
 
 
 @professor_bp.route('/ta/<ta_id>/publish', methods=['GET', 'POST'])
@@ -502,11 +538,36 @@ def test_chat_stream(ta_id):
     if ta.indexing_status == 'running':
         return jsonify(error="Indexing is in progress. Please wait until it completes."), 400
 
-    data = request.get_json(silent=True) or {}
-    query = (data.get('query') or '').strip()
-    conversation_history = (data.get('conversation_history') or '')
+    # Accepts JSON (text only) or multipart/form-data with one or more `image`
+    # parts, so the preview exercises the same path students do. Files are read
+    # to bytes here, before the streaming generator runs.
+    from src.chat_streaming import MAX_IMAGES_PER_TURN, ALLOWED_IMAGE_MIMES, MAX_IMAGE_BYTES
 
-    if not query:
+    images = []
+    if (request.content_type or '').lower().startswith('multipart/'):
+        query = (request.form.get('query') or '').strip()
+        conversation_history = request.form.get('conversation_history') or ''
+        files = [f for f in request.files.getlist('image') if f and f.filename]
+        if not ta.image_upload_enabled and files:
+            return jsonify(error="Image uploads are turned off for this TA."), 400
+        if len(files) > MAX_IMAGES_PER_TURN:
+            return jsonify(error=f"Too many images — max {MAX_IMAGES_PER_TURN} per message."), 400
+        for f in files:
+            mime = (f.mimetype or '').lower()
+            if mime not in ALLOWED_IMAGE_MIMES:
+                return jsonify(error=f"Unsupported image format: {mime or 'unknown'}"), 400
+            blob = f.read()
+            if not blob:
+                return jsonify(error=f"Empty image file: {f.filename}"), 400
+            if len(blob) > MAX_IMAGE_BYTES:
+                return jsonify(error=f"Image '{f.filename}' exceeds 5 MB limit."), 400
+            images.append({"data": blob, "mime": mime})
+    else:
+        data = request.get_json(silent=True) or {}
+        query = (data.get('query') or '').strip()
+        conversation_history = (data.get('conversation_history') or '')
+
+    if not query and not images:
         return jsonify(error="Query is required."), 400
 
     session_id = f"prof_test_{secrets.token_hex(8)}"
@@ -553,6 +614,7 @@ def test_chat_stream(ta_id):
                 hybrid_doc_filename=hybrid_doc_filename,
                 query_reference=query_reference,
                 attempt_count=attempt_count,
+                current_images=images or None,
                 # Professor test-chat: TA-scoped cache key (no per-session id — professor testing).
                 # TA-scoped is safe at low RPM (only the TA's owner is testing).
                 session_id=f"prof-preview-{ta.id}",

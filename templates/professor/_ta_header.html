@@ -1,0 +1,71 @@
+{#
+  Shared chrome for the three per-TA pages: manage, analytics, test.
+
+  These are separate routes rather than JavaScript tabs on one page. Analytics runs
+  expensive aggregate queries and is tier-gated; the test chat is rate-limited and
+  holds streaming state. Client-side tabs would load all three payloads on every
+  visit and break back/forward and deep links.
+
+  Caller must set `active_tab` to one of: manage | analytics | test.
+  Include the companion `_ta_header_styles.html` inside the page's <style> block.
+#}
+<header class="admin-header">
+    <a href="{{ url_for('professor.dashboard') }}" class="header-brand">
+        <img src="/static/images/maize-logo.png" alt="Maize TA" width="32" height="32">
+        <span class="header-brand-name">Maize TA</span>
+    </a>
+    <nav class="header-nav">
+        <span class="header-nav-user">{{ current_user.first_name }}</span>
+        <div class="nav-divider"></div>
+        {# Admins reach these pages too (analytics already handled this); without the
+           branch they would be sent to professor-only routes and lose their logout. #}
+        {% if current_user.role == 'admin' %}
+        <a href="/admin">Admin Panel</a>
+        <div class="nav-divider"></div>
+        <a href="/admin/logout">Logout</a>
+        {% else %}
+        <a href="{{ url_for('professor.dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('professor.profile') }}">Profile</a>
+        <a href="{{ url_for('professor.settings') }}">Billing</a>
+        <a href="{{ url_for('professor.support') }}">Support</a>
+        <div class="nav-divider"></div>
+        <a href="{{ url_for('auth0.logout') }}">Logout</a>
+        {% endif %}
+    </nav>
+</header>
+
+<div class="ta-context-bar">
+  <div class="ta-context-inner">
+    <a href="{{ url_for('professor.dashboard') }}" class="ta-back-link">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M19 12H5"/><path d="m12 19-7-7 7-7"/>
+        </svg>
+        Back to dashboard
+    </a>
+
+    <div class="ta-context-title">
+        <h1>{{ ta.name }}</h1>
+        <span class="ta-context-course">{{ ta.course_name }}</span>
+        {% if ta.status == 'draft' %}
+            <span class="ta-status-pill ta-status-pill--draft">Draft</span>
+        {% elif ta.status == 'paused' %}
+            <span class="ta-status-pill ta-status-pill--paused">Paused</span>
+        {% elif ta.status == 'active' %}
+            <span class="ta-status-pill ta-status-pill--active">Active</span>
+        {% endif %}
+    </div>
+
+    <nav class="ta-tabs" aria-label="Teaching assistant sections">
+        <a href="{{ url_for('professor.manage_ta', ta_id=ta.id) }}"
+           class="ta-tab {% if active_tab == 'manage' %}ta-tab--active{% endif %}"
+           {% if active_tab == 'manage' %}aria-current="page"{% endif %}>Manage</a>
+        <a href="{{ url_for('professor.ta_analytics', ta_id=ta.id) }}"
+           class="ta-tab {% if active_tab == 'analytics' %}ta-tab--active{% endif %}"
+           {% if active_tab == 'analytics' %}aria-current="page"{% endif %}>Analytics</a>
+        <a href="{{ url_for('professor.test_ta', ta_id=ta.id) }}"
+           class="ta-tab {% if active_tab == 'test' %}ta-tab--active{% endif %}"
+           {% if active_tab == 'test' %}aria-current="page"{% endif %}>Test</a>
+    </nav>
+  </div>
+</div>

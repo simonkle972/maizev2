@@ -9,6 +9,8 @@
     <link rel="stylesheet" href="/static/css/style.css?v=13">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
     <style>
+{% include 'professor/_ta_header_styles.html' %}
+
         .analytics-header {
             display: flex;
             justify-content: space-between;
@@ -281,36 +283,10 @@
 </head>
 <body>
     <div class="admin-container">
-        <header class="admin-header">
-            <a href="{{ url_for('professor.dashboard') }}" class="header-brand">
-                <img src="/static/images/maize-logo.png" alt="Maize TA" width="32" height="32">
-                <span class="header-brand-name">Maize TA</span>
-            </a>
-            <nav class="header-nav">
-                <span class="header-nav-user">{{ current_user.first_name }}</span>
-                <div class="nav-divider"></div>
-                {% if current_user.role == 'admin' %}
-                <a href="/admin">Admin Panel</a>
-                <div class="nav-divider"></div>
-                <a href="/admin/logout">Logout</a>
-                {% else %}
-                <a href="{{ url_for('professor.dashboard') }}">Dashboard</a>
-                <a href="{{ url_for('professor.profile') }}">Profile</a>
-                <a href="{{ url_for('professor.settings') }}">Billing</a>
-                <a href="{{ url_for('professor.support') }}">Support</a>
-                <div class="nav-divider"></div>
-                <a href="{{ url_for('auth0.logout') }}">Logout</a>
-                {% endif %}
-            </nav>
-        </header>
+{% set active_tab = 'analytics' %}
+{% include 'professor/_ta_header.html' %}
 
         <main class="admin-main">
-            {% if current_user.role == 'admin' %}
-            <a href="{{ url_for('admin_manage_ta', ta_id=ta.id) }}" class="back-link">&larr; Back to {{ ta.name }}</a>
-            {% else %}
-            <a href="{{ url_for('professor.manage_ta', ta_id=ta.id) }}" class="back-link">&larr; Back to {{ ta.name }}</a>
-            {% endif %}
-
             {% if tier_gated %}
             <!-- Tier gate: upgrade prompt -->
             <div class="tier-gate">
@@ -323,7 +299,7 @@
             <!-- Analytics dashboard -->
             <div class="analytics-header">
                 <div>
-                    <h1>{{ ta.name }} <span>— Analytics</span></h1>
+                    <h1>Analytics</h1>
                 </div>
                 <div class="range-selector">
                     <a href="?range=7d" class="range-btn {{ 'active' if current_range == '7d' }}">7 days</a>
