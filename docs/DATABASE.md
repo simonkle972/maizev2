@@ -120,3 +120,64 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 ```
 
 This prevents database connection issues in production.
+
+## Backups and Data Deletion
+
+Production runs on **Vultr Managed PostgreSQL (Business tier)**, which takes automatic
+off-site backups with a **14-day point-in-time recovery window**. Backups are managed
+entirely in the Vultr console — there is no `pg_dump` cron or backup script in this repo.
+
+PITR retention is set by plan tier, so this number changes if the plan does:
+
+| plan | PITR window |
+|---|---|
+| Hobbyist | none |
+| Startup | 2 days |
+| **Business (current)** | **14 days** |
+| Premium | 30 days |
+
+Individual backups can be deleted from the console. That is a blunt instrument — it
+destroys a restore point for the whole database, not one account — so treat it as an
+escape hatch for an insistent erasure request, not routine practice.
+
+### What this means for account deletion
+
+`professor.delete_account` removes local rows immediately and irreversibly, and queues
+Stripe / Auth0 / filesystem cleanup in the same transaction (see
+`utils/vendor_deletion.py`). But **copies of the deleted data survive in backups for up
+to 14 days** before ageing out.
+
+The accurate statement to make to a user, and the one any privacy policy should match:
+
+> Live data is removed immediately and irreversibly. Copies persist in encrypted
+> database backups for up to 14 days, after which they age out automatically.
+
+Do not claim immediate erasure everywhere. Backups cannot be selectively edited, which
+is a recognised exception — but only if the window is stated rather than implied away.
+
+### ⚠️ Restoring a backup resurrects deleted accounts
+
+This is the failure mode nobody anticipates. Restoring a snapshot taken **before** a
+deletion brings back that professor's user row, TAs, documents and chat history — while:
+
+- their Stripe customer and subscription are **already permanently cancelled**
+- their Auth0 user is **already permanently deleted**
+- the restored `vendor_deletions` rows come back marked `completed_at`, so
+  `flask process-vendor-deletions` will **not** re-run anything
+
+The result is a half-deleted account: local data alive, external identity destroyed, and
+no queue entry recording that anything is owed. Nothing detects this automatically.
+
+**Any restore therefore requires a manual pass to re-apply deletions that happened after
+the snapshot was taken.** Before restoring, list the deletions in the window:
+
+```sql
+SELECT origin, target, completed_at
+FROM vendor_deletions
+WHERE completed_at > '<snapshot timestamp>'
+ORDER BY completed_at;
+```
+
+`origin` is one of `account_delete:user=<id>`, `ta_delete:ta=<id>` or
+`admin_ta_delete:ta=<id>`, so it identifies exactly which accounts and TAs need
+deleting again once the restore completes.
