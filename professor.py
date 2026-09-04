@@ -877,12 +877,17 @@ def delete_account():
     """
     Permanently delete the professor's account and all associated data.
     Requires email confirmation to prevent accidental deletion.
+
+    Ordering here is load-bearing. Every irreversible external action — Stripe,
+    Auth0, rmtree — is queued as a vendor_deletions row inside the same
+    transaction as the local delete, and only executed after that transaction
+    commits. So a failure before the commit destroys nothing, and a failure
+    after it leaves a pending row for `flask process-vendor-deletions` to retry
+    instead of a subscription that bills a deleted account forever.
     """
-    import shutil
     import logging
-    from models import ChatSession, PasswordResetToken
-    from auth_auth0 import delete_auth0_user
-    from utils.stripe_helpers import cancel_ta_subscription, delete_stripe_customer
+    from models import PasswordResetToken
+    from utils import vendor_deletion
 
     logger = logging.getLogger(__name__)
     user = current_user
@@ -893,35 +898,17 @@ def delete_account():
         flash('Email confirmation did not match. Account was not deleted.', 'error')
         return redirect(url_for('professor.profile'))
 
-    try:
-        logger.info(f"Beginning account deletion for professor {user.id} ({user.email})")
+    user_id = user.id
+    origin = f'account_delete:user={user_id}'
 
-        # 1. Delete all TAs owned by this professor (full cascade per TA)
+    try:
+        logger.info(f"Beginning account deletion for professor {user_id}")
+
+        # 1. Queue external cleanup for every TA this professor owns, then drop
+        #    the TA's local rows. Nothing external fires yet.
         owned_tas = TeachingAssistant.query.filter_by(professor_id=user.id).all()
         for ta in owned_tas:
-            logger.info(f"Deleting TA {ta.id} ({ta.name}) as part of account deletion")
-
-            # Cancel Stripe subscription
-            if ta.stripe_subscription_id:
-                success, error = cancel_ta_subscription(ta)
-                if not success:
-                    logger.warning(f"Failed to cancel Stripe sub for TA {ta.id}: {error}")
-
-            # Delete ChromaDB directory
-            chroma_path = os.path.join(Config.CHROMA_DB_PATH, ta.id)
-            if os.path.exists(chroma_path):
-                try:
-                    shutil.rmtree(chroma_path)
-                except Exception as e:
-                    logger.warning(f"Could not delete ChromaDB for {ta.id}: {e}")
-
-            # Delete document files from disk
-            docs_path = f"data/courses/{ta.id}/docs"
-            if os.path.exists(docs_path):
-                try:
-                    shutil.rmtree(docs_path)
-                except Exception as e:
-                    logger.warning(f"Could not delete document files for {ta.id}: {e}")
+            vendor_deletion.enqueue_ta_cleanup(ta, origin)
 
             # Manual cleanup of non-cascading relationships
             DocumentChunk.query.filter_by(ta_id=ta.id).delete()
@@ -932,48 +919,59 @@ def delete_account():
             # Delete the TA (cascades Documents, ChatSessions, ChatMessages)
             db.session.delete(ta)
 
-        # 2. Delete any enrollment links created by this user (for TAs they no longer own)
+        # 2. Delete this user's remaining enrollment rows and enrollment links.
+        #    enrollments.student_id and enrollment_links.created_by are both
+        #    NOT NULL, so any row surviving here fails the final user delete with
+        #    an IntegrityError rather than nullifying. Step 1 only cleared rows on
+        #    TAs this user owned; these are the ones on other professors' TAs.
+        Enrollment.query.filter_by(student_id=user.id).delete()
         EnrollmentLink.query.filter_by(created_by=user.id).delete()
 
         # 3. Delete password reset tokens
         PasswordResetToken.query.filter_by(user_id=user.id).delete()
 
-        # 4. Delete Stripe customer (if exists)
-        if hasattr(user, 'stripe_customer_id') and user.stripe_customer_id:
-            success, error = delete_stripe_customer(user.stripe_customer_id)
-            if not success:
-                logger.warning(f"Failed to delete Stripe customer for user {user.id}: {error}")
+        # 4. Queue the account-level vendor cleanup
+        vendor_deletion.enqueue(
+            vendor_deletion.TARGET_STRIPE_CUSTOMER, user.stripe_customer_id, origin)
+        vendor_deletion.enqueue(
+            vendor_deletion.TARGET_AUTH0_USER, user.auth0_sub, origin)
 
-        # 5. Delete Auth0 user
-        if user.auth0_sub:
-            try:
-                delete_auth0_user(user.auth0_sub)
-            except Exception as e:
-                logger.warning(f"Failed to delete Auth0 user for {user.id}: {e}")
-                # Continue — don't block account deletion if Auth0 fails
-
-        # 6. Delete the user record
-        user_email = user.email
+        # 5. Delete the user record. This commit is the point of no return: it
+        #    removes the local data and records what is owed externally, both or
+        #    neither.
         db.session.delete(user)
         db.session.commit()
 
-        logger.info(f"Account deletion complete for {user_email}")
-
-        # 7. Log out and redirect
-        from flask_login import logout_user
-        from auth_student import logout_student
-        logout_user()
-        logout_student()
-        session.clear()
-
-        flash('Your account and all associated data have been permanently deleted.', 'success')
-        return redirect(url_for('landing'))
-
     except Exception as e:
         db.session.rollback()
-        logger.error(f"Error deleting account for user {user.id}: {e}")
-        flash('An error occurred while deleting your account. Please try again or contact support.', 'error')
+        logger.error(f"Error deleting account for user {user_id}: {e}")
+        flash('An error occurred and your account was NOT deleted. '
+              'Nothing was removed. Please try again or contact support.', 'error')
         return redirect(url_for('professor.profile'))
+
+    # 6. Local data is gone. Now make the external calls. Anything that fails
+    #    stays queued — do not let it fail the request or block the logout.
+    try:
+        succeeded, failed = vendor_deletion.run_for_origin(origin)
+        if failed:
+            logger.warning(
+                f"Account deletion for user {user_id}: {succeeded} external cleanup(s) "
+                f"done, {failed} still pending — process-vendor-deletions will retry")
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Vendor cleanup pass failed for user {user_id}: {e}")
+
+    logger.info(f"Account deletion complete for user {user_id}")
+
+    # 7. Log out and redirect
+    from flask_login import logout_user
+    from auth_student import logout_student
+    logout_user()
+    logout_student()
+    session.clear()
+
+    flash('Your account and all associated data have been permanently deleted.', 'success')
+    return redirect(url_for('landing'))
 
 
 @professor_bp.route('/support', methods=['GET', 'POST'])
@@ -1279,51 +1277,44 @@ def delete_ta(ta_id):
     """
     ta = TeachingAssistant.query.get_or_404(ta_id)
 
+    import logging
+    from utils import vendor_deletion
+
+    logger = logging.getLogger(__name__)
+    origin = f'ta_delete:ta={ta_id}'
+    ta_name = ta.name
+
     try:
-        import shutil
-        import logging
-        logger = logging.getLogger(__name__)
+        # 1. Queue the Stripe cancellation and the on-disk cleanup. Nothing
+        #    external fires until the delete below commits — see
+        #    utils/vendor_deletion.py for why the order matters.
+        vendor_deletion.enqueue_ta_cleanup(ta, origin)
 
-        # 1. Cancel Stripe subscription (if exists)
-        if ta.requires_billing and ta.stripe_subscription_id:
-            from utils.stripe_helpers import cancel_ta_subscription
-            success, error = cancel_ta_subscription(ta)
-            if not success:
-                logger.warning(f"Failed to cancel Stripe subscription for TA {ta_id}: {error}")
-                # Continue with deletion anyway
-
-        # 2. Delete ChromaDB directory
-        chroma_path = os.path.join(Config.CHROMA_DB_PATH, ta_id)
-        if os.path.exists(chroma_path):
-            try:
-                shutil.rmtree(chroma_path)
-            except Exception as e:
-                logger.warning(f"Could not delete ChromaDB for {ta_id}: {e}")
-
-        # 3. Delete document files from disk
-        docs_path = f"data/courses/{ta_id}/docs"
-        if os.path.exists(docs_path):
-            try:
-                shutil.rmtree(docs_path)
-            except Exception as e:
-                logger.warning(f"Could not delete document files for {ta_id}: {e}")
-
-        # 4. Manual cleanup of non-cascading relationships
+        # 2. Manual cleanup of non-cascading relationships
         DocumentChunk.query.filter_by(ta_id=ta_id).delete()
         Enrollment.query.filter_by(ta_id=ta_id).delete()
         EnrollmentLink.query.filter_by(ta_id=ta_id).delete()
         IndexingJob.query.filter_by(ta_id=ta_id).delete()
 
-        # 5. Delete the TA (cascades Documents, ChatSessions, ChatMessages)
-        ta_name = ta.name
+        # 3. Delete the TA (cascades Documents, ChatSessions, ChatMessages)
         db.session.delete(ta)
         db.session.commit()
 
-        flash(f'TA "{ta_name}" has been permanently deleted.', 'success')
-        return jsonify({"success": True})
-
     except Exception as e:
         db.session.rollback()
-        import logging
-        logging.getLogger(__name__).error(f"Error deleting TA {ta_id}: {e}")
+        logger.error(f"Error deleting TA {ta_id}: {e}")
         return jsonify({"error": str(e)}), 500
+
+    # 4. TA is gone locally. Cancel billing and clear disk; retries are queued.
+    try:
+        succeeded, failed = vendor_deletion.run_for_origin(origin)
+        if failed:
+            logger.warning(
+                f"TA {ta_id} deleted: {succeeded} external cleanup(s) done, {failed} still "
+                f"pending — process-vendor-deletions will retry")
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Vendor cleanup pass failed for TA {ta_id}: {e}")
+
+    flash(f'TA "{ta_name}" has been permanently deleted.', 'success')
+    return jsonify({"success": True})

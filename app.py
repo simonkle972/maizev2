@@ -698,18 +698,14 @@ def delete_ta(ta_id):
     if not ta:
         return jsonify({"error": "TA not found"}), 404
 
+    from utils import vendor_deletion
+    origin = f'admin_ta_delete:ta={ta_id}'
+
     try:
-        import shutil
-
-        # Delete ChromaDB directory
-        chroma_path = os.path.join(Config.CHROMA_DB_PATH, ta_id)
-        if os.path.exists(chroma_path):
-            shutil.rmtree(chroma_path)
-
-        # Delete document files from disk
-        docs_path = f"data/courses/{ta_id}/docs"
-        if os.path.exists(docs_path):
-            shutil.rmtree(docs_path)
+        # Queue the Stripe cancellation and the on-disk cleanup. This route
+        # previously deleted the TA without cancelling its subscription at all,
+        # so an admin deletion kept billing indefinitely.
+        vendor_deletion.enqueue_ta_cleanup(ta, origin)
 
         # Clean up non-cascading relationships
         DocumentChunk.query.filter_by(ta_id=ta_id).delete()
@@ -720,11 +716,22 @@ def delete_ta(ta_id):
         # Delete the TA (cascades Documents, ChatSessions, ChatMessages)
         db.session.delete(ta)
         db.session.commit()
-        return jsonify({"success": True})
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error deleting TA {ta_id}: {e}")
         return jsonify({"error": str(e)}), 500
+
+    try:
+        succeeded, failed = vendor_deletion.run_for_origin(origin)
+        if failed:
+            logger.warning(
+                f"TA {ta_id} deleted by admin: {succeeded} external cleanup(s) done, "
+                f"{failed} still pending — process-vendor-deletions will retry")
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Vendor cleanup pass failed for TA {ta_id}: {e}")
+
+    return jsonify({"success": True})
 
 @app.route('/admin/api/cleanup-slug', methods=['POST'])
 @admin_api_required
@@ -1837,6 +1844,29 @@ def cleanup_images_cmd():
     )
     db.session.commit()
     print(f"Cleared image_data from {result.rowcount} message(s) older than {Config.IMAGE_RETENTION_DAYS} days (cutoff: {cutoff.isoformat()})")
+
+
+@app.cli.command('process-vendor-deletions')
+def process_vendor_deletions_cmd():
+    """
+    Retry external cleanups owed by an account or TA deletion that did not
+    complete inline — a cancelled Stripe subscription, an Auth0 user, an on-disk
+    course directory. Idempotent; safe to run repeatedly. Wire to cron:
+
+        # /etc/cron.d/maize-vendor-deletions (runs every 15 minutes):
+        */15 * * * * maize cd /opt/maize && /opt/maize/venv/bin/flask process-vendor-deletions >> /var/log/maize/cleanup.log 2>&1
+
+    Rows are retried with backoff and never abandoned: giving up on a Stripe
+    subscription means billing an account that no longer exists. Anything past
+    STUCK_AFTER_ATTEMPTS is printed for a human to look at, and keeps retrying.
+    """
+    from utils import vendor_deletion
+
+    succeeded, failed, stuck = vendor_deletion.process_pending()
+    print(f"Vendor deletions: {succeeded} completed, {failed} failed this pass.")
+    for row in stuck:
+        print(f"  STUCK: id={row.id} target={row.target} origin={row.origin} "
+              f"attempts={row.attempts} last_error={row.last_error}")
 
 
 def check_stale_indexing_jobs():

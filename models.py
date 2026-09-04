@@ -406,6 +406,37 @@ class PasswordResetToken(db.Model):
         return not self.is_used and datetime.utcnow() < self.expires_at
 
 
+class VendorDeletion(db.Model):
+    """Durable queue of external cleanups owed after a local delete committed.
+
+    Rows are inserted in the SAME transaction that removes the local data, so
+    the commit is what makes a cleanup owed. If that transaction rolls back,
+    nothing was destroyed locally and nothing is owed externally. Everything
+    irreversible — Stripe, Auth0, rmtree — runs only after the commit, and any
+    call that fails leaves its row pending for `flask process-vendor-deletions`
+    to retry. That is what guarantees billing actually stops even when the
+    request that triggered the deletion dies half way through.
+
+    On success the row is kept but external_id is cleared: we keep proof the
+    cleanup completed without keeping the vendor's identifier for someone who
+    asked to be deleted. `origin` is a non-PII correlation label for logs.
+
+    See utils/vendor_deletion.py for the executors and retry policy.
+    """
+    __tablename__ = 'vendor_deletions'
+
+    id = db.Column(db.Integer, primary_key=True)
+    # One of the TARGET_* constants in utils/vendor_deletion.py.
+    target = db.Column(db.String(32), nullable=False)
+    external_id = db.Column(db.String(1024), nullable=True)
+    origin = db.Column(db.String(128), nullable=False)
+    attempts = db.Column(db.Integer, nullable=False, default=0, server_default='0')
+    last_attempt_at = db.Column(db.DateTime, nullable=True)
+    last_error = db.Column(db.Text, nullable=True)
+    completed_at = db.Column(db.DateTime, nullable=True, index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
 class Auth0State(db.Model):
     """Store Auth0 OAuth state in PostgreSQL."""
     __tablename__ = 'auth0_states'
