@@ -322,6 +322,10 @@ def get_challenge_summary(queries, doc_label, prob_label):
         client = openai.OpenAI()
         query_list = "\n".join(f"- {q}" for q in queries[:10])
         response = client.chat.completions.create(
+            # store=False keeps prompts and completions out of OpenAI's Application
+            # State retention. Abuse-monitoring logs (up to 30 days) are separate and
+            # unaffected; only org-level Zero Data Retention removes those.
+            store=False,
             model="gpt-4o-mini",
             messages=[{
                 "role": "user",
@@ -449,6 +453,7 @@ Student queries:
         client = OpenAI(api_key=Config.OPENAI_API_KEY)
 
         response = client.chat.completions.create(
+            store=False,
             model="gpt-4o-mini",  # Fast and cheap for clustering
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3,

@@ -66,6 +66,10 @@ def extract_keywords(client, model, query: str, prior_turns: list) -> dict:
 
     prompt = KEYWORD_EXTRACTION_PROMPT.replace("{query}", query).replace("{prior_turns_text}", pt_text)
     resp = client.chat.completions.create(
+        # store=False keeps prompts and completions out of OpenAI's Application
+        # State retention. Abuse-monitoring logs (up to 30 days) are separate and
+        # unaffected; only org-level Zero Data Retention removes those.
+        store=False,
         model=model,
         messages=[{"role": "user", "content": prompt}],
         response_format={"type": "json_object"},

@@ -260,6 +260,10 @@ def extract_image(file_path: str) -> str:
 
         client = OpenAI(api_key=Config.OPENAI_API_KEY)
         response = client.chat.completions.create(
+            # store=False keeps prompts and completions out of OpenAI's Application
+            # State retention. Abuse-monitoring logs (up to 30 days) are separate and
+            # unaffected; only org-level Zero Data Retention removes those.
+            store=False,
             model=Config.VISION_MODEL,
             max_tokens=1500,
             messages=[{
@@ -571,6 +575,7 @@ def _supplement_pdf_with_figures(file_path: str, text: str, heartbeat=None) -> s
                 img_base64 = base64.b64encode(img_buffer.getvalue()).decode()
 
                 response = client.chat.completions.create(
+                    store=False,
                     model=Config.VISION_MODEL,
                     max_tokens=1000,
                     messages=[{
@@ -676,6 +681,7 @@ def _extract_pdf_vision(file_path: str, heartbeat=None) -> tuple:
                 logger.info(f"Vision extraction: processing page {page_num}/{len(images)} ({img_size_kb:.0f}KB)")
 
                 response = client.chat.completions.create(
+                    store=False,
                     model=Config.VISION_MODEL,
                     max_tokens=1500,
                     messages=[{
@@ -1013,6 +1019,7 @@ def extract_pptx(file_path: str) -> str:
                             continue
                         img_base64 = base64.b64encode(img.blob).decode()
                         response = client.chat.completions.create(
+                            store=False,
                             model=Config.VISION_MODEL,
                             max_tokens=800,
                             messages=[{
@@ -1066,6 +1073,7 @@ def extract_pptx(file_path: str) -> str:
                             "Include the key trend, axis interpretation, and any notable data points."
                         )
                         response = client.chat.completions.create(
+                            store=False,
                             model=Config.VISION_MODEL,
                             max_tokens=500,
                             messages=[{"role": "user", "content": prompt}]
@@ -1132,6 +1140,7 @@ Return ONLY valid JSON, no other text."""
     for attempt in range(3):
         try:
             response = client.chat.completions.create(
+                store=False,
                 model=Config.LLM_MODEL,
                 messages=[{"role": "user", "content": prompt}],
                 max_completion_tokens=500,
@@ -1277,6 +1286,7 @@ Confidence: 0.9+ = certain; 0.7-0.9 = likely; <0.7 = uncertain. The slug MUST ma
     for attempt in range(3):
         try:
             response = client.chat.completions.create(
+                store=False,
                 model=Config.VISION_MODEL,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=200,
@@ -1349,6 +1359,7 @@ Return ONLY the summary text — no JSON wrapping, no surrounding quotes."""
     for attempt in range(3):
         try:
             response = client.chat.completions.create(
+                store=False,
                 model=Config.VISION_MODEL,  # gpt-4o; cheap + fast for summarization
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=300,

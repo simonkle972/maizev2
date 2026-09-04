@@ -475,6 +475,10 @@ def generate_response(
 
     try:
         response = client.chat.completions.create(
+            # store=False keeps prompts and completions out of OpenAI's Application
+            # State retention. Abuse-monitoring logs (up to 30 days) are separate and
+            # unaffected; only org-level Zero Data Retention removes those.
+            store=False,
             model=Config.LLM_MODEL,
             messages=messages,
             max_completion_tokens=Config.LLM_MAX_COMPLETION_TOKENS,
@@ -491,6 +495,7 @@ def generate_response(
         if not content or not content.strip():
             logger.warning(f"Empty LLM response. finish_reason={finish_reason}, usage={usage}. Retrying with low reasoning.")
             response = client.chat.completions.create(
+                store=False,
                 model=Config.LLM_MODEL,
                 messages=messages,
                 max_completion_tokens=Config.LLM_MAX_COMPLETION_TOKENS,
@@ -540,6 +545,7 @@ def generate_response_stream(
 
     try:
         stream = client.chat.completions.create(
+            store=False,
             model=Config.LLM_MODEL,
             messages=messages,
             max_completion_tokens=Config.LLM_MAX_COMPLETION_TOKENS,

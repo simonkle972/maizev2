@@ -639,6 +639,10 @@ def _extract_concepts_via_llm(problem_text, ta_id):
     try:
         client = openai.OpenAI()
         response = client.chat.completions.create(
+            # store=False keeps prompts and completions out of OpenAI's Application
+            # State retention. Abuse-monitoring logs (up to 30 days) are separate and
+            # unaffected; only org-level Zero Data Retention removes those.
+            store=False,
             model="gpt-4o-mini",
             messages=[{
                 "role": "user",
@@ -1009,6 +1013,7 @@ Example: {{"scores": [{{"index": 0, "score": 8, "reason": "Contains problem 2f s
         # generate_response in response_generator.py for the full rationale.
         cache_kwargs = {"prompt_cache_key": session_id} if session_id else {}
         response = client.chat.completions.create(
+            store=False,
             model=Config.LLM_MODEL,
             messages=[{"role": "user", "content": prompt}],
             max_completion_tokens=2000,
@@ -2219,6 +2224,7 @@ Respond with JSON ONLY, no prose:
         # generate_response in response_generator.py for the full rationale.
         cache_kwargs = {"prompt_cache_key": session_id} if session_id else {}
         response = client.chat.completions.create(
+            store=False,
             model=Config.CONTEXTUALIZER_MODEL,
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"},
@@ -2331,6 +2337,7 @@ Return ONLY the redirect text, no quotes, no JSON, no explanation."""
     try:
         client = get_openai_client()
         resp = client.chat.completions.create(
+            store=False,
             model=Config.CONTEXTUALIZER_MODEL,
             messages=[{"role": "user", "content": prompt}],
             max_tokens=80,
