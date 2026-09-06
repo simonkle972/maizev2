@@ -150,9 +150,6 @@ def gpc():
 @app.route('/api/demo-request', methods=['POST'])
 def demo_request():
     """Handle demo request form submissions and send email notification."""
-    import smtplib
-    from email.mime.text import MIMEText
-    from email.mime.multipart import MIMEMultipart
     
     data = request.get_json()
     if not data:
@@ -182,32 +179,31 @@ Message:
 Submitted at: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}
 """
     
-    smtp_host = os.environ.get('SMTP_HOST')
-    smtp_port = int(os.environ.get('SMTP_PORT', 587))
-    smtp_user = os.environ.get('SMTP_USER')
-    smtp_pass = os.environ.get('SMTP_PASS')
-    
-    if smtp_host and smtp_user and smtp_pass:
-        try:
-            msg = MIMEMultipart()
-            msg['From'] = smtp_user
-            msg['To'] = 'simon.kleffner98@gmail.com'
-            msg['Subject'] = f'Maize Demo Request: {name} from {institution}'
-            msg.attach(MIMEText(email_body, 'plain'))
-            
-            with smtplib.SMTP(smtp_host, smtp_port) as server:
-                server.starttls()
-                server.login(smtp_user, smtp_pass)
-                server.send_message(msg)
-            
-            logger.info(f"Demo request email sent for {email}")
-        except Exception as e:
-            logger.error(f"Failed to send demo request email: {e}")
-            logger.info(f"Demo request (email failed): {name} <{email}> from {institution}")
-    else:
-        logger.info(f"Demo request (no SMTP configured): {name} <{email}> from {institution}")
-        logger.info(f"Course: {course or 'N/A'}, Message: {message or 'N/A'}")
-    
+    # Route through the shared helper rather than hand-rolling SMTP here. This
+    # endpoint previously built its own message with its own credentials read
+    # straight from os.environ, which is the same admin/professor-style
+    # divergence that let the upload allowlists drift apart.
+    from utils.email import send_email
+
+    ok, err = send_email(
+        Config.SMTP_USER or 'simon@getmaize.ai',
+        f'Maize Demo Request: {name} from {institution}',
+        '<pre>' + email_body.replace('&', '&amp;').replace('<', '&lt;') + '</pre>',
+        email_body,
+    )
+
+    # Always log the submission before returning. journald is the only record
+    # there is, so a mail outage must not also lose the lead.
+    logger.info(f"Demo request from {name} <{email}> ({institution or 'no institution'})"
+                + ("" if ok else f" -- EMAIL FAILED: {err}"))
+
+    if not ok:
+        # Previously this returned success unconditionally: the visitor saw
+        # "Thanks! We'll be in touch soon" while the mail had failed and nobody
+        # was notified. That is how a broken SMTP password went unnoticed.
+        return jsonify({"error": "We could not send your message. "
+                                 "Please email us directly at info@getmaize.ai."}), 502
+
     return jsonify({"success": True, "message": "Demo request received"})
 
 @app.route('/health')

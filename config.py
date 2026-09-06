@@ -12,6 +12,16 @@ if _explicit_dotenv:
 else:
     load_dotenv('.env')
 
+def _smtp_clean(v):
+    """Strip whitespace and non-breaking spaces from an SMTP credential.
+
+    smtplib encodes "\0user\0password" as ASCII, so one U+00A0 anywhere in
+    either value raises `'ascii' codec can't encode character '\xa0'` and every
+    send fails. Pasting a Gmail app password is enough to introduce one.
+    """
+    return (v or "").replace("\xa0", "").strip()
+
+
 class Config:
     # OpenAI Configuration
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -95,6 +105,26 @@ class Config:
     ADMIN_PASSWORD = os.getenv("admin_pw", "")
     
     DATABASE_URL = os.getenv("DATABASE_URL")
+
+    # --- SMTP -----------------------------------------------------------------
+    # utils/email.py referenced Config.SMTP_* for a long time while these were
+    # never defined, so send_email() raised AttributeError inside its own
+    # try/except and returned (False, ...) to callers that ignore the result.
+    # Every email silently failed: password resets, welcome mails, support
+    # requests, contact-sales and custom-tier notifications.
+    #
+    # _smtp_clean strips non-breaking spaces and surrounding whitespace. Gmail
+    # displays app passwords in four groups of four, and pasting them can carry a
+    # U+00A0. smtplib encodes "\0user\0password" as ASCII, so a single invisible
+    # character there kills every send with:
+    #   'ascii' codec can't encode character '\xa0' in position 32
+    # which is exactly what production was doing.
+    SMTP_HOST = _smtp_clean(os.getenv("SMTP_HOST"))
+    SMTP_PORT = int(_smtp_clean(os.getenv("SMTP_PORT")) or 587)
+    SMTP_USER = _smtp_clean(os.getenv("SMTP_USER"))
+    # Gmail shows app passwords in four space-separated groups; they must be sent
+    # unbroken, so ordinary spaces come out too.
+    SMTP_PASS = _smtp_clean(os.getenv("SMTP_PASS")).replace(" ", "")
     
     TOP_K_RETRIEVAL = 20
     TOP_K_RERANK = 8
