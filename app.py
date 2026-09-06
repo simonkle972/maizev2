@@ -54,14 +54,15 @@ limiter.init_app(app)
 # Flask-Login setup
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.login_view = 'auth.professor_login'  # Professors/admin use Flask-Login
+login_manager.login_view = 'auth0.login'  # professors authenticate via Auth0;
+# admins are handled separately by @admin_required -> auth.admin_login
 
 @login_manager.unauthorized_handler
 def unauthorized():
     """Handle unauthorized access - return JSON for API calls, HTML redirect for pages."""
     if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return jsonify({"error": "Authentication required. Please log in."}), 401
-    return redirect(url_for('auth.professor_login'))
+    return redirect(url_for('auth0.login', role='professor'))
 
 @login_manager.user_loader
 def load_user(user_id):

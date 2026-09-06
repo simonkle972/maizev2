@@ -67,7 +67,7 @@ def professor_required(f):
             if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return jsonify({"error": "Access denied. Professors only."}), 403
             flash('Access denied. Professors only.', 'error')
-            return redirect(url_for('auth.professor_login'))
+            return redirect(url_for('auth0.login', role='professor'))
         return f(*args, **kwargs)
     return decorated_function
 

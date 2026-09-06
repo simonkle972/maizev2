@@ -29,13 +29,13 @@ def student_required(f):
             if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return jsonify({"error": "Student authentication required"}), 401
             flash('Please log in as a student to access this page.', 'error')
-            return redirect(url_for('auth.student_login'))
+            return redirect(url_for('auth0.login', role='student'))
 
         if not current_student.is_active:
             flash('Your account is inactive. Please contact support.', 'error')
             from auth_student import logout_student
             logout_student()
-            return redirect(url_for('auth.student_login'))
+            return redirect(url_for('auth0.login', role='student'))
 
         return f(*args, **kwargs)
     return decorated_function

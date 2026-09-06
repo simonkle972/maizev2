@@ -53,26 +53,6 @@
                         </div>
                         <button type="submit" class="btn btn-primary btn-full">Login</button>
                     </form>
-
-                    <div style="margin-top: 20px; text-align: center;">
-                    </div>
-
-                    {% if role == 'student' %}
-                        <div style="margin-top: 15px; text-align: center;">
-                            <a href="{{ url_for('auth.professor_login') }}" style="color: #666; font-size: 14px;">Professor? Click here</a>
-                        </div>
-                    {% elif role == 'professor' %}
-                        <div style="margin-top: 15px; text-align: center;">
-                            <a href="{{ url_for('auth.student_login') }}" style="color: #666; font-size: 14px;">Student? Click here</a>
-                        </div>
-                    {% endif %}
-
-                    <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
-
-                    <div style="text-align: center;">
-                        <p style="color: #666; margin-bottom: 10px;">Don't have an account?</p>
-                        <a href="{{ url_for('auth.professor_signup') }}" class="btn btn-secondary" style="margin-right: 10px;">Sign up as Professor</a>
-                    </div>
                 </div>
             </div>
         </main>
