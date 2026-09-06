@@ -161,11 +161,44 @@ def demo_request():
     institution = data.get('institution', '').strip()
     course = data.get('course', '').strip()
     message = data.get('message', '').strip()
-    
-    if not name or not email:
+
+    # Demo Day (/demoday) capture rides this same handler so there stays exactly
+    # one place in the app that talks to SMTP. It differs only in what is
+    # required and how the subject is marked, so the in-person leads can be
+    # triaged apart from homepage inquiries without a second code path.
+    source = data.get('source', '').strip().lower()
+    is_demoday = source == 'demoday'
+    utm_source = str(data.get('utm_source') or '').strip()[:120]
+    utm_campaign = str(data.get('utm_campaign') or '').strip()[:120]
+    opt_in = bool(data.get('opt_in'))
+
+    if is_demoday:
+        # Name is optional at the event; the course answer is the whole point.
+        if not course or not email:
+            return jsonify({"error": "Class and email are required"}), 400
+    elif not name or not email:
         return jsonify({"error": "Name and email are required"}), 400
-    
-    email_body = f"""
+
+    if is_demoday:
+        subject = '[Maize Demo Day] ' + course[:90] + (f' - {name}' if name else '')
+        email_body = f"""
+Tsai CITY Demo Day - capture form
+
+Class / instructor: {course}
+Email: {email}
+Name: {name or 'Not given'}
+Wants updates if Maize comes to their class: {'YES' if opt_in else 'no'}
+
+Source: demoday
+utm_source: {utm_source or 'none'}
+utm_campaign: {utm_campaign or 'none'}
+
+---
+Submitted at: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}
+"""
+    else:
+        subject = f'Maize Demo Request: {name} from {institution}'
+        email_body = f"""
 New Demo Request for Maize
 
 Name: {name}
@@ -188,15 +221,20 @@ Submitted at: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}
 
     ok, err = send_email(
         Config.SMTP_USER or 'simon@getmaize.ai',
-        f'Maize Demo Request: {name} from {institution}',
+        subject,
         '<pre>' + email_body.replace('&', '&amp;').replace('<', '&lt;') + '</pre>',
         email_body,
     )
 
     # Always log the submission before returning. journald is the only record
     # there is, so a mail outage must not also lose the lead.
-    logger.info(f"Demo request from {name} <{email}> ({institution or 'no institution'})"
-                + ("" if ok else f" -- EMAIL FAILED: {err}"))
+    if is_demoday:
+        logger.info(f"Demo Day capture: {course} | {email} | name={name or '-'} | "
+                    f"opt_in={opt_in} | utm={utm_source or '-'}/{utm_campaign or '-'}"
+                    + ("" if ok else f" -- EMAIL FAILED: {err}"))
+    else:
+        logger.info(f"Demo request from {name} <{email}> ({institution or 'no institution'})"
+                    + ("" if ok else f" -- EMAIL FAILED: {err}"))
 
     if not ok:
         # Previously this returned success unconditionally: the visitor saw
@@ -299,6 +337,17 @@ def stripe_webhook():
 @app.route('/')
 def landing():
     return render_template('landing.html')
+
+
+@app.route('/demoday')
+def demoday():
+    """Tsai CITY Demo Day capture page (QR-code target).
+
+    Public and unlisted: not in the site nav, noindex/nofollow, no cookie
+    banner or analytics. Submissions go through /api/demo-request with
+    source='demoday'.
+    """
+    return render_template('demoday.html')
 
 
 @app.route('/privacy')
