@@ -8,7 +8,7 @@ from flask_login import login_user, logout_user, current_user
 from datetime import datetime, timedelta
 import secrets
 
-from models import db, User, Institution, Enrollment, EnrollmentLink, PasswordResetToken, TeachingAssistant
+from models import db, User, Institution, Enrollment, EnrollmentLink, TeachingAssistant
 from auth_student import current_student, login_student, logout_student
 from extensions import limiter
 from utils.validators import (
@@ -18,7 +18,7 @@ from utils.validators import (
     suggest_institution,
     validate_password_strength
 )
-from utils.email import send_password_reset_email, send_welcome_email
+from utils.email import send_welcome_email
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -302,95 +302,6 @@ def student_signup(token):
 
     return render_template('auth/student_signup.html', link=link, ta=ta)
 
-
-@auth_bp.route('/forgot-password', methods=['GET', 'POST'])
-def forgot_password():
-    """Request password reset."""
-    if current_user.is_authenticated:
-        flash('You are already logged in.', 'info')
-        return redirect(url_for('landing'))
-
-    if request.method == 'POST':
-        email = request.form.get('email', '').strip().lower()
-
-        user = User.query.filter_by(email=email).first()
-
-        if user:
-            # Generate reset token
-            token = secrets.token_urlsafe(32)
-            reset_token = PasswordResetToken(
-                user_id=user.id,
-                token=token,
-                expires_at=datetime.utcnow() + timedelta(hours=24)
-            )
-            db.session.add(reset_token)
-            db.session.commit()
-
-            # Send reset email
-            base_url = request.url_root.rstrip('/')
-            success, error = send_password_reset_email(email, token, base_url)
-
-            if not success:
-                flash('Failed to send reset email. Please try again later.', 'error')
-                return render_template('auth/forgot_password.html')
-
-        # Always show success message (don't reveal if email exists)
-        flash('If an account exists with that email, you will receive password reset instructions.', 'success')
-        return redirect(url_for('landing'))
-
-    return render_template('auth/forgot_password.html')
-
-
-@auth_bp.route('/reset-password/<token>', methods=['GET', 'POST'])
-def reset_password(token):
-    """Reset password with token."""
-    if current_user.is_authenticated:
-        flash('You are already logged in.', 'info')
-        return redirect(url_for('landing'))
-
-    reset_token = PasswordResetToken.query.filter_by(token=token).first_or_404()
-
-    if not reset_token.is_valid:
-        flash('This password reset link is invalid or has expired.', 'error')
-        return redirect(url_for('auth.forgot_password'))
-
-    if request.method == 'POST':
-        password = request.form.get('password', '')
-        confirm_password = request.form.get('confirm_password', '')
-
-        if not password or not confirm_password:
-            flash('Both fields are required', 'error')
-            return render_template('auth/reset_password.html', token=token)
-
-        if password != confirm_password:
-            flash('Passwords do not match', 'error')
-            return render_template('auth/reset_password.html', token=token)
-
-        # Validate password strength
-        is_valid, error = validate_password_strength(password)
-        if not is_valid:
-            flash(error, 'error')
-            return render_template('auth/reset_password.html', token=token)
-
-        # Update password
-        user = reset_token.user
-        user.set_password(password)
-        reset_token.is_used = True
-        db.session.commit()
-
-        flash('Password reset successfully! Please log in with your new password.', 'success')
-
-        # Redirect to role-specific login page
-        if user.role == 'student':
-            return redirect(url_for('auth.student_login'))
-        elif user.role == 'professor':
-            return redirect(url_for('auth.professor_login'))
-        elif user.role == 'admin':
-            return redirect(url_for('auth.admin_login'))
-        else:
-            return redirect(url_for('landing'))  # Unknown role - redirect to home
-
-    return render_template('auth/reset_password.html', token=token)
 
 
 @auth_bp.route('/logout')
