@@ -6,6 +6,11 @@
     <title>Test {{ ta.name }} - Maize TA</title>
     <link rel="icon" type="image/png" sizes="32x32" href="/static/images/favicon-32.png">
     <link rel="stylesheet" href="/static/css/style.css?v=13">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+    <script src="/static/js/message-format.js?v=1"></script>
     <style>
 {% include 'professor/_ta_header_styles.html' %}
 
@@ -62,6 +67,15 @@
             color: #111827;
             align-self: flex-start;
             border-bottom-left-radius: 4px;
+        }
+        /* Rendered messages are HTML (<br> for newlines), so pre-wrap would add a
+           second set of breaks and cramp KaTeX display math. */
+        .test-msg.is-formatted { white-space: normal; }
+        .test-msg.is-formatted p { margin: 0; }
+        .test-msg.is-formatted .katex-display {
+            margin: 0.5em 0;
+            overflow-x: auto;
+            overflow-y: hidden;
         }
         .test-msg--status {
             font-size: 12px;
@@ -279,12 +293,27 @@
             ).join('\n');
         }
 
+        // Markdown + KaTeX, via the same formatter the student chat uses — the
+        // point of the preview is to show what the student will actually see.
+        function setTestMessageContent(el, content) {
+            el.innerHTML = formatContent(content);
+            el.classList.add('is-formatted');
+            renderLatex(el);
+        }
+
+        // Mid-stream the text stays plain: half-finished math must not reach KaTeX,
+        // and pre-wrap keeps the line breaks until the formatter takes over.
+        function setTestMessageText(el, text) {
+            el.classList.remove('is-formatted');
+            el.textContent = text;
+        }
+
         function appendTestMessage(role, content) {
             const container = document.getElementById('test-chat-messages');
             if (!container) return null;
             const div = document.createElement('div');
             div.className = `test-msg test-msg--${role}`;
-            div.textContent = content;
+            setTestMessageContent(div, content);
             container.appendChild(div);
             container.scrollTop = container.scrollHeight;
             return div;
@@ -459,11 +488,12 @@
                                 assistantEl = appendTestMessage('assistant', '');
                             }
                             assistantContent += evt.content;
-                            assistantEl.textContent = assistantContent;
+                            setTestMessageText(assistantEl, assistantContent);
                             const container = document.getElementById('test-chat-messages');
                             if (container) container.scrollTop = container.scrollHeight;
                         } else if (evt.type === 'done') {
                             removeTestStatus();
+                            if (assistantEl) setTestMessageContent(assistantEl, assistantContent);
                             testMessages.push({role: 'assistant', content: assistantContent});
                         } else if (evt.type === 'error') {
                             removeTestStatus();
