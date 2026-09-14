@@ -1,0 +1,7 @@
+{
+ "econ_s1117_syn_typeM_01_v2": "econ_s1117_syn_working_logit_01",
+ "econ_s1117_syn_typeM_03_v2": "econ_s1117_syn_working_timeseries_01",
+ "econ_s1117_syn_typeM_04_v2": "econ_s1117_syn_working_bootstrap_01",
+ "econ_s1117_syn_typeM_05_v2": "econ_s1117_syn_typeC_propensity_01",
+ "analytics101_syn_typeM_03_v2": "analytics101_syn_working_matplotlib_01"
+}

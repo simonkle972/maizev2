@@ -68,11 +68,27 @@ if str(_PROJECT_ROOT) not in sys.path:
 # (stage_1_top_k_docs, initial_retrieval_k). First entry MUST be the live
 # production values -- it is the row the positive control is checked against,
 # and every other row is read as a delta from it.
+# (stage_1_top_k_docs, initial_retrieval_k, (w_dense, w_filename, w_bm25))
+#
+# The funnel was sized when reranking cost 11-19s per turn, so every candidate was
+# expensive. Cohere reranks in ~300ms, which removes the reason it is this narrow.
+# Standard practice is a WIDE first stage -- 50-100 candidates -- then an expensive
+# reranker narrows. Ours goes 70 docs -> 5 -> 20 chunks -> 8, i.e. the opposite.
+#
+# Weights: equal (1,1,1) is plain RRF. The alternative is derived from measured
+# per-signal recall on the fusion path -- dense 87%, filename 61%, bm25 30% --
+# normalised against dense, rather than guessed.
+EQ = (1.0, 1.0, 1.0)
+WQ = (1.0, 0.70, 0.34)
+
 SWEEP = [
-    (5, 20),   # current
-    (10, 20),  # wider document shortlist -- does gate 1 recover misses?
-    (20, 20),  # wider still -- where does L1 saturate?
-    (5, 50),   # wider chunk pool at today's shortlist -- gate 2 in isolation
+    (5, 20, EQ),    # current -- the positive control
+    (10, 50, EQ),   # widen both gates together (never tested; earlier sweeps
+                    # widened docs while leaving chunks at 20, which caused crowding)
+    (20, 50, EQ),
+    (20, 100, EQ),  # roughly the candidate count standard practice describes
+    (5, 20, WQ),    # weighted fusion alone, isolating it from any widening
+    (20, 50, WQ),   # both levers
 ]
 
 
@@ -261,10 +277,12 @@ def main() -> None:
                 print(f"         {rid}: {f!r}")
         print()
 
-        for s1k, ik in configs:
+        for s1k, ik, w in configs:
             Config.STAGE_1_TOP_K_DOCS = s1k
             R.INITIAL_RETRIEVAL_K = ik  # module global, read at call time (:2364)
-            label = f"docs={s1k},chunks={ik}"
+            (Config.RRF_WEIGHT_DENSE, Config.RRF_WEIGHT_FILENAME,
+             Config.RRF_WEIGHT_BM25) = w
+            label = f"docs={s1k},chunks={ik},w={'eq' if w == EQ else 'qual'}"
             print(f"--- {label} ---", flush=True)
             out = []
             for i, row in enumerate(rows, 1):
@@ -282,7 +300,7 @@ def main() -> None:
 
 
 def report(all_results: dict, out: Path, sweep: bool = True) -> None:
-    live = all_results[f"docs={SWEEP[0][0]},chunks={SWEEP[0][1]}"]
+    live = all_results[f"docs={SWEEP[0][0]},chunks={SWEEP[0][1]},w=eq"]
 
     print("=" * 70)
     print("CANDIDATE CEILING — live configuration")

@@ -51,12 +51,21 @@ class RowResult:
     correct_hit_at_5: bool
     hard_negative_top1: bool
     forbidden_hit: bool
-    forbidden_text_hit: bool  # chunk-level: any retrieved chunk text contains any forbidden fragment
+    forbidden_text_hit: bool  # RETIRED 2026-09-12. Substring-scanned every retrieved chunk, and
+                              # under hybrid_full_doc the whole document arrives as ONE chunk -- so a
+                              # file containing both Part 1 and Part 2 self-triggered on correct
+                              # retrieval. Never fed bucket_hit, so no row was ever failed by it.
+                              # If intra-doc routing needs measuring, use DocumentChunk.section_path
+                              # (fully populated, e.g. ["Part I", "Page 3"]) instead of text matching.
     # Pre-rerank metrics — same logic but applied to the chunk order BEFORE
     # llm_rerank() ran. Lets us measure rerank's actual lift in isolation.
     # The diff (post − pre) is rerank "lift": positive = rerank helped,
     # negative = rerank hurt, zero = rerank had no effect on top-5 membership.
     pre_rerank_retrieved_doc_ids: list[str] = field(default_factory=list)
+    pre_rerank_pool_doc_ids: list[str] = field(default_factory=list)  # untruncated
+    hybrid_fallback_reason: str = ""    # session_cache | early_routing_* | low_confidence etc.
+                                        # WITHOUT this, a cache hit and a real collapse are
+                                        # indistinguishable in the saved results.
     correct_hit_at_5_pre_rerank: bool = False
     hard_negative_top1_pre_rerank: bool = False
     error: str | None = None
@@ -65,11 +74,25 @@ class RowResult:
     # rows so we can audit intent-class accuracy across the body, but the
     # per-bucket scorecard surfaces them only where they're the primary signal
     # (H/I/J/K/L). See eval/schema.md "Wave 2 intent-classification failures".
-    expected_action: str = "retrieve"          # row's expected_action ("retrieve" | "redirect" | "no_retrieval")
+    expected_action: str = "retrieve"          # "retrieve" | "redirect" | "no_retrieval" | "acknowledge_gap"
     expected_intent_class: str | None = None   # row's expected_intent.intent_class, if labeled
     contextualizer_intent: str | None = None   # diagnostics["intent"] — what the contextualizer classified as
     adversarial_short_circuit_fired: bool = False  # diagnostics["adversarial_short_circuit"]
+    hybrid_fallback_triggered: bool = False    # diagnostics["hybrid_fallback_triggered"] -- the Path 4 collapse
+    supporting_doc_ids: list[str] = field(default_factory=list)
+    supporting_hit: bool = False               # a labelled "nice-to-have" doc reached the top-5.
+                                               # NEVER counted as a miss -- absence is not a failure.
+    answer: str = ""                           # --generate: the reply a student would have seen.
+    generation_ms: int = 0                     # Persisted to the per-row JSON so adversarial /
+                                               # coverage-gap answers are reviewable as evidence.
+    answer_good_without_direct_source: bool = False  # labeler flagged: prod answer was good
+                                                     # even though no doc directly served it
     retrieved_chunk_count: int = 0             # raw count of returned chunks (0 means skip-retrieval path fired)
+    is_follow_up: bool = False                 # row had prior_turns: scored as a follow-up, not an opener.
+                                               # The blended headline hid follow-up changes (137 of 250 rows).
+    retrieved_section_paths: list = field(default_factory=list)  # section_path per top-5 chunk when the
+                                               # retriever supplies it. Plumbing for a passage-level hit;
+                                               # the eval set carries no section labels yet.
     # Bucket-specific HIT signal — what counts as a pass for THIS row's
     # expected_action. For "retrieve" rows this equals correct_hit_at_5; for
     # "redirect" rows, equals adversarial_short_circuit_fired; for
@@ -158,6 +181,7 @@ def _generate_answer(row: dict, chunks: list, diagnostics: dict, session_id: str
             query_reference=diagnostics.get("validation_expected_ref"),
             attempt_count=diagnostics.get("attempt_count", 0) or 0,
             session_id=session_id,
+            low_confidence=diagnostics.get("low_confidence_after_widen", False),
         )
         return (answer or ""), int((_t.time() - t0) * 1000)
 
@@ -255,6 +279,7 @@ def group_into_sessions(rows: list[dict]) -> list[list[dict]]:
     child_of: dict[str, str] = {}   # parent row_id -> child row_id
     parent_of: dict[str, str] = {}
 
+    children: dict[str, list[str]] = {}
     for b in rows:
         ub = _user_turns(b)
         if not ub:
@@ -263,9 +288,18 @@ def group_into_sessions(rows: list[dict]) -> list[list[dict]]:
             if a is b or a.get("ta_id") != b.get("ta_id"):
                 continue
             if _user_turns(a) + [a["query"]] == ub:
-                child_of[a["row_id"]] = b["row_id"]
-                parent_of[b["row_id"]] = a["row_id"]
+                children.setdefault(a["row_id"], []).append(b["row_id"])
                 break
+
+    # Chain only LINEAR continuations. A turn with several alternative next turns
+    # (e.g. different student replies to the same clarifying question) is not one
+    # conversation; each alternative runs as its own session and replays its
+    # recorded prefix. Previously the second child overwrote the first in child_of,
+    # silently dropping a row (caught only by the rows_in == rows_out assertion).
+    for parent, kids in children.items():
+        if len(kids) == 1:
+            child_of[parent] = kids[0]
+            parent_of[kids[0]] = parent
 
     sessions: list[list[dict]] = []
     consumed: set[str] = set()
@@ -399,19 +433,27 @@ def evaluate_row(row: dict, retrieve_context, warm_cache: bool = True,
         retrieved = [c.get("file_name", "") for c in (chunks or [])][:8]
         retrieved_top5 = retrieved[:5]
         retrieved_chunk_texts = [c.get("text", "") for c in (chunks or [])][:8]
+        retrieved_section_paths = [c.get("section_path") for c in (chunks or [])][:5]
         retrieved_chunk_count = len(chunks or [])
         # Pre-rerank ordering — extracted from the diagnostics dict so we can
         # measure rerank lift in isolation (post − pre).
         pre_candidates = diagnostics.get("pre_rerank_candidates") or []
         pre_rerank_retrieved = [c.get("file", "") for c in pre_candidates][:8]
+        # FULL pool, untruncated. The [:8] above is kept for the rerank-lift metric
+        # (post-8 vs pre-8, like for like); this records every candidate that reached
+        # the reranker, so we can ask whether a document the pipeline had ALREADY
+        # FOUND was then discarded -- which the top-8 view cannot answer.
+        pre_rerank_pool = [c.get("file", "") for c in pre_candidates]
         error = None
     except Exception as e:
         latency = int((time.time() - t0) * 1000)
         retrieved = []
         retrieved_top5 = []
         retrieved_chunk_texts = []
+        retrieved_section_paths = []
         retrieved_chunk_count = 0
         pre_rerank_retrieved = []
+        pre_rerank_pool = []
         error = f"{type(e).__name__}: {e}"
 
     # Generate the answer the student would have seen, before logging, so the sheet
@@ -467,10 +509,23 @@ def evaluate_row(row: dict, retrieve_context, warm_cache: bool = True,
 
     # bucket_hit — the primary HIT signal, depends on the row's expected_action.
     if expected_action == "retrieve":
-        bucket_hit = correct_hit_at_5
+        # correct_doc_mode distinguishes "any of these is acceptable" (alternatives)
+        # from "all of these are needed" (a genuine multi-document answer, bucket H).
+        # Without this, an H row passes when only ONE of the two documents surfaces --
+        # which is precisely the failure H exists to detect.
+        if row.get("correct_doc_mode") == "all":
+            bucket_hit = all_correct_in_top_5
+        else:
+            bucket_hit = correct_hit_at_5
     elif expected_action == "redirect":
         # HIT = system fired the off-topic short-circuit AND returned no chunks.
         bucket_hit = adversarial_short_circuit_fired and retrieved_chunk_count == 0
+    elif expected_action == "acknowledge_gap":
+        # Coverage-gap rows (type M): the material genuinely is not in the corpus,
+        # so the right behaviour is to retrieve nothing and say so. The failure we
+        # actually see is the opposite -- collapsing to one whole document and then
+        # being unable to back out of it. Retrieval-level proxy: did NOT collapse.
+        bucket_hit = not bool(diagnostics.get("hybrid_fallback_triggered"))
     elif expected_action == "no_retrieval":
         # Today (pre-LangGraph): proxy via contextualizer classifying as "clarification".
         # Post-LangGraph adaptation: chunks==[] is also a HIT signal once the upstream skip-gate exists.
@@ -492,6 +547,11 @@ def evaluate_row(row: dict, retrieve_context, warm_cache: bool = True,
         ta_id=row.get("ta_id", ""),
         not_in_corpus=bool(row.get("not_in_corpus")),
         correct_doc_ids=row["correct_doc_ids"],
+        answer_good_without_direct_source=bool(row.get("answer_good_without_direct_source")),
+        supporting_doc_ids=row.get("supporting_doc_ids") or [],
+        supporting_hit=bool(set(row.get("supporting_doc_ids") or []) & set(retrieved_top5)),
+        answer=answer,
+        generation_ms=generation_ms,
         hard_negative_doc_ids=row.get("hard_negative_doc_ids") or [],
         forbidden_doc_ids=row.get("forbidden_doc_ids") or [],
         forbidden_text_fragments=forbidden_fragments,
@@ -509,7 +569,12 @@ def evaluate_row(row: dict, retrieve_context, warm_cache: bool = True,
         expected_intent_class=expected_intent_class,
         contextualizer_intent=contextualizer_intent,
         adversarial_short_circuit_fired=adversarial_short_circuit_fired,
+        hybrid_fallback_triggered=bool(diagnostics.get("hybrid_fallback_triggered")),
+        hybrid_fallback_reason=str(diagnostics.get("hybrid_fallback_reason") or ""),
+        pre_rerank_pool_doc_ids=pre_rerank_pool,
         retrieved_chunk_count=retrieved_chunk_count,
+        is_follow_up=bool(prior_turns),
+        retrieved_section_paths=retrieved_section_paths,
         bucket_hit=bucket_hit,
         all_correct_in_top_5=all_correct_in_top_5,
         intent_class_match=intent_class_match,
@@ -518,8 +583,32 @@ def evaluate_row(row: dict, retrieve_context, warm_cache: bool = True,
 
 # Wave 1 doc-routing buckets (existing) + Wave 2 intent-classification buckets
 # (H/I/J/K/L added 2026-05-31 — see eval/schema.md).
-BUCKET_KEYS = ["A", "B", "C", "D", "E", "F1", "F2", "G1", "G2",
-               "H", "I", "J", "K", "L", "working"]
+BUCKET_KEYS = ["A", "B", "C", "E", "F1", "F2",
+               "H", "I", "J", "K", "L", "M", "working"]
+
+
+def _percentile(values: list, pct: float) -> float:
+    """Nearest-rank percentile; P50/P95 rather than a mean, because one 30 s collapse
+    row moves a bucket average by seconds while saying nothing about a typical turn."""
+    if not values:
+        return 0.0
+    vs = sorted(values)
+    k = max(0, min(len(vs) - 1, int(round(pct / 100.0 * len(vs) + 0.5)) - 1))
+    return float(vs[k])
+
+
+def _split_stats(rows: list) -> dict:
+    """Opener / follow-up sub-scorecard for one group of rows."""
+    n = len(rows)
+    if n == 0:
+        return {"n": 0, "bucket_hit_rate": None, "collapse_rate": None,
+                "p50_latency_ms": None, "p95_latency_ms": None}
+    lat = [r.retrieval_latency_ms for r in rows]
+    return {"n": n,
+            "bucket_hit_rate": sum(r.bucket_hit for r in rows) / n,
+            "collapse_rate": sum(r.hybrid_fallback_triggered for r in rows) / n,
+            "p50_latency_ms": _percentile(lat, 50),
+            "p95_latency_ms": _percentile(lat, 95)}
 
 
 def aggregate(results: list[RowResult]) -> dict:
@@ -574,7 +663,12 @@ def aggregate(results: list[RowResult]) -> dict:
                 if any(r.expected_intent_class is not None for r in bucket) else None
             ),
             "redirect_fired_rate": sum(r.adversarial_short_circuit_fired for r in bucket) / n,
+            "collapse_rate": sum(r.hybrid_fallback_triggered for r in bucket) / n,
             "chunks_returned_avg": sum(r.retrieved_chunk_count for r in bucket) / n,
+            "p50_latency_ms": _percentile([r.retrieval_latency_ms for r in bucket], 50),
+            "p95_latency_ms": _percentile([r.retrieval_latency_ms for r in bucket], 95),
+            "opener": _split_stats([r for r in bucket if not r.is_follow_up]),
+            "follow_up": _split_stats([r for r in bucket if r.is_follow_up]),
         }
     summary["not_in_corpus"] = {
         "n": len(not_in_corpus),
@@ -584,12 +678,22 @@ def aggregate(results: list[RowResult]) -> dict:
         "forbidden_hit_rate": sum(r.forbidden_hit for r in not_in_corpus) / max(len(not_in_corpus), 1),
         "note": "These rows can't pass at the retrieval layer (correct doc not verified in corpus). Reported for tracking only.",
     }
+    _sup = [r for r in results if r.supporting_doc_ids]
+    summary["supporting"] = {"n": len(_sup), "hits": sum(r.supporting_hit for r in _sup)}
+
+    _agw = [r for r in results if r.answer_good_without_direct_source]
+    summary["answer_good_without_direct_source"] = {
+        "n": len(_agw), "hits": sum(r.bucket_hit for r in _agw)}
+
     summary["__overall__"] = {
         "total_rows": len(results),
         "in_corpus": len(in_corpus),
         "not_in_corpus": len(not_in_corpus),
         "errors": sum(1 for r in results if r.error),
         "distinct_tas": sorted({r.ta_id for r in results if r.ta_id}),
+        "opener": _split_stats([r for r in in_corpus if not r.is_follow_up]),
+        "follow_up": _split_stats([r for r in in_corpus if r.is_follow_up]),
+        "all": _split_stats(in_corpus),
     }
     return summary
 
@@ -599,6 +703,11 @@ def format_scorecard(summary: dict, label: str = "Retrieval scorecard") -> str:
     overall = summary["__overall__"]
     lines.append(f"**Total rows:** {overall['total_rows']} ({overall['in_corpus']} in-corpus + "
                  f"{overall['not_in_corpus']} not-in-corpus). **Errors:** {overall['errors']}.")
+    from config import Config as _Cfg
+    # Printed because every run_eval between 2026-09-11 and 09-13 silently reranked with
+    # gpt-5.2 (inherited from .env.local) while production runs Cohere.
+    lines.append(f"**Reranker:** `{_Cfg.RERANKER_VENDOR}` · **low-confidence action:** "
+                 f"`{_Cfg.LOW_CONFIDENCE_ACTION}` · **cache reuse:** `{_Cfg.SESSION_CACHE_REUSE_ENABLED}` · **rerank query:** `{_Cfg.RERANK_QUERY_MODE}`")
     distinct_tas = overall.get("distinct_tas") or []
     if len(distinct_tas) > 1:
         lines.append(
@@ -607,30 +716,52 @@ def format_scorecard(summary: dict, label: str = "Retrieval scorecard") -> str:
         )
     elif len(distinct_tas) == 1:
         lines.append(f"**TA:** `{distinct_tas[0]}` (filtered to one TA — `--ta-id` flag in use OR file only contains rows for this TA).")
+    # ---- Opener vs follow-up split (the headline) ----
+    # 137 of 250 rows have prior turns and the follow-up half is where the numbers
+    # are worst; a blended headline hides a change that only touches one half.
+    def _pct(v):
+        return "—" if v is None else f"{v:.0%}"
+    def _ms(v):
+        return "—" if v is None else f"{v:.0f}"
+    def _split_row(name, b):
+        o, f = b["opener"], b["follow_up"]
+        return (f"| {name} | {o['n']} | {_pct(o['bucket_hit_rate'])} | {_pct(o['collapse_rate'])} | "
+                f"{_ms(o['p50_latency_ms'])} / {_ms(o['p95_latency_ms'])} | "
+                f"{f['n']} | {_pct(f['bucket_hit_rate'])} | {_pct(f['collapse_rate'])} | "
+                f"{_ms(f['p50_latency_ms'])} / {_ms(f['p95_latency_ms'])} |")
+    lines.append("")
+    lines.append("## Openers vs follow-ups (bucket_hit)")
+    lines.append("")
+    lines.append("| Bucket | openers n | hit | collapsed | p50 / p95 ms | follow-ups n | hit | collapsed | p50 / p95 ms |")
+    lines.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|")
+    lines.append(_split_row("**all in-corpus**", overall))
+    for key in BUCKET_KEYS:
+        b = summary.get(key)
+        if b is None:
+            continue
+        lines.append(_split_row(key, b))
     # ---- Wave 1 doc-routing scorecard table ----
     lines.append("")
     lines.append("## Doc-routing buckets (Wave 1)")
     lines.append("")
-    lines.append("| Failure type | n | hit@5 pre→post (lift) | hard_neg_top1 | forbidden_hit | forbidden_text_hit | avg_latency_ms | errors |")
+    lines.append("| Failure type | n | hit@5 pre→post (lift) | collapsed_to_full_doc | hard_neg_top1 | forbidden_hit | avg_latency_ms | errors |")
     lines.append("|---|---:|---:|---:|---:|---:|---:|---:|")
     label_map = {
         "A": "A (Lab vs PS)",
         "B": "B (Roman numeral siblings, cross-doc)",
         "C": "C (lookalike-unrelated)",
-        "D": "D (problem-vs-solutions)",
         "E": "E (cache anchoring)",
         "F1": "F1 (explicit conceptual switch)",
         "F2": "F2 (explicit document switch)",
-        "G1": "G1 (intra-doc section confusion)",
-        "G2": "G2 (intra-doc Roman/numeric sibling)",
         "H": "H (multi-document intent)",
         "I": "I (document correction)",
         "J": "J (concept-vs-problem)",
         "K": "K (followup/clarification)",
         "L": "L (off-topic / redirect)",
+        "M": "M (coverage gap / acknowledge)",
         "working": "working cases",
     }
-    wave1_keys = ["A", "B", "C", "D", "E", "F1", "F2", "G1", "G2", "working"]
+    wave1_keys = ["A", "B", "C", "E", "F1", "F2", "working"]
     for key in wave1_keys:
         b = summary.get(key)
         if b is None:
@@ -640,8 +771,9 @@ def format_scorecard(summary: dict, label: str = "Retrieval scorecard") -> str:
             f"| {label_map[key]} | {b['n']} | "
             f"{b['correct_hit_at_5_pre_rerank_rate']:.0%}→{b['correct_hit_at_5_rate']:.0%} "
             f"({b['rerank_lift']:+.0%}) | "
+            f"{b['collapse_rate']:.0%} | "
             f"{b['hard_negative_top1_rate']:.0%} | {b['forbidden_hit_rate']:.0%} | "
-            f"{b['forbidden_text_hit_rate']:.0%} | "
+            f""
             f"{b['avg_latency_ms']:.0f} | {b['error_count']} |"
         )
 
@@ -651,11 +783,11 @@ def format_scorecard(summary: dict, label: str = "Retrieval scorecard") -> str:
     lines.append("")
     lines.append("| Failure type | n | bucket_hit | hit@5 (doc-routing) | all_correct_in_top_5 (H only) | intent_class_match | redirect_fired (L only) | avg_chunks_returned | avg_latency_ms |")
     lines.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|")
-    wave2_keys = ["H", "I", "J", "K", "L"]
+    wave2_keys = ["H", "I", "K", "L", "M"]
     for key in wave2_keys:
         b = summary.get(key)
         if b is None:
-            lines.append(f"| {label_map[key]} | 0 | — | — | — | — | — | — | — |")
+            lines.append(f"| {label_map[key]} | 0 | — | — | — | — | — | — |")
             continue
         intent_match_str = "—" if b.get("intent_class_match_rate") is None else f"{b['intent_class_match_rate']:.0%}"
         all_correct_str = f"{b['all_correct_in_top_5_rate']:.0%}" if key == "H" else "—"
@@ -673,6 +805,23 @@ def format_scorecard(summary: dict, label: str = "Retrieval scorecard") -> str:
 
     nic = summary["not_in_corpus"]
     lines.append("")
+    sup = summary.get("supporting") or {"n": 0, "hits": 0}
+    if sup["n"]:
+        lines.append(f"**Supporting material:** {sup['hits']}/{sup['n']} rows with a labelled "
+                     f"nice-to-have document had it reach the top-5. Never scored as a miss — this "
+                     f"measures whether the lecturer's own explanatory material accompanies the answer.")
+        lines.append("")
+
+    agw = summary.get("answer_good_without_direct_source") or {"n": 0, "hits": 0}
+    if agw["n"]:
+        hits = agw["hits"]
+        lines.append(
+            f"**Answer-good-without-direct-source:** {agw['n']} rows the labeler marked as having "
+            f"produced a good production answer even though no document directly answered them. "
+            f"{hits}/{agw['n']} score a retrieval hit here — the remainder are rows where our "
+            f"metrics say MISS but the student was served correctly. Treat them as a ceiling on "
+            f"how much retrieval improvement is actually available, not as failures to fix.")
+        lines.append("")
     lines.append(f"**Not-in-corpus bucket:** {nic['n']} rows. Retrieved a labeled-correct doc on "
                  f"{nic['retrieved_anything_relevant']}/{nic['n']} (expected 0 — these docs are unverified in the corpus). "
                  f"Forbidden-hit rate: {nic['forbidden_hit_rate']:.0%}.")
@@ -684,17 +833,50 @@ def format_scorecard(summary: dict, label: str = "Retrieval scorecard") -> str:
                  "(i.e., the current bad retrieval pattern fired).")
     lines.append("- **forbidden_hit** — fraction of rows where ANY retrieved doc was on the forbidden list "
                  "(e.g., solutions doc returned when student is solving). Lower is better; ideal = 0%.")
-    lines.append("- **forbidden_text_hit** — fraction of rows where ANY retrieved chunk's text contained a forbidden substring "
-                 "(e.g., \"Part II\" when the row tests Part I retrieval). Detects G failures — right doc, wrong section/part. "
-                 "Lower is better; ideal = 0%.")
     lines.append("- **bucket_hit** (Wave 2) — the primary HIT signal for a row, depends on its `expected_action`: "
                  "for `retrieve` rows it equals hit@5; for `redirect` rows it requires `adversarial_short_circuit` fired AND zero chunks returned; "
                  "for `no_retrieval` rows it's a proxy via `intent == 'clarification'` today (becomes a true skip-gate metric post-LangGraph adaptation).")
     lines.append("- **all_correct_in_top_5** (H bucket) — stricter than hit@5: requires EVERY `correct_doc_ids` entry to appear in top-5, not just one. Tests whether multi-doc intent surfaces ALL needed docs.")
     lines.append("- **intent_class_match** — fraction of rows (with `expected_intent.intent_class` labeled) where the contextualizer's classification matches the label. Measures intent-classification accuracy independently of retrieval — Q1+Q2 deep-research flagged this as a literature gap; doing this puts Maize ahead of published practice.")
+    lines.append("- **collapsed_to_full_doc** — fraction of rows where `hybrid_fallback_triggered` fired: "
+                 "the router gave up on its shortlist and expanded ONE whole document to full text. "
+                 "This is the Path 4 collapse. Lower is better; for M (coverage-gap) rows it IS the bucket_hit rule inverted.")
     lines.append("- **redirect_fired** (L bucket) — fraction of rows where `adversarial_short_circuit` fired in diagnostics, regardless of whether chunks were also returned.")
     lines.append("- **avg_chunks_returned** — average number of chunks the retriever returned. For K/L rows the IDEAL value is 0 (system should skip retrieval). Useful as a smoke check that the skip-gate is firing.")
     return "\n".join(lines)
+
+
+def results_from_json(path: Path) -> list[RowResult]:
+    """Rebuild RowResult objects from a saved per-row JSON. Fields the dataclass has
+    grown since that run are defaulted, and `is_follow_up` is backfilled from the
+    eval set by row_id, so older runs still split into openers and follow-ups."""
+    import dataclasses
+    known = {f.name for f in dataclasses.fields(RowResult)}
+    raw = json.loads(path.read_text())
+    prior_by_id = {}
+    try:
+        prior_by_id = {r["row_id"]: bool(r.get("prior_turns")) for r in load_rows()}
+    except Exception as e:  # eval set unreadable: still render, without the split
+        print(f"WARNING: could not read eval set for is_follow_up backfill: {e}", file=sys.stderr)
+    results = []
+    for d in raw:
+        kept = {k: v for k, v in d.items() if k in known}
+        if "is_follow_up" not in d and kept.get("row_id") in prior_by_id:
+            kept["is_follow_up"] = prior_by_id[kept["row_id"]]
+        results.append(RowResult(**kept))
+    return results
+
+
+def rerender_from_json(path: Path, out: str | None, baseline: bool = False) -> int:
+    results = results_from_json(path)
+    summary = aggregate(results)
+    label = "Baseline (CURRENT retriever)" if baseline else "Retrieval scorecard"
+    scorecard = format_scorecard(summary, label=f"{label} — re-rendered from {path.name}")
+    print(scorecard)
+    if out:
+        Path(out).write_text(scorecard + "\n")
+        print(f"\nScorecard written to {out}")
+    return 0
 
 
 def main() -> int:
@@ -704,7 +886,19 @@ def main() -> int:
     parser.add_argument("--out", type=str, default=None,
                         help="Write scorecard to a specific path (overrides --baseline default).")
     parser.add_argument("--row-id", type=str, default=None,
-                        help="Run only the row with this row_id; useful for debugging a single case.")
+                        help="Run only these row_ids (comma-separated); useful for debugging "
+                             "specific cases or re-running one bucket with --generate.")
+    parser.add_argument("--reranker", type=str, default="cohere", choices=["cohere", "gpt-5.2"],
+                        help="Reranker for this run. Set in-process because config.py loads .env.local "
+                             "with override=True, which silently beats a RERANKER_VENDOR env var. "
+                             "Defaults to cohere to match production.")
+    parser.add_argument("--failure-type", type=str, default=None,
+                        help="Filter to these failure_type_target buckets (comma-separated), "
+                             "e.g. --failure-type L,M")
+    parser.add_argument("--from-json", type=str, default=None,
+                        help="Re-render a scorecard from a saved per-row results JSON (written next "
+                             "to --out) instead of running retrieval. Needs no DB or API; row fields "
+                             "added since the run are backfilled from the eval set where possible.")
     parser.add_argument("--ta-id", type=str, default=None,
                         help="Filter eval rows to those whose ta_id matches. Without this flag the harness "
                              "runs every row across every TA in the eval file (cross-TA mode).")
@@ -739,6 +933,9 @@ def main() -> int:
                              "the file says (which is how 4 eval rows once landed in dev_logs).")
     args = parser.parse_args()
 
+    if args.from_json:
+        return rerender_from_json(Path(args.from_json), args.out, baseline=args.baseline)
+
     # Set up Flask app context for DB queries.
     try:
         from app import app
@@ -748,8 +945,18 @@ def main() -> int:
                  f"Make sure DOTENV_PATH is set and dependencies are installed.")
 
     rows = load_rows()
+    if args.failure_type:
+        fts = {x.strip() for x in args.failure_type.split(",") if x.strip()}
+        rows = [r for r in rows if (r.get("failure_type_target") or "") in fts]
+        if not rows:
+            sys.exit(f"ERROR: no rows with failure_type_target in {sorted(fts)}")
+
     if args.row_id:
-        rows = [r for r in rows if r["row_id"] == args.row_id]
+        wanted = {x.strip() for x in args.row_id.split(",") if x.strip()}
+        missing = wanted - {r["row_id"] for r in rows}
+        if missing:
+            sys.exit(f"ERROR: row_id(s) not found: {sorted(missing)}")
+        rows = [r for r in rows if r["row_id"] in wanted]
         if not rows:
             sys.exit(f"ERROR: row_id {args.row_id!r} not found")
     if args.ta_id:
@@ -761,6 +968,9 @@ def main() -> int:
         rows = rows[: args.limit]
 
     warm = not args.cold_cache
+    from config import Config as _Cfg
+    _Cfg.RERANKER_VENDOR = args.reranker
+    print(f"Reranker vendor: {_Cfg.RERANKER_VENDOR}", flush=True)
     cache_mode = "warm-cache (prior turns replayed)" if warm else "cold-cache (target query only)"
     print(f"Running {len(rows)} eval rows against the current retriever... [{cache_mode}]", flush=True)
     if args.log_to_sheet:
@@ -860,6 +1070,16 @@ def main() -> int:
     elif args.out:
         Path(args.out).write_text(scorecard + "\n")
         print(f"\nScorecard written to {args.out}")
+
+    # Persist per-row results alongside the scorecard so a reporting change can be
+    # re-rendered without paying for another run (candidate_ceiling.py has --from-json;
+    # this harness did not, which cost a full re-run on 2026-09-11).
+    if args.out:
+        import dataclasses
+        json_path = Path(args.out).with_suffix(".json")
+        json_path.write_text(json.dumps(
+            [dataclasses.asdict(r) for r in results], ensure_ascii=False, indent=1))
+        print(f"Per-row results written to {json_path}")
 
     return 1 if summary["__overall__"]["errors"] > 0 else 0
 

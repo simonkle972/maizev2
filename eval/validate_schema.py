@@ -23,10 +23,10 @@ REQUIRED = {"row_id", "source", "ta_id", "query", "prior_turns",
             "failure_type_target", "expected_intent"}
 # Wave 2 (2026-05-31) added H/I/J/K/L for intent-classification dimensions.
 # See eval/schema.md "Wave 2 intent-classification failures".
-VALID_FAILURE_TYPES = {"A", "B", "C", "D", "E", "F1", "F2", "G1", "G2",
-                        "H", "I", "J", "K", "L", None}
+VALID_FAILURE_TYPES = {"A", "B", "C", "D", "E", "F1", "F2", "G", "G1", "G2",
+                        "H", "I", "J", "K", "L", "M", "N", None}
 VALID_SOURCES = {"prod_log", "synthetic", "synthetic_working_case"}
-VALID_EXPECTED_ACTIONS = {"retrieve", "redirect", "no_retrieval"}
+VALID_EXPECTED_ACTIONS = {"retrieve", "redirect", "no_retrieval", "acknowledge_gap"}
 VALID_INTENT_CLASSES = {"continuation", "concept_lookup", "pivot",
                          "clarification", "new", "off_topic"}
 
@@ -148,8 +148,8 @@ def main() -> int:
     print(f"Total rows: {len(rows)}")
     print()
     print(f"Failure type distribution:")
-    for k in ["A", "B", "C", "D", "E", "F1", "F2", "G1", "G2",
-              "H", "I", "J", "K", "L", None]:
+    for k in ["A", "B", "C", "D", "E", "F1", "F2", "G", "G1", "G2",
+              "H", "I", "J", "K", "L", "M", "N", None]:
         print(f"  {k!s:>6}: {failure_dist[k]}")
     print()
     print(f"Source distribution:")

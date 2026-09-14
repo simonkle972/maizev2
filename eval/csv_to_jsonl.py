@@ -7,7 +7,7 @@ Workflow (see `eval/bootstrap_new_ta.md` "Minimal-input mode"):
 - Claude auto-derives the remaining 8 columns by running the live V2 retriever
   + applying pattern rules:
     * hard_negative_doc_ids — top retrieved docs minus correct
-    * forbidden_doc_ids — solutions doc matching correct's assignment number
+    * forbidden_doc_ids — NOT auto-derived (solutions are not forbidden; see policy note)
     * failure_type_target — A/B/C/D/E heuristic from the retrieval pattern
     * expected_intent — keyword heuristic on the query
     * not_in_corpus — verified against the TA's docs table
@@ -43,9 +43,9 @@ JSONL_PATH = Path(__file__).parent / "maize_eval_v1.jsonl"
 REQUIRED_INPUT_COLS = {"row_id", "source", "ta_id", "query"}
 VALID_SOURCES = {"prod_log", "synthetic", "synthetic_working_case"}
 # Wave 2 (2026-05-31) — H/I/J/K/L for intent-classification dimensions.
-VALID_FAILURE_TYPES = {"A", "B", "C", "D", "E", "F1", "F2", "G1", "G2",
-                        "H", "I", "J", "K", "L"}
-VALID_EXPECTED_ACTIONS = {"retrieve", "redirect", "no_retrieval"}
+VALID_FAILURE_TYPES = {"A", "B", "C", "D", "E", "F1", "F2", "G", "G1", "G2",
+                        "H", "I", "J", "K", "L", "M", "N"}
+VALID_EXPECTED_ACTIONS = {"retrieve", "redirect", "no_retrieval", "acknowledge_gap"}
 VALID_INTENT_CLASSES = {"continuation", "concept_lookup", "pivot",
                          "clarification", "new", "off_topic"}
 
@@ -348,12 +348,12 @@ def autofill(parsed: dict, ta_doc_names: list[str]) -> tuple[dict, list[str]]:
         forbidden = parsed["forbidden_doc_ids_input"]
         notes_log.append("forbidden: from CSV (kept human-provided)")
     else:
+        # POLICY 2026-09-07: solutions documents are NOT forbidden. Retrieval may
+        # surface an answer key; the generator already withholds answers by content
+        # (see the closed is_solutions investigation). Auto-deriving a forbidden list
+        # from solutions siblings scored correct retrievals as failures, so it is off.
         forbidden = []
-        for c in parsed["correct_doc_ids"]:
-            sol = find_solutions_doc_for(c, ta_doc_names)
-            if sol and sol not in forbidden and sol not in parsed["correct_doc_ids"]:
-                forbidden.append(sol)
-        notes_log.append(f"forbidden: auto-derived → {forbidden}")
+        notes_log.append("forbidden: none auto-derived (solutions-are-not-forbidden policy)")
 
     if parsed["failure_type_target_input"]:
         ftype = parsed["failure_type_target_input"]

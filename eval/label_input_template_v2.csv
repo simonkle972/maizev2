@@ -1,0 +1,7 @@
+label_correct_docs,label_mode,label_supporting_docs,label_forbidden_docs,label_expected_action,label_verdict,label_note,session_id,timestamp,ta_id,query,retrieval_method,sources
+DELETE THIS ROW AND THE FOUR EXAMPLES BELOW,,,,,,,,,,,,
+econ117_pset02_2025B_with_table,,Lecture 5 - Expectations|Lecture 6 - Rational Expectations,,,good,working case — do not regress; supporting = where the method is taught,a1b2c3d4,2026-08-02 15:20,EgZ14pvqEYzfQRTM,help me with question 3 from problem set 2,v2_hybrid_rrf,econ117_pset02_2025B_with_table
+econ117_pset02_2025B_solutions,,,,,good,answer key explicitly requested — solutions doc is CORRECT per decision 1,a1b2c3d4,2026-08-02 15:31,EgZ14pvqEYzfQRTM,show me the answer key for pset 2,hybrid_full_doc,econ117_pset02_2025B_with_table
+2026 Homework 1 PQ and Other Basics,,Lecture 3 - GDP and Price Indices,,,wrong_doc,T2 doc switch failed — stayed on the circular-flow lecture from T1,iTj1T4Yj,2026-08-02 14:03,ec112_ta_id,I need help with questions 2-6 from homework 1,unfiltered,Lecture 2 - Circular Flow
+exam_2024_part_1|exam_2024_part_2,any,,,,unsure,"student didn't say which part; either is defensible",e5f6g7h8,2026-08-03 09:12,EgZ14pvqEYzfQRTM,question 2 from the 2024 final,v2_hybrid_rrf,exam_2024_part_2
+,,,,no_retrieval,good,contentless — acknowledgement only,a1b2c3d4,2026-08-02 15:24,EgZ14pvqEYzfQRTM,thanks,unfiltered,econ117_pset02_2025B_with_table
