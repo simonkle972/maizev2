@@ -179,7 +179,10 @@ class Config:
     # rewriter changed that by 0.018 — so the reranker, not the contextualizer,
     # owns it. A cross-encoder is deterministic, which also stabilises
     # assess_retrieval_confidence, since that thresholds directly on these scores.
-    RERANKER_VENDOR = os.getenv("RERANKER_VENDOR", "gpt-5.2")
+    # Default flipped to cohere 2026-09-13: production has run Cohere since
+    # 2026-08-24 (ecbf2f1) and every local eval that inherited the old default
+    # silently measured gpt-5.2 instead. Rollback remains RERANKER_VENDOR=gpt-5.2.
+    RERANKER_VENDOR = os.getenv("RERANKER_VENDOR", "cohere")
     COHERE_API_KEY = os.getenv("COHERE_API_KEY")
     # rerank-v4.0-pro, NOT v3.5. On the 27 queries where the reranker had a real
     # decision to make (the correct document reached the candidate pool), measured
