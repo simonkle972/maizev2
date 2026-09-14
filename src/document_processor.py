@@ -9,6 +9,12 @@ from config import Config
 from sqlalchemy.exc import OperationalError, DBAPIError
 
 logger = logging.getLogger(__name__)
+# pypdf logs one warning per unparsed font ("fontTools is required to fully parse
+# the encoding of a CFF Type1 font...") and one per damaged xref entry ("Ignoring
+# wrong pointing object"). A LaTeX-generated textbook produced hundreds of lines on
+# a single index. PyPDF2 emitted the xref lines too; the font lines are new with the
+# 2026-09-13 upgrade and change nothing in the output. Keep errors, drop the rest.
+logging.getLogger("pypdf").setLevel(logging.ERROR)
 
 # Phase B Stage B8 (2026-05-25). Hierarchy levels for structural headers.
 # Used by extract_section_headers + get_section_path_at_position to build a
@@ -432,7 +438,7 @@ _DOUBLED_MATH_ALNUM = re.compile(r'([\U0001D400-\U0001D7FF])\1')
 
 def normalize_math_glyphs(text: str) -> str:
     """Repair the doubled Mathematical-Alphanumeric glyphs that Word/Cambria-Math
-    PDFs produce under both PyPDF2 and pdfplumber.
+    PDFs produce under pypdf (and PyPDF2 before it) and pdfplumber alike.
 
     Measured 2026-09-13 on the local eval corpus: 25 documents across all four
     eval TAs carry glyphs from the U+1D400 block, and in every sampled chunk each
@@ -460,13 +466,13 @@ def extract_pdf(file_path: str, heartbeat=None) -> tuple:
     heartbeat: optional callable passed down to the page-by-page vision loops so a
     long document keeps reporting progress to the indexing watchdog.
     """
-    text, page_count = _extract_pdf_pypdf2(file_path, heartbeat=heartbeat)
+    text, page_count = _extract_pdf_pypdf(file_path, heartbeat=heartbeat)
     text = normalize_math_glyphs(text)
     if text and len(text.strip()) > 100:
         text = _supplement_pdf_with_figures(file_path, text, heartbeat=heartbeat)
         return text, page_count
 
-    logger.info("PyPDF2 extraction insufficient, trying pdfplumber...")
+    logger.info("pypdf extraction insufficient, trying pdfplumber...")
     text, page_count = _extract_pdf_pdfplumber(file_path, heartbeat=heartbeat)
     text = normalize_math_glyphs(text)
     if text and len(text.strip()) > 100:
@@ -812,9 +818,16 @@ def _extract_pdf_pdfplumber(file_path: str, heartbeat=None) -> tuple:
         logger.warning(f"pdfplumber extraction failed: {e}")
         return "", 0
 
-def _extract_pdf_pypdf2(file_path: str, heartbeat=None) -> tuple:
+def _extract_pdf_pypdf(file_path: str, heartbeat=None) -> tuple:
     """
-    Extract PDF text using PyPDF2. Returns (text, page_count).
+    Extract PDF text using pypdf. Returns (text, page_count).
+
+    pypdf replaced PyPDF2 (its deprecated predecessor) on 2026-09-13. PyPDF2 3.0.1
+    split heading digits by a space in Word-generated PDFs ("Problem 1 4", "Problem
+    1 8"), so a reference like "question 14" could never match the chunk text;
+    measured on 10 documents of the econ corpus. pypdf 6.18 renders all ten headings
+    of extra problems II-1-1.pdf correctly and is otherwise 94-99% identical text on
+    six sampled PDFs. Same PdfReader / extract_text API.
 
     heartbeat fires every 25 pages. Measured on a 356-page textbook, this loop
     alone runs ~170s — longer than the vision supplement that follows it — so
@@ -822,7 +835,7 @@ def _extract_pdf_pypdf2(file_path: str, heartbeat=None) -> tuple:
     5-minute window before the first progress update is even possible.
     """
     try:
-        from PyPDF2 import PdfReader
+        from pypdf import PdfReader
 
         reader = PdfReader(file_path)
         text_parts = []
@@ -835,7 +848,7 @@ def _extract_pdf_pypdf2(file_path: str, heartbeat=None) -> tuple:
                 text_parts.append(f"--- Page {page_num} ---\n{text}")
         return "\n\n".join(text_parts), page_count
     except Exception as e:
-        logger.warning(f"PyPDF2 extraction failed: {e}")
+        logger.warning(f"pypdf extraction failed: {e}")
         return "", 0
 
 def extract_docx(file_path: str) -> str:
