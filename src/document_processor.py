@@ -3,6 +3,7 @@ import logging
 import json
 import time
 import re
+import unicodedata
 from datetime import datetime
 from config import Config
 from sqlalchemy.exc import OperationalError, DBAPIError
@@ -425,6 +426,33 @@ def extract_text_from_file(file_path: str, heartbeat=None) -> tuple:
         logger.error(f"Error extracting text from {file_path}: {e}")
         return "", 0
 
+_MATH_ALNUM = re.compile(r'[\U0001D400-\U0001D7FF]')
+_DOUBLED_MATH_ALNUM = re.compile(r'([\U0001D400-\U0001D7FF])\1')
+
+
+def normalize_math_glyphs(text: str) -> str:
+    """Repair the doubled Mathematical-Alphanumeric glyphs that Word/Cambria-Math
+    PDFs produce under both PyPDF2 and pdfplumber.
+
+    Measured 2026-09-13 on the local eval corpus: 25 documents across all four
+    eval TAs carry glyphs from the U+1D400 block, and in every sampled chunk each
+    glyph appears twice ("𝑓𝑓𝑋𝑋,𝑌𝑌(𝑥𝑥,𝑦𝑦)" for f_{X,Y}(x,y)). On "extra problems
+    II-1-1.pdf" that was 456 glyphs, all 228 pairs doubled. Two effects downstream:
+    the tokens never match a query ("fX" vs "𝑓𝑓𝑋𝑋"), and the chunk text the
+    generator sees is unreadable.
+
+    Two steps, in this order: collapse an immediately repeated math-block glyph to
+    one, then NFKC-fold the block onto plain ASCII letters (𝑓 -> f, 𝑋 -> X). The
+    collapse is restricted to that block, so ordinary doubled letters ("book",
+    "11") are untouched. Applied to every PDF text extractor's output before the
+    figure supplement, so page markers and [FIGURE] blocks are unaffected.
+    """
+    if not text or not _MATH_ALNUM.search(text):
+        return text
+    collapsed = _DOUBLED_MATH_ALNUM.sub(r'\1', text)
+    return _MATH_ALNUM.sub(lambda m: unicodedata.normalize("NFKC", m.group(0)), collapsed)
+
+
 def extract_pdf(file_path: str, heartbeat=None) -> tuple:
     """
     Extract PDF text and return (text, page_count).
@@ -433,12 +461,14 @@ def extract_pdf(file_path: str, heartbeat=None) -> tuple:
     long document keeps reporting progress to the indexing watchdog.
     """
     text, page_count = _extract_pdf_pypdf2(file_path, heartbeat=heartbeat)
+    text = normalize_math_glyphs(text)
     if text and len(text.strip()) > 100:
         text = _supplement_pdf_with_figures(file_path, text, heartbeat=heartbeat)
         return text, page_count
 
     logger.info("PyPDF2 extraction insufficient, trying pdfplumber...")
     text, page_count = _extract_pdf_pdfplumber(file_path, heartbeat=heartbeat)
+    text = normalize_math_glyphs(text)
     if text and len(text.strip()) > 100:
         text = _supplement_pdf_with_figures(file_path, text, heartbeat=heartbeat)
         return text, page_count
