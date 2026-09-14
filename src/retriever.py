@@ -1409,7 +1409,7 @@ def detect_pasted_question(
 # short-circuit logic below is load-bearing for that query class — keep it.
 # Full results + diagnosis: attached_assets/maize-hybrid-doc-search-refactor-
 # plan.md ("Result — did not ship") + audit-doc 3.3 entry.
-def hybrid_doc_search(query: str, query_embedding: list, ta_id: str, top_k: int = None, query_analysis: dict = None) -> tuple:
+def hybrid_doc_search(query: str, query_embedding: list, ta_id: str, top_k: int = None, query_analysis: dict = None, allow_short_circuit: bool = True) -> tuple:
     """Stage 1 hybrid document-level retrieval (Phase A Stage 3 + Stage 5).
 
     Two-phase routing:
@@ -1684,7 +1684,11 @@ def hybrid_doc_search(query: str, query_embedding: list, ta_id: str, top_k: int 
             diagnostics["stage_1_method"] = "filename_direct_match"
             diagnostics["fused_doc_ids"] = [sc_doc_id]
             logger.info(f"[{ta_id}] hybrid_doc_search SHORT-CIRCUIT: doc_id={sc_doc_id} reason={sc_reason} query_number={query_number}")
-            return [sc_doc_id], diagnostics
+            if allow_short_circuit:
+                return [sc_doc_id], diagnostics
+            # Widening pass: keep the direct match as the top candidate but still fuse
+            # the rest, so a wider search actually returns more than one document.
+            diagnostics["short_circuit_suppressed_doc"] = sc_doc_id
         else:
             # Preserve the multi_doc_query_suppressed reason if it was set earlier;
             # otherwise record a generic miss.
@@ -1787,6 +1791,9 @@ def hybrid_doc_search(query: str, query_embedding: list, ta_id: str, top_k: int 
         fused.append((doc_id, score))
     fused.sort(key=lambda x: x[1], reverse=True)
     top_doc_ids = [doc_id for doc_id, _ in fused[:top_k]]
+    sc_kept = diagnostics.get("short_circuit_suppressed_doc")
+    if sc_kept is not None:
+        top_doc_ids = [sc_kept] + [d for d in top_doc_ids if d != sc_kept][:top_k - 1]
     diagnostics["fused_doc_ids"] = top_doc_ids
     return top_doc_ids, diagnostics
 
@@ -2098,6 +2105,55 @@ def _format_history_for_contextualizer(conversation_history: list, max_turns: in
     return "\n".join(normalized)
 
 
+_COURSE_SUMMARY_CACHE: dict = {}
+
+
+def get_course_summary(ta_id: str) -> str:
+    """Short description of what a TA's course covers, for the off-topic check.
+
+    Derived from what is already indexed -- course name, document titles, and the
+    per-document summaries generated at indexing time -- condensed by one small LLM
+    call and memoised per process. No professor input needed. Returns "" on any
+    failure so the classifier simply runs without it.
+    """
+    if not ta_id:
+        return ""
+    if ta_id in _COURSE_SUMMARY_CACHE:
+        return _COURSE_SUMMARY_CACHE[ta_id]
+    summary = ""
+    try:
+        from models import Document, TeachingAssistant
+        ta = TeachingAssistant.query.get(ta_id)
+        docs = Document.query.filter_by(ta_id=ta_id).all()
+        if ta and docs:
+            lines = []
+            for d in docs:
+                title = d.display_name or d.original_filename
+                blurb = (d.summary or "").replace("\n", " ")[:400]
+                lines.append(f"- {title}: {blurb}")
+            material = "\n".join(lines)
+            client = get_openai_client()
+            response = client.chat.completions.create(
+                store=False,
+                model=Config.CONTEXTUALIZER_MODEL,
+                messages=[{"role": "user", "content": (
+                    f"Course name: {ta.course_name or ta.name}\n\n"
+                    f"Materials in this course (title: summary):\n{material}\n\n"
+                    "Write a description of this course in at most 120 words: its subject area "
+                    "in broad terms, then the main topics and kinds of materials it contains. "
+                    "Use only what the materials show; do not invent topics."
+                )}],
+                max_tokens=220,
+                temperature=0.0,
+            )
+            summary = (response.choices[0].message.content or "").strip()
+    except Exception as e:
+        logger.warning(f"[{ta_id}] Course summary failed: {type(e).__name__}: {e}")
+        summary = ""
+    _COURSE_SUMMARY_CACHE[ta_id] = summary
+    return summary
+
+
 def contextualize_query(query: str, conversation_history: list = None, session_context: dict = None, ta_id: str = "", session_id: str = "") -> dict:
     """
     Pre-retrieval contextualization: rewrite the query into a self-contained form
@@ -2147,6 +2203,17 @@ def contextualize_query(query: str, conversation_history: list = None, session_c
         conversation_history or [], Config.CONTEXTUALIZER_MAX_HISTORY
     )
 
+    course_block = ""
+    course_rule = ""
+    if Config.OFFTOPIC_COURSE_SUMMARY_ENABLED:
+        course_summary = get_course_summary(ta_id)
+        if course_summary:
+            course_block = f"\nWHAT THIS COURSE COVERS:\n{course_summary}\n"
+            course_rule = """
+(g) A sincere question with no plausible connection to this course's subject area or its materials (see WHAT THIS COURSE COVERS). Examples: sports results, weather, news or politics, celebrity trivia, shopping or investment tips, personal tasks like writing a cover letter, general trivia. Be generous about what counts as related: applying course concepts to real life, study help, course logistics (syllabus, deadlines, grading), and topics within or adjacent to the course's subject area are NOT off_topic — even when the materials might not cover that specific topic (that is a coverage gap, not off-topic). Flag only when nothing in this course's subject could reasonably bear on the question.
+    "pivot" versus "off_topic": "pivot" is ONLY for moving to a different problem or topic WITHIN this course. If the question has nothing to do with this course — if your own reason would say it is unrelated to the course — the intent is "off_topic", not "pivot".
+"""
+
     if has_cache:
         cache_summary = (
             f"Document: {session_context.get('document_filename', 'unknown')} | "
@@ -2157,7 +2224,7 @@ def contextualize_query(query: str, conversation_history: list = None, session_c
         cache_summary = "none"
 
     prompt = f"""You help a Teaching Assistant understand what a student is asking in context.
-
+{course_block}
 Student's current message:
 "{query}"
 
@@ -2211,7 +2278,7 @@ Classify as "off_topic" ONLY when the message clearly falls into one of these ca
 (e) Direct request for exam or assignment SOLUTIONS with NO problem-solving context. Example: "give me the exam answers" with no specific problem being worked on. (NOT this: "help me with Q3" — that's a legit homework request.)
 
 (f) Pure insults, abuse, or hostile rudeness with NO substantive course content. Examples: "you suck", "this AI is dumb", "shut up". The distinguishing test: does the message engage with any course concept, problem, or learning task? If no — flag. Frustration that DOES engage with the material ("this is so hard, I hate stats", "why is integration so confusing?", "this assignment makes no sense") is NOT off_topic — that's a real student who needs help.
-
+{course_rule}
 When in doubt between "off_topic" and any other intent, choose the OTHER intent. False positives (dismissing real students) are far worse than false negatives (letting an adversarial query through to the next layer of defense). Real students asking conceptual questions, expressing frustration that engages with course material, saying "I don't understand", asking about the syllabus, or continuing a real homework discussion are NEVER "off_topic".
 
 Respond with JSON ONLY, no prose:
@@ -2699,6 +2766,11 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         else:
             diagnostics["cache_action"] = "heuristic_switch" if is_topic_switch else "heuristic_preserved"
 
+        if not is_topic_switch and not Config.SESSION_CACHE_REUSE_ENABLED:
+            # Experiment: never reuse the cached document; fall through to a fresh search.
+            diagnostics["cache_action"] = "reuse_disabled_by_config"
+            is_topic_switch = True
+
         if not is_topic_switch:
             # Use cached context - no need to re-search
             logger.info(f"[{ta_id}] Using cached session context for follow-up (document: {session_context.get('document_filename')})")
@@ -2951,6 +3023,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
     base_query = db.session.query(
         DocumentChunk.chunk_text,
         DocumentChunk.chunk_context,  # D12: surfaced to qa_logs for inspector parity
+        DocumentChunk.section_path,   # eval plumbing: passage-level hit (2026-09-13)
         DocumentChunk.file_name,
         DocumentChunk.doc_type,
         DocumentChunk.doc_category,  # Phase A Stage 4 — surfaced to reranker as text context
@@ -3140,6 +3213,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
             "doc_type": row.doc_type or "other",
             "doc_category": row.doc_category,  # Phase A Stage 4
             "chunk_context": row.chunk_context,  # D12: surfaced to qa_logs
+            "section_path": row.section_path,
             "metadata": {
                 "assignment_number": row.assignment_number,
                 "instructional_unit_number": row.instructional_unit_number,
@@ -3162,6 +3236,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         structural_query = db.session.query(
             DocumentChunk.chunk_text,
             DocumentChunk.chunk_context,  # D12: surfaced to qa_logs
+            DocumentChunk.section_path,
             DocumentChunk.file_name,
             DocumentChunk.doc_type,
             DocumentChunk.doc_category,  # Phase A Stage 4
@@ -3205,6 +3280,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                         "doc_type": row.doc_type or "other",
                         "doc_category": row.doc_category,  # Phase A Stage 4
                         "chunk_context": row.chunk_context,  # D12
+                        "section_path": row.section_path,
                         "metadata": {
                             "assignment_number": row.assignment_number,
                             "instructional_unit_number": row.instructional_unit_number,
@@ -3263,7 +3339,18 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         })
     diagnostics["pre_rerank_candidates"] = pre_rerank_candidates
 
-    chunks, rerank_info = rerank(query, initial_chunks, top_k=final_k, session_id=session_id)
+    # Reranker query text (experiment flag). Search embeds effective_query; by default
+    # the reranker still scores against the raw turn.
+    if Config.RERANK_QUERY_MODE == "rewrite":
+        rerank_query = effective_query
+    elif Config.RERANK_QUERY_MODE == "concat" and effective_query.strip().lower() != query.strip().lower():
+        rerank_query = f"{effective_query}\n{query}"
+    else:
+        rerank_query = query
+    diagnostics["rerank_query_mode"] = Config.RERANK_QUERY_MODE
+    if rerank_query != query:
+        logger.info(f"[{ta_id}] Rerank query ({Config.RERANK_QUERY_MODE}): {rerank_query[:120]!r}")
+    chunks, rerank_info = rerank(rerank_query, initial_chunks, top_k=final_k, session_id=session_id)
     diagnostics["rerank_applied"] = rerank_info.get("reranked", False)
     diagnostics["rerank_info"] = rerank_info
 
@@ -3322,7 +3409,79 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
             logger.warning(f"[{ta_id}] Validation FAILED: expected reference '{problem_ref['full_ref']}' not found in top chunks")
     
     confidence = assess_retrieval_confidence(chunks, rerank_info)
-    
+
+    # WIDENING LADDER (experiment, LOW_CONFIDENCE_ACTION=widen). Only for low
+    # confidence -- a failed reference validation keeps its existing behaviour.
+    # Rung 1: wider shortlist + pool, raw query and rewrite, first pass kept, rerank.
+    # Rung 2 (still low): return the widened chunks flagged for the generator.
+    validation_failed = diagnostics["validation_performed"] and not diagnostics["validation_passed"]
+    if (Config.LOW_CONFIDENCE_ACTION == "widen" and confidence["is_low_confidence"]
+            and not validation_failed and Config.RETRIEVAL_V2_ENABLED):
+        _widen_t0 = _t.time()
+        search_texts = [(effective_query, query_embedding)]
+        if query.strip().lower() != effective_query.strip().lower():
+            raw_emb = client.embeddings.create(model=Config.EMBEDDING_MODEL, input=query).data[0].embedding
+            search_texts.append((query, raw_emb))
+
+        widened_doc_ids, widened_rows = [], []
+        for text, emb in search_texts:
+            doc_ids, _ = hybrid_doc_search(text, emb, ta_id, top_k=Config.WIDEN_TOP_K_DOCS,
+                                           query_analysis=query_analysis, allow_short_circuit=False)
+            widened_doc_ids.extend(d for d in doc_ids if d not in widened_doc_ids)
+            wq = base_query
+            if doc_ids:
+                wq = wq.filter(DocumentChunk.document_id.in_(doc_ids))
+            widened_rows.extend(wq.order_by(DocumentChunk.embedding.cosine_distance(emb))
+                                .limit(Config.WIDEN_RETRIEVAL_K).all())
+
+        pool = list(initial_chunks)
+        seen = {c["text"] for c in pool}
+        for row in widened_rows:
+            if row.chunk_text in seen:
+                continue
+            seen.add(row.chunk_text)
+            pool.append({
+                "text": row.chunk_text,
+                "score": float(row.score) if row.score else 0.0,
+                "file_name": row.file_name or "unknown",
+                "doc_type": row.doc_type or "other",
+                "doc_category": row.doc_category,
+                "chunk_context": row.chunk_context,
+                "section_path": row.section_path,
+                "metadata": {
+                    "assignment_number": row.assignment_number,
+                    "instructional_unit_number": row.instructional_unit_number,
+                    "instructional_unit_label": row.instructional_unit_label,
+                },
+            })
+
+        chunks, rerank_info = rerank(rerank_query, pool, top_k=final_k, session_id=session_id)
+        confidence = assess_retrieval_confidence(chunks, rerank_info)
+        diagnostics["pre_rerank_candidates"] = [
+            {"idx": i, "file": c["file_name"], "score": round(c["score"], 4),
+             "doc_category": c.get("doc_category"),
+             "chunk_context": (c.get("chunk_context") or "")[:60],
+             "text": c["text"][:200].replace("\n", " ")}
+            for i, c in enumerate(pool)
+        ]
+        diagnostics["widen_performed"] = True
+        diagnostics["widen_doc_count"] = len(widened_doc_ids)
+        diagnostics["widen_pool_size"] = len(pool)
+        diagnostics["widen_latency_ms"] = int((_t.time() - _widen_t0) * 1000)
+        diagnostics["rerank_applied"] = rerank_info.get("reranked", False)
+        if chunks:
+            diagnostics["score_top1"] = round(chunks[0].get("llm_relevance_score", chunks[0].get("score", 0)) or 0, 4)
+        logger.info(f"[{ta_id}] Widening ladder: {len(widened_doc_ids)} docs, pool {len(pool)} -> "
+                    f"low_confidence={confidence['is_low_confidence']} ({diagnostics['widen_latency_ms']}ms)")
+
+        if confidence["is_low_confidence"]:
+            diagnostics["low_confidence_after_widen"] = True
+            diagnostics["hybrid_fallback_reason"] = f"widened_still_low_{confidence['reason']}"
+            diagnostics["retrieval_method"] = "widened_low_confidence"
+            return chunks, diagnostics      # not cached, no full-document expansion
+        diagnostics["hybrid_fallback_reason"] = "widened_now_confident"
+        # confident after widening: fall through to the normal path (supplementary, caching)
+
     # Trigger hybrid fallback if: low confidence OR validation failed
     should_trigger_hybrid = confidence["is_low_confidence"] or (
         diagnostics["validation_performed"] and not diagnostics["validation_passed"]
@@ -3336,6 +3495,14 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         else:
             trigger_reason = confidence["reason"]
             logger.info(f"[{ta_id}] Hybrid triggered by LOW CONFIDENCE: {confidence['reason']} (top_score={confidence['top_score']}, spread={confidence['score_spread']})")
+            if Config.LOW_CONFIDENCE_ACTION == "decline":
+                # Experiment: nothing scored well enough, so hand the generator no
+                # material rather than committing to one whole document. Not cached.
+                logger.info(f"[{ta_id}] LOW_CONFIDENCE_ACTION=decline: returning no material instead of full-document fallback")
+                diagnostics["low_confidence_declined"] = True
+                diagnostics["hybrid_fallback_reason"] = f"declined_{trigger_reason}"
+                diagnostics["retrieval_method"] = "declined_low_confidence"
+                return [], diagnostics
 
         # Phase A Stage 3: in V2 mode, hide the regex-derived filters from
         # identify_target_documents so it can't re-pick the wrong doc via

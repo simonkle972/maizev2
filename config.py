@@ -226,6 +226,40 @@ class Config:
     HYBRID_SPREAD_TOP_SCORE_CUTOFF_COHERE = float(
         os.getenv("HYBRID_SPREAD_TOP_SCORE_CUTOFF_COHERE", "8.4"))
 
+    # EXPERIMENT FLAGS (2026-09-13). Defaults reproduce current behaviour exactly.
+    #
+    # SESSION_CACHE_REUSE_ENABLED=false: on a follow-up turn, never reuse the cached
+    # document -- always run a fresh search on the contextualized query. Conversation
+    # history is still used. Tests whether caching less beats layering intent
+    # detection on top of the cache (reused turns selected the right doc 49% of the
+    # time vs 87% for fresh search in the 2026-09-13 baseline).
+    SESSION_CACHE_REUSE_ENABLED = os.getenv(
+        "SESSION_CACHE_REUSE_ENABLED", "true").lower() == "true"
+    # LOW_CONFIDENCE_ACTION=decline: when retrieval confidence is low, return no
+    # material (so the answer says the course materials don't cover it) instead of
+    # collapsing to one whole document. Only the low-confidence trigger changes; a
+    # failed reference validation ("question 14" not in the chunks) still collapses.
+    LOW_CONFIDENCE_ACTION = os.getenv("LOW_CONFIDENCE_ACTION", "collapse").lower()
+    # LOW_CONFIDENCE_ACTION=widen ("widening ladder"): on low confidence, search again
+    # with a wider document shortlist and chunk pool (raw query + rewrite), keep the
+    # first-pass chunks, rerank the merged pool. Still low -> pass the chunks to the
+    # generator with an ask-which-document-or-say-not-covered instruction; never expand
+    # a document to full text, never cache the result.
+    WIDEN_TOP_K_DOCS = int(os.getenv("WIDEN_TOP_K_DOCS", "20"))
+    WIDEN_RETRIEVAL_K = int(os.getenv("WIDEN_RETRIEVAL_K", "50"))
+    # RERANK_QUERY_MODE: what text the reranker scores chunks against.
+    #   raw     -- the student's literal turn (current behaviour)
+    #   rewrite -- the contextualizer's self-contained rewrite, which search already uses
+    #   concat  -- rewrite + raw turn (SemEval-2026 Task 8 found concatenation beat
+    #              rewrite-only on average; for corrections it keeps the wrong doc name in)
+    RERANK_QUERY_MODE = os.getenv("RERANK_QUERY_MODE", "raw").lower()
+    # OFFTOPIC_COURSE_SUMMARY_ENABLED=true: give the contextualizer's off-topic check a
+    # short summary of what this TA's course covers (derived from the indexed document
+    # summaries) plus a rule for sincere-but-unrelated questions. Without it the
+    # classifier never learns what the course is, and only catches adversarial input.
+    OFFTOPIC_COURSE_SUMMARY_ENABLED = os.getenv(
+        "OFFTOPIC_COURSE_SUMMARY_ENABLED", "false").lower() == "true"
+
     # Ceiling on the context assembled for a session-cache follow-up turn. That
     # path concatenates up to four sources (cached document + solution doc +
     # cached supplementary + fresh concept-lookup chunks) and historically
