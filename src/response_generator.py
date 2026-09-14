@@ -308,6 +308,14 @@ Example: "Let me walk you through this. First, the task time for dyeing is 6 min
 """
 }
 
+LOW_CONFIDENCE_INSTRUCTIONS = """
+LOW RETRIEVAL CONFIDENCE:
+The course materials were searched twice, the second time more widely, and no passage clearly matched the student's question. Before answering, decide which of these applies:
+1. The passages come from two or more DIFFERENT course documents that could each be what the student means (for example two different years' finals, "Extra Problems I" vs "Extra Problems II", two lectures on similar topics), and you cannot tell which one they mean: ask ONE short question naming the options by their full titles, e.g. "Do you mean question 1 on the 2018 final or on the 2019 final?". Do not answer the question yet.
+2. None of the passages actually address what the student asked: say plainly that the course materials don't cover this. You may say briefly what the materials DO cover that is closest, if anything. Do not answer from general knowledge as if it came from the course, and do not ask the student to provide the material.
+3. One passage clearly does address the question after all: answer normally from it.
+"""
+
 LIMITED_CONTEXT_INSTRUCTIONS = """
 === LIMITED MATERIAL COVERAGE ===
 The retrieved course materials have VERY LIMITED coverage of this topic. You MUST follow these rules:
@@ -344,6 +352,7 @@ def build_messages(
     limited_context: bool = False,
     current_images: Optional[list] = None,
     history_for_llm: Optional[list] = None,
+    low_confidence: bool = False,
 ):
     """
     Build the messages array for the LLM call.
@@ -384,6 +393,8 @@ def build_messages(
         dynamic_system_parts.append(HYBRID_FULL_DOC_INSTRUCTIONS.format(query_reference=ref))
     if limited_context:
         dynamic_system_parts.append(LIMITED_CONTEXT_INSTRUCTIONS)
+    if low_confidence:
+        dynamic_system_parts.append(LOW_CONFIDENCE_INSTRUCTIONS)
 
     if limited_context:
         context_header = """WARNING — LIMITED MATERIAL: The retrieved content below is thin (e.g. a syllabus, course outline, or brief mention). It does NOT contain detailed explanations, formulas, or worked examples for this topic.
@@ -396,20 +407,29 @@ STRICT RULES FOR THIS RESPONSE:
 
 Here is the limited course material available:"""
     elif hybrid_mode and hybrid_doc_filename:
-        context_header = f"Here is the COMPLETE document '{hybrid_doc_filename}' to help answer the student's question:"
+        context_header = f"Here is the COMPLETE course document '{hybrid_doc_filename}':"
     else:
-        context_header = "Here is relevant course material to help answer the student's question:"
+        context_header = "Here are the most relevant excerpts from the course materials:"
+
+    # Retrieved material goes in its OWN system message, not the student's turn.
+    # When it sat inside the user message, the model read it as something the
+    # student had sent, and replied "the document you provided / shared" — and,
+    # when the material did not cover the question, asked the student to upload
+    # the missing lesson. The student never supplies course material and cannot
+    # see what was retrieved.
+    retrieved_context = f"""RETRIEVED COURSE MATERIAL
+This material was retrieved automatically by the teaching assistant system from the professor's course library. The student did NOT provide it, has NOT seen it, and cannot upload course materials. Never describe it as something the student gave, shared, sent, uploaded, or showed you — refer to it as "the course materials". If it does not cover what the student asked, say the course materials don't cover it; do not ask the student to provide the material.
+
+{context_header}
+
+---
+{context if context else "No relevant course material was found for this question."}
+---"""
 
     # Build the current-turn user-message text. When using structured history, the prose
     # conversation_history is omitted from this text (history is in its own messages).
     use_structured_history = history_for_llm is not None
-    user_text = f"""{context_header}
-
----
-{context if context else "No specific course material was found for this question."}
----
-
-"""
+    user_text = ""
     if conversation_history and not use_structured_history:
         user_text += f"""Recent conversation for context:
 {conversation_history}
@@ -442,6 +462,9 @@ Here is the limited course material available:"""
         messages.append({"role": "system", "content": "\n".join(dynamic_system_parts)})
     if use_structured_history:
         messages.extend(history_for_llm)
+    # Placed AFTER history and immediately before the student's turn, so the cacheable
+    # prefix (stable system + per-turn system + history) is unchanged.
+    messages.append({"role": "system", "content": retrieved_context})
     messages.append({"role": "user", "content": current_user_content})
     return messages
 
@@ -456,13 +479,14 @@ def generate_response(
     query_reference: Optional[str] = None,
     attempt_count: int = 0,
     session_id: str = "",
+    low_confidence: bool = False,
 ) -> str:
     client = OpenAI(api_key=Config.OPENAI_API_KEY)
 
     messages = build_messages(
         query, context, system_prompt, conversation_history, course_name,
         hybrid_mode=hybrid_mode, hybrid_doc_filename=hybrid_doc_filename, query_reference=query_reference,
-        attempt_count=attempt_count
+        attempt_count=attempt_count, low_confidence=low_confidence,
     )
 
     # Prompt caching (2026-08-05): pass session_id as prompt_cache_key so
@@ -530,6 +554,7 @@ def generate_response_stream(
     history_for_llm: Optional[list] = None,
     usage_capture: Optional[dict] = None,
     session_id: str = "",
+    low_confidence: bool = False,
 ):
     client = OpenAI(api_key=Config.OPENAI_API_KEY)
 
@@ -538,6 +563,7 @@ def generate_response_stream(
         hybrid_mode=hybrid_mode, hybrid_doc_filename=hybrid_doc_filename, query_reference=query_reference,
         attempt_count=attempt_count, limited_context=limited_context,
         current_images=current_images, history_for_llm=history_for_llm,
+        low_confidence=low_confidence,
     )
 
     # Prompt caching (2026-08-05): see generate_response for rationale.

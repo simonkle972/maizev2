@@ -395,6 +395,7 @@ def stream_chat_response(
                 query_reference=query_reference,
                 attempt_count=attempt_count,
                 limited_context=limited_context,
+                low_confidence=retrieval_diagnostics.get("low_confidence_after_widen", False),
                 current_images=current_images,
                 history_for_llm=history_for_llm,
                 usage_capture=retrieval_diagnostics,
