@@ -308,6 +308,16 @@ Example: "Let me walk you through this. First, the task time for dyeing is 6 min
 """
 }
 
+HYBRID_CLOSEST_DOC_INSTRUCTIONS = """
+CLOSEST-DOCUMENT MODE:
+The search across the ENTIRE course library found no passage that strongly matched the student's question. You have been given the complete text of the closest document as the best available material. It may not address the question at all.
+- If it does address the question, answer from it as usual.
+- If it does not, say plainly that the course materials do not cover this topic. State the gap at the level of the course, never of one document: do NOT say that this particular document does not cover it, do NOT name the document as the place you looked, and do NOT imply the search was limited to one file. You may say briefly what the course materials do cover that is closest.
+- Do not answer from general knowledge as if it came from the course, and do not ask the student to provide the material.
+
+REMEMBER: even with a full document (possibly including solutions), never reveal answers until the student has attempted the problem.
+"""
+
 LOW_CONFIDENCE_INSTRUCTIONS = """
 LOW RETRIEVAL CONFIDENCE:
 The course materials were searched twice, the second time more widely, and no passage clearly matched the student's question. Before answering, decide which of these applies:
@@ -353,9 +363,22 @@ def build_messages(
     current_images: Optional[list] = None,
     history_for_llm: Optional[list] = None,
     low_confidence: bool = False,
+    hybrid_reason: Optional[str] = None,
 ):
     """
     Build the messages array for the LLM call.
+
+    `hybrid_reason` is the retriever's `hybrid_fallback_reason`. A collapse to one full
+    document happens for two different reasons and the generator must be told which:
+    a named problem reference the chunks failed to validate ("validation_failed_*"), a
+    cached document the student is already working in ("session_cache"), or an
+    explicit sub-part route ("early_routing_*") -- in all of which the content really
+    is in that file -- versus plain LOW CONFIDENCE ("top_score_*", "low_spread_*",
+    "no_rerank_*", "widened_*"), where the file is merely the closest thing the course
+    library had. Telling the model "the content IS in this document" in the second
+    case made it report "'Pre-recorded lecture 08-1' does NOT cover Bayesian models",
+    which reads to a student as if the system looked in the wrong file (prod,
+    2026-09-15). Callers that do not pass a reason keep the old behaviour.
 
     Two modes:
     - TEXT-ONLY (default): conversation history is passed as a prose string in the user
@@ -388,9 +411,16 @@ def build_messages(
     patience_instructions = get_patience_instructions(attempt_count)
     if patience_instructions:
         dynamic_system_parts.append(patience_instructions)
+    _targeted_prefixes = ("validation_failed", "session_cache", "early_routing")
+    hybrid_closest_doc = bool(
+        hybrid_mode and hybrid_reason and not str(hybrid_reason).startswith(_targeted_prefixes)
+    )
     if hybrid_mode and not limited_context:
-        ref = query_reference or query
-        dynamic_system_parts.append(HYBRID_FULL_DOC_INSTRUCTIONS.format(query_reference=ref))
+        if hybrid_closest_doc:
+            dynamic_system_parts.append(HYBRID_CLOSEST_DOC_INSTRUCTIONS)
+        else:
+            ref = query_reference or query
+            dynamic_system_parts.append(HYBRID_FULL_DOC_INSTRUCTIONS.format(query_reference=ref))
     if limited_context:
         dynamic_system_parts.append(LIMITED_CONTEXT_INSTRUCTIONS)
     if low_confidence:
@@ -406,6 +436,10 @@ STRICT RULES FOR THIS RESPONSE:
 - End your response with: "Your course materials don't cover this topic in detail — I'd recommend checking with your professor or textbook for more."
 
 Here is the limited course material available:"""
+    elif hybrid_mode and hybrid_doc_filename and hybrid_closest_doc:
+        context_header = (f"No passage in the course library matched the question strongly. The closest "
+                          f"document, '{hybrid_doc_filename}', is included in full as the best available "
+                          f"material; it may not address the question at all:")
     elif hybrid_mode and hybrid_doc_filename:
         context_header = f"Here is the COMPLETE course document '{hybrid_doc_filename}':"
     else:
@@ -418,7 +452,7 @@ Here is the limited course material available:"""
     # the missing lesson. The student never supplies course material and cannot
     # see what was retrieved.
     retrieved_context = f"""RETRIEVED COURSE MATERIAL
-This material was retrieved automatically by the teaching assistant system from the professor's course library. The student did NOT provide it, has NOT seen it, and cannot upload course materials. Never describe it as something the student gave, shared, sent, uploaded, or showed you — refer to it as "the course materials". If it does not cover what the student asked, say the course materials don't cover it; do not ask the student to provide the material.
+This material was retrieved automatically by the teaching assistant system from the professor's course library. The student did NOT provide it, has NOT seen it, and cannot upload course materials. Never describe it as something the student gave, shared, sent, uploaded, or showed you — refer to it as "the course materials". If it does not cover what the student asked, say the course materials don't cover it; do not ask the student to provide the material. State such a gap at the level of the course, never of one document: the system searched the entire course library, so never say that a particular document does not cover it or name a file as the place you looked.
 
 {context_header}
 
@@ -480,6 +514,7 @@ def generate_response(
     attempt_count: int = 0,
     session_id: str = "",
     low_confidence: bool = False,
+    hybrid_reason: Optional[str] = None,
 ) -> str:
     client = OpenAI(api_key=Config.OPENAI_API_KEY)
 
@@ -487,6 +522,7 @@ def generate_response(
         query, context, system_prompt, conversation_history, course_name,
         hybrid_mode=hybrid_mode, hybrid_doc_filename=hybrid_doc_filename, query_reference=query_reference,
         attempt_count=attempt_count, low_confidence=low_confidence,
+        hybrid_reason=hybrid_reason,
     )
 
     # Prompt caching (2026-08-05): pass session_id as prompt_cache_key so
@@ -555,6 +591,7 @@ def generate_response_stream(
     usage_capture: Optional[dict] = None,
     session_id: str = "",
     low_confidence: bool = False,
+    hybrid_reason: Optional[str] = None,
 ):
     client = OpenAI(api_key=Config.OPENAI_API_KEY)
 
@@ -563,7 +600,7 @@ def generate_response_stream(
         hybrid_mode=hybrid_mode, hybrid_doc_filename=hybrid_doc_filename, query_reference=query_reference,
         attempt_count=attempt_count, limited_context=limited_context,
         current_images=current_images, history_for_llm=history_for_llm,
-        low_confidence=low_confidence,
+        low_confidence=low_confidence, hybrid_reason=hybrid_reason,
     )
 
     # Prompt caching (2026-08-05): see generate_response for rationale.

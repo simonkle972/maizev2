@@ -182,6 +182,7 @@ def _generate_answer(row: dict, chunks: list, diagnostics: dict, session_id: str
             attempt_count=diagnostics.get("attempt_count", 0) or 0,
             session_id=session_id,
             low_confidence=diagnostics.get("low_confidence_after_widen", False),
+            hybrid_reason=diagnostics.get("hybrid_fallback_reason"),
         )
         return (answer or ""), int((_t.time() - t0) * 1000)
 

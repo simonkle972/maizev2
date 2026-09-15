@@ -616,6 +616,7 @@ def test_chat_stream(ta_id):
                 attempt_count=attempt_count,
                 current_images=images or None,
                 low_confidence=retrieval_diagnostics.get("low_confidence_after_widen", False),
+                hybrid_reason=retrieval_diagnostics.get("hybrid_fallback_reason"),
                 # Professor test-chat: TA-scoped cache key (no per-session id — professor testing).
                 # TA-scoped is safe at low RPM (only the TA's owner is testing).
                 session_id=f"prof-preview-{ta.id}",
