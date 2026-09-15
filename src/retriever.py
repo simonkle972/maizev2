@@ -266,12 +266,22 @@ def identify_target_documents(chunks: list, query_analysis: dict, ta_id: str) ->
     
     year_filter = query_analysis.get("year_filter")
     if year_filter and query_analysis.get("doc_type_filter") == "exam":
-        docs = Document.query.filter_by(ta_id=ta_id, doc_type="exam").all()
-        for doc in docs:
-            doc_name = doc.display_name or doc.original_filename
-            if doc_name and year_filter in doc_name:
-                logger.info(f"[{ta_id}] Target doc identified via filename year match: '{doc_name}' (year={year_filter})")
-                return [doc.id], "filename_year_match"
+        # Route on the year only when it is unambiguous, like the single_doc_type_match
+        # branch above. This used to return the FIRST match of an unordered query, so
+        # with three "2024" exam files (part 1 solutions, part 2 solutions, without
+        # solutions) the winner depended on physical row order: re-indexing one of
+        # them on 2026-09-14 flipped four passing "part 2" eval rows to the part 1
+        # file. When several files share the year, fall through to normal retrieval,
+        # where filename tokens and the reranker can tell the parts apart.
+        docs = Document.query.filter_by(ta_id=ta_id, doc_type="exam").order_by(Document.id).all()
+        year_docs = [d for d in docs
+                     if (d.display_name or d.original_filename) and year_filter in (d.display_name or d.original_filename)]
+        if len(year_docs) == 1:
+            doc_name = year_docs[0].display_name or year_docs[0].original_filename
+            logger.info(f"[{ta_id}] Target doc identified via filename year match: '{doc_name}' (year={year_filter})")
+            return [year_docs[0].id], "filename_year_match"
+        elif year_docs:
+            logger.info(f"[{ta_id}] Year match ambiguous: {len(year_docs)} exam docs contain '{year_filter}'; not routing on year")
     
     if exam_match:
         exam_year = exam_match.group(1) if exam_match.group(1) else None
