@@ -470,14 +470,16 @@ def extract_pdf(file_path: str, heartbeat=None) -> tuple:
     text = normalize_math_glyphs(text)
     if text and len(text.strip()) > 100:
         text = _supplement_pdf_with_figures(file_path, text, heartbeat=heartbeat)
-        return text, page_count
+        # Fold again: gpt-4o's figure descriptions can themselves contain math-italic
+        # letters (single, not doubled). Seen on prod 2026-09-15, MGT403 Lecture 04.
+        return normalize_math_glyphs(text), page_count
 
     logger.info("pypdf extraction insufficient, trying pdfplumber...")
     text, page_count = _extract_pdf_pdfplumber(file_path, heartbeat=heartbeat)
     text = normalize_math_glyphs(text)
     if text and len(text.strip()) > 100:
         text = _supplement_pdf_with_figures(file_path, text, heartbeat=heartbeat)
-        return text, page_count
+        return normalize_math_glyphs(text), page_count
 
     logger.info("Text extraction insufficient - attempting vision-based extraction for image/handwritten PDF...")
     text, page_count = _extract_pdf_vision(file_path, heartbeat=heartbeat)

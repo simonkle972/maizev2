@@ -54,7 +54,9 @@ GLYPH_RE = r'[\U0001D400-\U0001D7FF]'
 # A literal space, not \s: the defect is a space INSIDE a number on one line
 # ("Problem 1 4"). \s also matched "Part 1<newline>1.1(a)", a legitimate heading
 # followed by its sub-heading, which produced four false positives on 2026-09-13.
-SPLIT_RE = r'(Problem|Question|Exercise|Part|Section) \d \d\y'
+# (?!\.\d) excludes a point value after the number: a Canvas export prints
+# "Question 1 0.5 pts", which is correct text (prod, 2026-09-15).
+SPLIT_RE = r'(Problem|Question|Exercise|Part|Section) \d \d(?!\.\d)\y'
 
 FIND_SQL = """
 SELECT d.ta_id, d.id, d.original_filename,
