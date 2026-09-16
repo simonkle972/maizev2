@@ -89,6 +89,10 @@ class RowResult:
                                                      # even though no doc directly served it
     retrieved_chunk_count: int = 0             # raw count of returned chunks (0 means skip-retrieval path fired)
     is_follow_up: bool = False                 # row had prior_turns: scored as a follow-up, not an opener.
+    latency_breakdown: dict = field(default_factory=dict)  # per-stage ms from diagnostics (contextualizer,
+                                               # vector search, rerank, supplementary, hybrid fetch, widen)
+    cache_action: str = ""                     # diagnostics['cache_action'] -- which cache decision fired
+    ctx_v2: dict = field(default_factory=dict)  # contextualizer v2 judgement: retrieve / document_hint / teaching
                                                # The blended headline hid follow-up changes (137 of 250 rows).
     retrieved_section_paths: list = field(default_factory=list)  # section_path per top-5 chunk when the
                                                # retriever supplies it. Plumbing for a passage-level hit;
@@ -453,6 +457,13 @@ def evaluate_row(row: dict, retrieve_context, warm_cache: bool = True,
         retrieved_chunk_texts = []
         retrieved_section_paths = []
         retrieved_chunk_count = 0
+        # A failed retrieval can leave the scoped session in an invalid transaction; the
+        # next row then hangs on reconnect attempts (one row spent 10 min this way on
+        # 2026-09-15 after a transient OpenAI connection error). Roll back before moving on.
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
         pre_rerank_retrieved = []
         pre_rerank_pool = []
         error = f"{type(e).__name__}: {e}"
@@ -575,6 +586,13 @@ def evaluate_row(row: dict, retrieve_context, warm_cache: bool = True,
         pre_rerank_pool_doc_ids=pre_rerank_pool,
         retrieved_chunk_count=retrieved_chunk_count,
         is_follow_up=bool(prior_turns),
+        latency_breakdown={k: diagnostics.get(k) for k in (
+            'moderation_latency_ms', 'contextualizer_latency_ms', 'vector_search_latency_ms',
+            'supplementary_latency_ms', 'hybrid_fetch_latency_ms', 'widen_latency_ms') if diagnostics.get(k) is not None}
+        | ({'rerank_latency_ms': (diagnostics.get('rerank_info') or {}).get('rerank_latency_ms')}
+           if (diagnostics.get('rerank_info') or {}).get('rerank_latency_ms') is not None else {}),
+        cache_action=str(diagnostics.get('cache_action') or ''),
+        ctx_v2={k[4:]: diagnostics.get(k) for k in ('ctx_retrieve', 'ctx_document_hint', 'ctx_document_hint_doc_id', 'ctx_wants_teaching_material') if k in diagnostics},
         retrieved_section_paths=retrieved_section_paths,
         bucket_hit=bucket_hit,
         all_correct_in_top_5=all_correct_in_top_5,
@@ -699,6 +717,9 @@ def aggregate(results: list[RowResult]) -> dict:
     return summary
 
 
+_CFG_OVERRIDES: dict = {}
+
+
 def format_scorecard(summary: dict, label: str = "Retrieval scorecard") -> str:
     lines = [f"# {label}", ""]
     overall = summary["__overall__"]
@@ -708,7 +729,11 @@ def format_scorecard(summary: dict, label: str = "Retrieval scorecard") -> str:
     # Printed because every run_eval between 2026-09-11 and 09-13 silently reranked with
     # gpt-5.2 (inherited from .env.local) while production runs Cohere.
     lines.append(f"**Reranker:** `{_Cfg.RERANKER_VENDOR}` · **low-confidence action:** "
-                 f"`{_Cfg.LOW_CONFIDENCE_ACTION}` · **cache reuse:** `{_Cfg.SESSION_CACHE_REUSE_ENABLED}` · **rerank query:** `{_Cfg.RERANK_QUERY_MODE}`")
+                 f"`{_Cfg.LOW_CONFIDENCE_ACTION}` · **cache reuse:** `{_Cfg.SESSION_CACHE_REUSE_ENABLED}` · **rerank query:** `{_Cfg.RERANK_QUERY_MODE}`"
+                 f" · **cache as prior:** `{getattr(_Cfg, 'CACHE_AS_PRIOR_ENABLED', False)}`"
+                 f" · **contextualizer v2:** `{getattr(_Cfg, 'CONTEXTUALIZER_V2_ENABLED', False)}`")
+    if _CFG_OVERRIDES:
+        lines.append("**Config overrides (--set):** " + ", ".join(f"`{k}={v!r}`" for k, v in _CFG_OVERRIDES.items()))
     distinct_tas = overall.get("distinct_tas") or []
     if len(distinct_tas) > 1:
         lines.append(
@@ -896,6 +921,14 @@ def main() -> int:
     parser.add_argument("--failure-type", type=str, default=None,
                         help="Filter to these failure_type_target buckets (comma-separated), "
                              "e.g. --failure-type L,M")
+    parser.add_argument("--follow-ups", action="store_true",
+                        help="Run only rows that have prior_turns (the follow-up half of the set). "
+                             "Each row replays its own prior turns, so the subset is self-contained.")
+    parser.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
+                        help="Override a Config attribute in-process for this run, e.g. "
+                             "--set CACHE_AS_PRIOR_ENABLED=true. Needed because config.py loads "
+                             ".env.local with override=True, so an exported env var is ignored. "
+                             "true/false and integers are converted; printed in the scorecard header.")
     parser.add_argument("--from-json", type=str, default=None,
                         help="Re-render a scorecard from a saved per-row results JSON (written next "
                              "to --out) instead of running retrieval. Needs no DB or API; row fields "
@@ -945,7 +978,24 @@ def main() -> int:
         sys.exit(f"ERROR: failed to import Flask app or retriever: {type(e).__name__}: {e}\n"
                  f"Make sure DOTENV_PATH is set and dependencies are installed.")
 
+    # Bound database hangs. A follow-up subset run sat at 0% CPU for 5.5 hours on
+    # 2026-09-15 at a DB call with no timeout; with a per-statement limit a hang becomes
+    # an error row (rolled back in evaluate_row) instead of a dead run.
+    try:
+        from sqlalchemy import event as _sa_event
+        from models import db as _db_for_timeout
+        with app.app_context():
+            @_sa_event.listens_for(_db_for_timeout.engine, "connect")
+            def _set_statement_timeout(dbapi_conn, _record):
+                cur = dbapi_conn.cursor()
+                cur.execute("SET statement_timeout = 60000")
+                cur.close()
+    except Exception as _e:
+        print(f"WARNING: could not set statement_timeout: {_e}", file=sys.stderr)
+
     rows = load_rows()
+    if args.follow_ups:
+        rows = [r for r in rows if r.get("prior_turns")]
     if args.failure_type:
         fts = {x.strip() for x in args.failure_type.split(",") if x.strip()}
         rows = [r for r in rows if (r.get("failure_type_target") or "") in fts]
@@ -972,6 +1022,18 @@ def main() -> int:
     from config import Config as _Cfg
     _Cfg.RERANKER_VENDOR = args.reranker
     print(f"Reranker vendor: {_Cfg.RERANKER_VENDOR}", flush=True)
+    global _CFG_OVERRIDES
+    for kv in args.set:
+        key, _, val = kv.partition("=")
+        if val.lower() in ("true", "false"):
+            val = val.lower() == "true"
+        elif val.lstrip("-").isdigit():
+            val = int(val)
+        if not hasattr(_Cfg, key):
+            sys.exit(f"ERROR: --set {key}: Config has no such attribute")
+        setattr(_Cfg, key, val)
+        _CFG_OVERRIDES[key] = val
+        print(f"Config override: {key} = {val!r}", flush=True)
     cache_mode = "warm-cache (prior turns replayed)" if warm else "cold-cache (target query only)"
     print(f"Running {len(rows)} eval rows against the current retriever... [{cache_mode}]", flush=True)
     if args.log_to_sheet:

@@ -238,6 +238,22 @@ class Config:
     # time vs 87% for fresh search in the 2026-09-13 baseline).
     SESSION_CACHE_REUSE_ENABLED = os.getenv(
         "SESSION_CACHE_REUSE_ENABLED", "true").lower() == "true"
+    # CACHE_AS_PRIOR_ENABLED=true (Phase 1 step 1, 2026-09-15): the cached document is a
+    # PRIOR, not an answer. Follow-up turns always run a fresh search; the cached
+    # document id is guaranteed a shortlist slot and the chunks served last turn are
+    # merged into the pool before rerank. The only label-driven decision left is the
+    # skip gate (intent == clarification -> return last turn's chunks, no search). The
+    # session stores ids (document_ids, served_chunk_ids), not document text.
+    # See attached_assets/maize-phase1-cache-as-prior-plan-2026-09-15.md.
+    CACHE_AS_PRIOR_ENABLED = os.getenv("CACHE_AS_PRIOR_ENABLED", "false").lower() == "true"
+    # CONTEXTUALIZER_V2_ENABLED=true (Phase 1 step 2, 2026-09-15): the contextualizer
+    # returns a judgement instead of a six-way label -- rewritten_query (document names
+    # and numbers verbatim), retrieve (bool), document_hint, wants_teaching_material,
+    # off_topic -- and sees the FULL last assistant turn plus the course's document titles.
+    # Only `retrieve` and `off_topic` gate anything; the rest are search parameters.
+    # A derived legacy `intent` is still emitted for logging.
+    CONTEXTUALIZER_V2_ENABLED = os.getenv("CONTEXTUALIZER_V2_ENABLED", "false").lower() == "true"
+    CONTEXTUALIZER_V2_LAST_TURN_CHARS = int(os.getenv("CONTEXTUALIZER_V2_LAST_TURN_CHARS", "4000"))
     # LOW_CONFIDENCE_ACTION=decline: when retrieval confidence is low, return no
     # material (so the answer says the course materials don't cover it) instead of
     # collapsing to one whole document. Only the low-confidence trigger changes; a
