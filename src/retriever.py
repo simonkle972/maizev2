@@ -2368,12 +2368,12 @@ Student's current message:
 Recent conversation (oldest first; the TA's last message is given in full, and its END is usually the question the student is answering):
 {history_text or "(none)"}
 
-Document the student was working in last turn: {cached_title or "none"}
+Document the student was working in last turn (context for the rewrite only; it is NOT a document_hint): {cached_title or "none"}
 
 Return JSON with exactly these keys:
 1. "rewritten_query": the student's message rewritten to be self-contained, resolving pronouns and references from the conversation. Copy document names, problem/question numbers, part letters, years and Roman numerals EXACTLY as the student or the TA wrote them (keep "extra problems I", "PS3 Q2b", "Part II", "2019 final" as they are); never paraphrase, expand or drop them. If the message is already self-contained, return it unchanged.
 2. "retrieve": true if answering needs course material to be looked up (a question about content, a problem, a concept, a document, a check of the student's work). false only when the message needs no new material at all: a thank-you, a greeting, a bare acknowledgement ("ok", "got it", "makes sense"), a request to repeat or rephrase what the TA just said, or a question that the TA's last message already answers. When in doubt, true.
-3. "document_hint": if the student refers to a specific course document -- by name, by number, or by choosing among options the TA offered -- give the matching title from COURSE DOCUMENTS verbatim. If they name a document that is not in the list, give their words. Otherwise null. Do not infer a document from the topic alone.
+3. "document_hint": when the student refers to a specific course document -- by name, by number, or by choosing among options the TA offered -- the matching title from COURSE DOCUMENTS, resolved using the conversation. null when the message names no document, including when the student is simply continuing in the document they were working in.
 4. "wants_teaching_material": true if the student is asking to understand a concept, method, definition or the intuition behind something (explain, what is, how does, why), whether or not they are also working on a problem. false if they only want help with a specific problem's steps.
 5. "off_topic": true ONLY under the OFF-TOPIC RULES below; otherwise false.
 6. "current_focus": one short phrase for what the student is working on.
@@ -2403,6 +2403,18 @@ JSON only, no prose."""
         hint = parsed.get("document_hint")
         hint = str(hint).strip() if hint not in (None, "", "null", "None") else None
         hint_id, hint_title = _resolve_document_hint(ta_id, hint, titles) if hint else (None, None)
+        # The cached document is already a shortlist member (prior_doc_ids); a hint that
+        # resolves to it carries no new information and must not read as a pivot.
+        cached_doc_id = _doc_id_for_filename(ta_id, cached_title) if cached_title else None
+        hint_is_prior = bool(hint_id and cached_doc_id and hint_id == cached_doc_id)
+        if hint_is_prior:
+            hint_id, hint_title = None, None
+        # The hint exists to resolve references that depend on the CONVERSATION ("the AS-AD
+        # one", "back to quiz 3"). On an opener there is none, and the document search on
+        # the message itself already does that job; a title guessed from an opener's words
+        # cost three working rows on 2026-09-15 ("practice problems 1" -> "extra problems I").
+        if not has_history and hint_id:
+            hint_id, hint_title = None, None
 
         # Derived label, for logging continuity only.
         if off_topic:
@@ -2411,7 +2423,7 @@ JSON only, no prose."""
             intent = "clarification"
         elif wants_tm:
             intent = "concept_lookup"
-        elif hint_id and has_cache and _doc_id_for_filename(ta_id, cached_title) not in (None, hint_id):
+        elif hint_id and has_cache:
             intent = "pivot"
         elif has_cache or has_history:
             intent = "continuation"
@@ -2424,7 +2436,8 @@ JSON only, no prose."""
             "reason": (parsed.get("reason") or "")[:200],
             "latency_ms": int((time.time() - start) * 1000),
             "retrieve": retrieve, "document_hint": hint, "document_hint_doc_id": hint_id,
-            "document_hint_title": hint_title, "wants_teaching_material": wants_tm, "off_topic": off_topic,
+            "document_hint_title": hint_title, "hint_is_prior": hint_is_prior,
+            "wants_teaching_material": wants_tm, "off_topic": off_topic,
         })
         logger.info(
             f"[{ta_id}] Contextualizer v2: retrieve={retrieve} hint={hint!r}->{hint_id} teach={wants_tm} "
@@ -3315,6 +3328,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                     "file_name": filename,
                     "doc_type": "exam",  # Will be from document metadata in practice
                     "metadata": {},
+                    "document_id": doc_id,
                     "is_full_document": True,
                     "llm_relevance_score": 10.0,
                     "llm_reason": f"Early hybrid routing for specific reference '{problem_ref.get('full_ref')}'"
@@ -3957,6 +3971,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                     "file_name": filename,
                     "doc_type": chunks[0].get("doc_type", "other") if chunks else "other",
                     "metadata": chunks[0].get("metadata", {}) if chunks else {},
+                    "document_id": doc_id,
                     "is_full_document": True,
                     "llm_relevance_score": 10.0,
                     "llm_reason": "Full document fallback due to low chunk confidence"

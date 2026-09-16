@@ -116,3 +116,13 @@ Cost: warm-cache adds one `retrieve_context` call per prior turn. A 6-turn row b
 10. For `failure_type_target = "H"`: `len(correct_doc_ids) >= 2` (multi-doc requires multiple correct docs).
 11. For `failure_type_target = "I"`: `expected_intent.document_corrected_from_prior_turn = true` AND `len(prior_turns) >= 2` (correction requires a prior turn to correct).
 12. For `failure_type_target = "J"`: `expected_intent.concept_or_problem` is set (not the implicit default).
+
+
+## K bucket scoring note (2026-09-16)
+
+K rows ("what do you mean?", "say that again", `expected_action: no_retrieval`) are judged on
+answer quality; at the retrieval level the failure is pulling an **unrelated** document. `bucket_hit`
+passes when nothing was retrieved or every top-5 document is one the session was already working
+in (the cache prior). Caveat: the synthetic K rows carry one-sentence TA answers ("A Series is a
+one-dimensional labelled array..."), so a classifier deciding "the last answer already covers this"
+cannot be tested fairly on them; realistic prior answers are a later labelling task.

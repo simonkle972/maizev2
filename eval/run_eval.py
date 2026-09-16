@@ -93,6 +93,8 @@ class RowResult:
                                                # vector search, rerank, supplementary, hybrid fetch, widen)
     cache_action: str = ""                     # diagnostics['cache_action'] -- which cache decision fired
     ctx_v2: dict = field(default_factory=dict)  # contextualizer v2 judgement: retrieve / document_hint / teaching
+    retrieved_top5_document_ids: list = field(default_factory=list)  # Document ids of the top-5 chunks
+    prior_doc_ids: list = field(default_factory=list)  # documents the session was already working in (cache prior)
                                                # The blended headline hid follow-up changes (137 of 250 rows).
     retrieved_section_paths: list = field(default_factory=list)  # section_path per top-5 chunk when the
                                                # retriever supplies it. Plumbing for a passage-level hit;
@@ -439,6 +441,8 @@ def evaluate_row(row: dict, retrieve_context, warm_cache: bool = True,
         retrieved_top5 = retrieved[:5]
         retrieved_chunk_texts = [c.get("text", "") for c in (chunks or [])][:8]
         retrieved_section_paths = [c.get("section_path") for c in (chunks or [])][:5]
+        retrieved_top5_document_ids = [c.get("document_id") for c in (chunks or [])][:5]
+        prior_doc_ids = list(diagnostics.get("cache_prior_doc_ids") or [])
         retrieved_chunk_count = len(chunks or [])
         # Pre-rerank ordering — extracted from the diagnostics dict so we can
         # measure rerank lift in isolation (post − pre).
@@ -456,6 +460,8 @@ def evaluate_row(row: dict, retrieve_context, warm_cache: bool = True,
         retrieved_top5 = []
         retrieved_chunk_texts = []
         retrieved_section_paths = []
+        retrieved_top5_document_ids = []
+        prior_doc_ids = []
         retrieved_chunk_count = 0
         # A failed retrieval can leave the scoped session in an invalid transaction; the
         # next row then hangs on reconnect attempts (one row spent 10 min this way on
@@ -539,9 +545,20 @@ def evaluate_row(row: dict, retrieve_context, warm_cache: bool = True,
         # being unable to back out of it. Retrieval-level proxy: did NOT collapse.
         bucket_hit = not bool(diagnostics.get("hybrid_fallback_triggered"))
     elif expected_action == "no_retrieval":
-        # Today (pre-LangGraph): proxy via contextualizer classifying as "clarification".
-        # Post-LangGraph adaptation: chunks==[] is also a HIT signal once the upstream skip-gate exists.
-        bucket_hit = (contextualizer_intent == "clarification") or (retrieved_chunk_count == 0)
+        # K rule (user decision 2026-09-16): these turns ("what do you mean?") are judged on
+        # answer quality; at the retrieval level the FAILURE is pulling an unrelated document.
+        # Pass = nothing retrieved, or every top-5 document is one the session was already
+        # working in (the cache prior). When no prior is recorded (v1 cache path, openers)
+        # fall back to the old proxy, intent == clarification.
+        _known = [d for d in retrieved_top5_document_ids if d is not None]
+        if retrieved_chunk_count == 0:
+            bucket_hit = True
+        elif prior_doc_ids and _known and all(d in prior_doc_ids for d in _known):
+            bucket_hit = True
+        elif not prior_doc_ids:
+            bucket_hit = (contextualizer_intent == "clarification")
+        else:
+            bucket_hit = False
     else:
         bucket_hit = False  # unknown expected_action, validator catches this
 
@@ -592,6 +609,8 @@ def evaluate_row(row: dict, retrieve_context, warm_cache: bool = True,
         | ({'rerank_latency_ms': (diagnostics.get('rerank_info') or {}).get('rerank_latency_ms')}
            if (diagnostics.get('rerank_info') or {}).get('rerank_latency_ms') is not None else {}),
         cache_action=str(diagnostics.get('cache_action') or ''),
+        retrieved_top5_document_ids=retrieved_top5_document_ids,
+        prior_doc_ids=prior_doc_ids,
         ctx_v2={k[4:]: diagnostics.get(k) for k in ('ctx_retrieve', 'ctx_document_hint', 'ctx_document_hint_doc_id', 'ctx_wants_teaching_material') if k in diagnostics},
         retrieved_section_paths=retrieved_section_paths,
         bucket_hit=bucket_hit,
@@ -861,7 +880,7 @@ def format_scorecard(summary: dict, label: str = "Retrieval scorecard") -> str:
                  "(e.g., solutions doc returned when student is solving). Lower is better; ideal = 0%.")
     lines.append("- **bucket_hit** (Wave 2) — the primary HIT signal for a row, depends on its `expected_action`: "
                  "for `retrieve` rows it equals hit@5; for `redirect` rows it requires `adversarial_short_circuit` fired AND zero chunks returned; "
-                 "for `no_retrieval` rows it's a proxy via `intent == 'clarification'` today (becomes a true skip-gate metric post-LangGraph adaptation).")
+                 "for `no_retrieval` rows (K) it passes when nothing was retrieved or every top-5 document is one the session was already working in -- pulling an UNRELATED document is the failure; with no recorded prior it falls back to `intent == 'clarification'`.")
     lines.append("- **all_correct_in_top_5** (H bucket) — stricter than hit@5: requires EVERY `correct_doc_ids` entry to appear in top-5, not just one. Tests whether multi-doc intent surfaces ALL needed docs.")
     lines.append("- **intent_class_match** — fraction of rows (with `expected_intent.intent_class` labeled) where the contextualizer's classification matches the label. Measures intent-classification accuracy independently of retrieval — Q1+Q2 deep-research flagged this as a literature gap; doing this puts Maize ahead of published practice.")
     lines.append("- **collapsed_to_full_doc** — fraction of rows where `hybrid_fallback_triggered` fired: "
