@@ -116,11 +116,12 @@ class RowResult:
     intent_class_match: bool = False
 
 
-def load_rows():
-    if not EVAL_FILE.exists():
-        sys.exit(f"ERROR: {EVAL_FILE} not found")
+def load_rows(path: Path = None):
+    path = Path(path) if path else EVAL_FILE
+    if not path.exists():
+        sys.exit(f"ERROR: {path} not found")
     rows = []
-    with EVAL_FILE.open() as f:
+    with path.open() as f:
         for line in f:
             line = line.strip()
             if line:
@@ -955,6 +956,9 @@ def main() -> int:
                              "--set CACHE_AS_PRIOR_ENABLED=true. Needed because config.py loads "
                              ".env.local with override=True, so an exported env var is ignored. "
                              "true/false and integers are converted; printed in the scorecard header.")
+    parser.add_argument("--eval-file", type=str, default=None,
+                        help="Row file to run instead of maize_eval_v1.jsonl (e.g. eval/real_followups_v1.jsonl, "
+                             "real multi-turn sessions from the prod QA logs, unlabelled: for --generate + judge_pairs).")
     parser.add_argument("--from-json", type=str, default=None,
                         help="Re-render a scorecard from a saved per-row results JSON (written next "
                              "to --out) instead of running retrieval. Needs no DB or API; row fields "
@@ -1019,7 +1023,7 @@ def main() -> int:
     except Exception as _e:
         print(f"WARNING: could not set statement_timeout: {_e}", file=sys.stderr)
 
-    rows = load_rows()
+    rows = load_rows(args.eval_file)
     if args.follow_ups:
         rows = [r for r in rows if r.get("prior_turns")]
     if args.failure_type:

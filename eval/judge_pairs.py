@@ -46,8 +46,9 @@ Which reply better responds to what the student actually asked, given the conver
 Answer with JSON only: {{"winner": "1" | "2" | "tie", "reason": "<one line>"}}"""
 
 
-def load_rows():
-    return {json.loads(l)["row_id"]: json.loads(l) for l in EVAL_FILE.open() if l.strip()}
+def load_rows(path=None):
+    path = Path(path) if path else EVAL_FILE
+    return {json.loads(l)["row_id"]: json.loads(l) for l in path.open() if l.strip()}
 
 
 def transcript_of(row) -> str:
@@ -60,8 +61,16 @@ def transcript_of(row) -> str:
 def judge_once(client, model, transcript, query, a, b) -> tuple[str, str]:
     from src.retriever import _json_completion
     prompt = JUDGE_PROMPT.format(transcript=transcript, query=query, a=a or "(empty)", b=b or "(empty)")
-    r = _json_completion(client, model, prompt, 200)
-    out = json.loads(r.choices[0].message.content)
+    r = _json_completion(client, model, prompt, 300)
+    raw = r.choices[0].message.content or ""
+    try:
+        out = json.loads(raw)
+    except json.JSONDecodeError:
+        # A reason with LaTeX ("\\beta") is not valid JSON; salvage the verdict by regex.
+        import re as _re
+        m = _re.search(r'"winner"\s*:\s*"([^"]+)"', raw)
+        m2 = _re.search(r'"reason"\s*:\s*"(.*?)"\s*}?\s*$', raw, _re.S)
+        out = {"winner": m.group(1) if m else "tie", "reason": (m2.group(1) if m2 else raw)[:160]}
     w = str(out.get("winner", "tie")).strip().lower()
     return ("1" if w in ("1", "reply 1") else "2" if w in ("2", "reply 2") else "tie"), str(out.get("reason", ""))[:160]
 
@@ -74,12 +83,13 @@ def main() -> int:
     ap.add_argument("--rows-with-reply", action="store_true", help="include the *_reply_* rows")
     ap.add_argument("--model", default=None, help="judge model (default: Config.LLM_MODEL)")
     ap.add_argument("--out", default=None)
+    ap.add_argument("--eval-file", default=None, help="row file for transcripts (default maize_eval_v1.jsonl)")
     args = ap.parse_args()
 
     from config import Config
     from src.retriever import get_openai_client
     model = args.model or Config.LLM_MODEL
-    rows = load_rows()
+    rows = load_rows(args.eval_file)
     A = {r["row_id"]: r for r in json.load(open(args.a))}
     B = {r["row_id"]: r for r in json.load(open(args.b))}
     ids = sorted(set(A) & set(B))
