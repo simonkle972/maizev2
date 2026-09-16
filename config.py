@@ -277,7 +277,9 @@ class Config:
     # material (so the answer says the course materials don't cover it) instead of
     # collapsing to one whole document. Only the low-confidence trigger changes; a
     # failed reference validation ("question 14" not in the chunks) still collapses.
-    LOW_CONFIDENCE_ACTION = os.getenv("LOW_CONFIDENCE_ACTION", "collapse").lower()
+    # Default widen since 2026-09-16 (Phase 2): widen + prior fallback 197/250 vs collapse 179
+    # on the same set (M 1->12, H 4->10); collapse remains only for a failed reference validation.
+    LOW_CONFIDENCE_ACTION = os.getenv("LOW_CONFIDENCE_ACTION", "widen").lower()
     # LOW_CONFIDENCE_ACTION=widen ("widening ladder"): on low confidence, search again
     # with a wider document shortlist and chunk pool (raw query + rewrite), keep the
     # first-pass chunks, rerank the merged pool. Still low -> pass the chunks to the
@@ -332,7 +334,12 @@ class Config:
     VISION_HEARTBEAT_EVERY = int(os.getenv("VISION_HEARTBEAT_EVERY", "5"))
 
     CONTEXTUALIZER_ENABLED = os.getenv('CONTEXTUALIZER_ENABLED', 'true').lower() == 'true'
-    CONTEXTUALIZER_MODEL = os.getenv('CONTEXTUALIZER_MODEL', 'gpt-4o-mini')
+    # gpt-5.4-mini since 2026-09-16 (Phase 2): on identical prompts gpt-4o-mini never said a
+    # clarification needs no retrieval (0/15) and echoed the cached document as a hint;
+    # gpt-5.4-mini 10/15 on the probe and K 13/15 on the full set, same overall accuracy as
+    # gpt-5.6-terra (203 vs 204 / 250) at half the classifier latency and no heavy tail
+    # (p50/p95 1.1/1.6 s vs 2.0/6.7 s). Rollback: CONTEXTUALIZER_MODEL=gpt-4o-mini.
+    CONTEXTUALIZER_MODEL = os.getenv('CONTEXTUALIZER_MODEL', 'gpt-5.4-mini')
     CONTEXTUALIZER_MAX_HISTORY = 6
 
     # Pre-retrieval adversarial / off-topic filter. When True, queries the contextualizer
