@@ -258,6 +258,13 @@ class Config:
     # A derived legacy `intent` is still emitted for logging.
     CONTEXTUALIZER_V2_ENABLED = os.getenv("CONTEXTUALIZER_V2_ENABLED", "true").lower() == "true"
     CONTEXTUALIZER_V2_LAST_TURN_CHARS = int(os.getenv("CONTEXTUALIZER_V2_LAST_TURN_CHARS", "4000"))
+    # SHORT_CIRCUIT_AS_SLOT=true (Phase 2 item 3): the filename short-circuit in
+    # hybrid_doc_search keeps its precision (openers where it fires hit 87-89% vs 44-59%
+    # where it does not) but stops being a one-document bypass: the matched document
+    # becomes the first guaranteed member of a normal fused shortlist and the reranker
+    # decides, so a wrong match can recover and multi-document questions are not
+    # foreclosed. Same mechanism as the widen pass and the Phase 1 prior/hint slots.
+    SHORT_CIRCUIT_AS_SLOT = os.getenv("SHORT_CIRCUIT_AS_SLOT", "false").lower() == "true"
     # LOW_CONFIDENCE_ACTION=decline: when retrieval confidence is low, return no
     # material (so the answer says the course materials don't cover it) instead of
     # collapsing to one whole document. Only the low-confidence trigger changes; a

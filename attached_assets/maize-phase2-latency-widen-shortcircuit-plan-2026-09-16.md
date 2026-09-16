@@ -45,3 +45,17 @@ laptop), then the Phase 1 + Phase 2 push as one deploy. Rollback = the flags.
 
 ## Not in scope
 Chunk-level lexical index and the document card (Phase 3); retrieval as a generator tool call.
+
+
+## Status 2026-09-16 afternoon (close-out items)
+
+- Item 1 latency: DONE (f301f0b) — Document rows were loading PDF bytes; now 2.4 / 2.5 s p50, below v7.
+- Item 2 widen: measured; widen + prior fallback = 197 / 250 vs 179 collapse (21a551d). Default flip
+  pending the classifier-model decision.
+- Classifier model (absorbed into Phase 2): gpt-4o-mini never says "no retrieval" on clarifications;
+  gpt-5.6-terra does (K 13/15) but applies off-topic rules literally (L 15→5) and has a heavy tail;
+  gpt-5.4-mini is the speed candidate. Runs phase2e (terra + off-topic rule g) and phase2f
+  (gpt-5.4-mini) decide `CONTEXTUALIZER_MODEL`. `_json_completion()` makes the model a config change.
+- Item 3 short-circuit as slot: `SHORT_CIRCUIT_AS_SLOT` flag, to measure after the model runs.
+- Item 4 deploy: after the above; VPS latency check first.
+- Phase 3 defined separately: `maize-phase3-one-conversation-plan-2026-09-16.md`.

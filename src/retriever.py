@@ -1779,11 +1779,13 @@ def hybrid_doc_search(query: str, query_embedding: list, ta_id: str, top_k: int 
             diagnostics["stage_1_method"] = "filename_direct_match"
             diagnostics["fused_doc_ids"] = [sc_doc_id]
             logger.info(f"[{ta_id}] hybrid_doc_search SHORT-CIRCUIT: doc_id={sc_doc_id} reason={sc_reason} query_number={query_number}")
-            if allow_short_circuit:
+            if allow_short_circuit and not Config.SHORT_CIRCUIT_AS_SLOT:
                 return [sc_doc_id], diagnostics
-            # Widening pass: keep the direct match as the top candidate but still fuse
-            # the rest, so a wider search actually returns more than one document.
+            # Widening pass, or SHORT_CIRCUIT_AS_SLOT: keep the direct match as the top
+            # candidate but still fuse the rest, so the shortlist has more than one document
+            # and the reranker can recover from a wrong match.
             diagnostics["short_circuit_suppressed_doc"] = sc_doc_id
+            diagnostics["short_circuit_as_slot"] = bool(allow_short_circuit)
         else:
             # Preserve the multi_doc_query_suppressed reason if it was set earlier;
             # otherwise record a generic miss.
