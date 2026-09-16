@@ -265,6 +265,14 @@ class Config:
     # decides, so a wrong match can recover and multi-document questions are not
     # foreclosed. Same mechanism as the widen pass and the Phase 1 prior/hint slots.
     SHORT_CIRCUIT_AS_SLOT = os.getenv("SHORT_CIRCUIT_AS_SLOT", "false").lower() == "true"
+
+    # Phase 3 (2026-09-16): the generator sees the same conversation the classifier sees.
+    # Today it gets six prior messages cut to 300 chars as prose; the end of the TA's last
+    # answer -- the step the student did not follow, the question the TA asked -- is exactly
+    # what gets dropped. With the flag on, history is passed as structured messages, whole,
+    # newest-first under a token budget; the last assistant turn is never cut.
+    HISTORY_FULL_TRANSCRIPT_ENABLED = os.getenv("HISTORY_FULL_TRANSCRIPT_ENABLED", "false").lower() == "true"
+    HISTORY_MAX_TOKENS = int(os.getenv("HISTORY_MAX_TOKENS", "8000"))
     # LOW_CONFIDENCE_ACTION=decline: when retrieval confidence is low, return no
     # material (so the answer says the course materials don't cover it) instead of
     # collapsing to one whole document. Only the low-confidence trigger changes; a

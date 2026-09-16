@@ -165,6 +165,10 @@ def _generate_answer(row: dict, chunks: list, diagnostics: dict, session_id: str
             role_label = "Student" if msg.get("role") == "user" else "Assistant"
             history_parts.append(f"{role_label}: {(msg.get('content') or '')[:300]}...")
         history_text = "\n".join(history_parts)
+        history_for_llm = None
+        if Config.HISTORY_FULL_TRANSCRIPT_ENABLED:
+            from src.response_generator import build_history_messages
+            history_for_llm = build_history_messages(row.get("prior_turns") or [], Config.HISTORY_MAX_TOKENS)
 
         chunk_count = len(chunks or [])
         score_top1 = diagnostics.get("score_top1", 0) or 0
@@ -190,6 +194,7 @@ def _generate_answer(row: dict, chunks: list, diagnostics: dict, session_id: str
             session_id=session_id,
             low_confidence=diagnostics.get("low_confidence_after_widen", False),
             hybrid_reason=diagnostics.get("hybrid_fallback_reason"),
+            history_for_llm=history_for_llm,
         )
         return (answer or ""), int((_t.time() - t0) * 1000)
 

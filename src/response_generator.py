@@ -349,6 +349,49 @@ def get_patience_instructions(attempt_count: int) -> str:
     else:
         return PATIENCE_INSTRUCTIONS["deep"]
 
+def build_history_messages(messages, max_tokens: int) -> list:
+    """Phase 3: the conversation as structured messages, whole, under a token budget.
+
+    Accepts ChatMessage rows or {"role", "content"[, "images"]} dicts. Walks from the
+    most recent message backwards and keeps whole messages while the running estimate
+    (chars / 4) fits the budget; the most recent assistant message is always kept whole
+    even if it alone exceeds the budget, because it is what a follow-up responds to.
+    User messages with attached images become multimodal content, as before.
+    """
+    import base64 as _b64
+    if not messages:
+        return []
+    def _get(m, k, default=None):
+        return m.get(k, default) if isinstance(m, dict) else getattr(m, k, default)
+    kept, used = [], 0
+    last_assistant_seen = False
+    for m in reversed(list(messages)):
+        role = _get(m, "role"); content = _get(m, "content") or ""
+        if role not in ("user", "assistant") or not content:
+            continue
+        cost = len(content) // 4 + 8
+        must_keep = (role == "assistant" and not last_assistant_seen)
+        if used + cost > max_tokens and not must_keep:
+            break
+        if role == "assistant":
+            last_assistant_seen = True
+        used += cost
+        images = _get(m, "images") if role == "user" else None
+        if images:
+            parts = [{"type": "text", "text": content}]
+            for img in images:
+                data = _get(img, "image_data") or _get(img, "data")
+                if not data:
+                    continue
+                mime = _get(img, "image_mime") or _get(img, "mime") or "image/jpeg"
+                parts.append({"type": "image_url", "image_url": {"url": f"data:{mime};base64,{_b64.b64encode(data).decode('ascii')}"}})
+            kept.append({"role": "user", "content": parts if len(parts) > 1 else content})
+        else:
+            kept.append({"role": role, "content": content})
+    kept.reverse()
+    return kept
+
+
 def build_messages(
     query: str,
     context: str,
@@ -515,6 +558,7 @@ def generate_response(
     session_id: str = "",
     low_confidence: bool = False,
     hybrid_reason: Optional[str] = None,
+    history_for_llm: Optional[list] = None,
 ) -> str:
     client = OpenAI(api_key=Config.OPENAI_API_KEY)
 
@@ -522,7 +566,7 @@ def generate_response(
         query, context, system_prompt, conversation_history, course_name,
         hybrid_mode=hybrid_mode, hybrid_doc_filename=hybrid_doc_filename, query_reference=query_reference,
         attempt_count=attempt_count, low_confidence=low_confidence,
-        hybrid_reason=hybrid_reason,
+        hybrid_reason=hybrid_reason, history_for_llm=history_for_llm,
     )
 
     # Prompt caching (2026-08-05): pass session_id as prompt_cache_key so

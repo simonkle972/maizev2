@@ -270,11 +270,16 @@ def stream_chat_response(
             session_has_any_image = any(
                 bool(getattr(m, "images", None)) for m in conversation_history
             ) or bool(images)
-            history_for_llm = (
-                _build_history_for_llm(conversation_history, max_turns=6)
-                if session_has_any_image
-                else None
-            )
+            if Config.HISTORY_FULL_TRANSCRIPT_ENABLED:
+                # Phase 3: the generator sees the conversation whole, like the classifier.
+                from src.response_generator import build_history_messages
+                history_for_llm = build_history_messages(conversation_history, Config.HISTORY_MAX_TOKENS)
+            else:
+                history_for_llm = (
+                    _build_history_for_llm(conversation_history, max_turns=6)
+                    if session_has_any_image
+                    else None
+                )
 
             # RETRIEVAL
             retrieval_start = time.time()
