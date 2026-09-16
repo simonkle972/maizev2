@@ -2219,6 +2219,28 @@ Classify as "off_topic" ONLY when the message clearly falls into one of these ca
 """
 
 
+_NO_TEMPERATURE_MODELS: set = set()
+
+
+def _json_completion(client, model: str, prompt: str, max_completion_tokens: int, session_id: str = ""):
+    """One JSON-mode chat completion, model-agnostic. Newer models reject `max_tokens`
+    (use max_completion_tokens) and some reject temperature=0; the first refusal is
+    remembered per model so switching CONTEXTUALIZER_MODEL is a config change only."""
+    kw = dict(store=False, model=model, messages=[{"role": "user", "content": prompt}],
+              response_format={"type": "json_object"}, max_completion_tokens=max_completion_tokens)
+    if session_id:
+        kw["prompt_cache_key"] = session_id
+    if model not in _NO_TEMPERATURE_MODELS:
+        try:
+            return client.chat.completions.create(temperature=0.0, **kw)
+        except Exception as e:
+            if "temperature" not in str(e):
+                raise
+            _NO_TEMPERATURE_MODELS.add(model)
+            logger.info(f"{model} rejects temperature=0; calling without it from now on")
+    return client.chat.completions.create(**kw)
+
+
 _COURSE_SUMMARY_CACHE: dict = {}
 
 
@@ -2257,8 +2279,7 @@ def get_course_summary(ta_id: str) -> str:
                     "in broad terms, then the main topics and kinds of materials it contains. "
                     "Use only what the materials show; do not invent topics."
                 )}],
-                max_tokens=220,
-                temperature=0.0,
+                max_completion_tokens=220,
             )
             summary = (response.choices[0].message.content or "").strip()
     except Exception as e:
@@ -2412,12 +2433,7 @@ JSON only, no prose."""
     start = time.time()
     try:
         client = get_openai_client()
-        cache_kwargs = {"prompt_cache_key": session_id} if session_id else {}
-        response = client.chat.completions.create(
-            store=False, model=Config.CONTEXTUALIZER_MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"}, max_tokens=400, temperature=0.0, **cache_kwargs,
-        )
+        response = _json_completion(client, Config.CONTEXTUALIZER_MODEL, prompt, 600, session_id=session_id)
         parsed = json.loads(response.choices[0].message.content.strip())
 
         rewritten = (parsed.get("rewritten_query") or query).strip() or query
@@ -2598,16 +2614,7 @@ Respond with JSON ONLY, no prose:
         client = get_openai_client()
         # Prompt caching (2026-08-05): session_id as routing hint. See
         # generate_response in response_generator.py for the full rationale.
-        cache_kwargs = {"prompt_cache_key": session_id} if session_id else {}
-        response = client.chat.completions.create(
-            store=False,
-            model=Config.CONTEXTUALIZER_MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"},
-            max_tokens=300,
-            temperature=0.0,
-            **cache_kwargs,
-        )
+        response = _json_completion(client, Config.CONTEXTUALIZER_MODEL, prompt, 400, session_id=session_id)
         raw = response.choices[0].message.content.strip()
         parsed = json.loads(raw)
 
@@ -3935,6 +3942,21 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                     f"low_confidence={confidence['is_low_confidence']} ({diagnostics['widen_latency_ms']}ms)")
 
         if confidence["is_low_confidence"]:
+            if Config.CACHE_AS_PRIOR_ENABLED and prior_chunk_ids:
+                # Still low with a prior: the turn carried too little signal for search to
+                # settle ("what do you mean?", "I still don't get it"). The wide pool then
+                # drifts to unrelated documents -- K went 12 -> 1 on 2026-09-16 -- while the
+                # passages the student was already discussing are the best available
+                # material. Serve those, as the skip gate does; no low-confidence framing.
+                _served = _rematerialize_chunks(ta_id, prior_chunk_ids)
+                if _served:
+                    diagnostics["session_cache_used"] = True
+                    diagnostics["hybrid_fallback_reason"] = f"widened_still_low_prior_served_{confidence['reason']}"
+                    diagnostics["retrieval_method"] = "widened_low_confidence_prior"
+                    diagnostics["cache_action"] = "widen_fallback_to_prior"
+                    logger.info(f"[{ta_id}] Widening ladder still low; serving {len(_served)} chunks from the cached prior instead of the wide pool")
+                    _stage("widen_prior_fallback")
+                    return _served, diagnostics
             diagnostics["low_confidence_after_widen"] = True
             diagnostics["hybrid_fallback_reason"] = f"widened_still_low_{confidence['reason']}"
             diagnostics["retrieval_method"] = "widened_low_confidence"
