@@ -19,16 +19,36 @@ def _estimate_tokens(text: str) -> int:
     return len(text) // 4 if text else 0
 
 
+def _docs_query(ta_id: str):
+    """Document rows for routing, WITHOUT the heavy columns.
+
+    `documents` carries file_content (the uploaded PDF bytes), full_text (extracted text,
+    2.4 MB across the local econ course) and summary_embedding (1536 floats). Plain
+    `Document.query...all()` loaded all of them, several times per turn, in the filename
+    matchers, the solutions lookup, the title list and the course summary. Measured
+    2026-09-16 with stage timers: document search 2.9 s, contextualizer 2.7 s, query
+    analysis 1.3 s per turn -- almost all of it this. Only metadata is loaded here;
+    a deferred column still loads lazily if a caller touches it.
+    """
+    from models import Document
+    from sqlalchemy.orm import load_only
+    return Document.query.options(load_only(
+        Document.id, Document.ta_id, Document.filename, Document.original_filename, Document.display_name,
+        Document.doc_type, Document.doc_category, Document.assignment_number,
+        Document.instructional_unit_number, Document.instructional_unit_label, Document.content_title,
+        Document.summary, Document.last_indexed_at,
+    )).filter(Document.ta_id == ta_id)
+
+
 def _doc_id_for_filename(ta_id: str, filename: str):
     """Resolve a cached document_filename (original name, display name, or the
     extension-less stem chunks carry as file_name) to a Document id. None if unknown."""
     if not filename:
         return None
     from models import Document
-    doc = (Document.query.filter_by(ta_id=ta_id, original_filename=filename).first()
-           or Document.query.filter_by(ta_id=ta_id, display_name=filename).first()
-           or Document.query.filter(Document.ta_id == ta_id,
-                                    Document.original_filename.like(f"{filename}.%")).first())
+    doc = (_docs_query(ta_id).filter(Document.original_filename == filename).first()
+           or _docs_query(ta_id).filter(Document.display_name == filename).first()
+           or _docs_query(ta_id).filter(Document.original_filename.like(f"{filename}.%")).first())
     return doc.id if doc else None
 
 
@@ -157,6 +177,28 @@ def get_full_document_text(document_id: int) -> tuple:
     return text, filename, len(text) // 4
 
 
+def find_solution_document_row(problem_doc_name: str, ta_id: str):
+    """The Document row (metadata only) of the solutions file for `problem_doc_name`, or
+    None. Same matching as find_solution_document without loading any text."""
+    if not problem_doc_name:
+        return None
+    problem_lower = problem_doc_name.lower()
+    number_match = re.search(r'(?:problem(?:s)?\s*set|homework|hw|ps|pset|practice\s*problems?\s*set?)\s*#?\s*(\d+)', problem_lower)
+    doc_number = number_match.group(1) if number_match else None
+    problem_name_clean = problem_lower.replace('.pdf', '').replace('.docx', '').strip()
+    for doc in _docs_query(ta_id).all():
+        doc_name = (doc.display_name or doc.original_filename or "").lower()
+        if 'solution' not in doc_name:
+            continue
+        if problem_name_clean in doc_name:
+            return doc
+        if doc_number:
+            m = re.search(r'(?:problem(?:s)?\s*set|homework|hw|ps|pset|practice\s*problems?\s*set?)\s*#?\s*(\d+)', doc_name)
+            if m and m.group(1) == doc_number:
+                return doc
+    return None
+
+
 def find_solution_document(problem_doc_name: str, ta_id: str) -> tuple:
     """
     Find the corresponding solution document for a problem document.
@@ -187,7 +229,7 @@ def find_solution_document(problem_doc_name: str, ta_id: str) -> tuple:
     doc_number = number_match.group(1) if number_match else None
     
     # Get all documents for this TA
-    docs = Document.query.filter_by(ta_id=ta_id).all()
+    docs = _docs_query(ta_id).all()
     
     solution_doc = None
     
@@ -255,15 +297,9 @@ def identify_target_documents(chunks: list, query_analysis: dict, ta_id: str) ->
     
     if query_analysis.get("filename_filter"):
         filter_value = query_analysis["filename_filter"]
-        doc = Document.query.filter_by(
-            ta_id=ta_id,
-            original_filename=filter_value
-        ).first()
+        doc = _docs_query(ta_id).filter_by(original_filename=filter_value).first()
         if not doc:
-            doc = Document.query.filter_by(
-                ta_id=ta_id,
-                display_name=filter_value
-            ).first()
+            doc = _docs_query(ta_id).filter_by(display_name=filter_value).first()
         if doc:
             logger.info(f"[{ta_id}] Target doc identified via filename_filter: {doc.display_name or doc.original_filename}")
             return [doc.id], "filename_filter"
@@ -289,10 +325,7 @@ def identify_target_documents(chunks: list, query_analysis: dict, ta_id: str) ->
             return [doc.id], "unit_filter"
     
     if query_analysis.get("doc_type_filter"):
-        docs = Document.query.filter_by(
-            ta_id=ta_id,
-            doc_type=query_analysis["doc_type_filter"]
-        ).all()
+        docs = _docs_query(ta_id).filter(Document.doc_type == query_analysis["doc_type_filter"]).all()
         if len(docs) == 1:
             logger.info(f"[{ta_id}] Target doc identified via single doc_type match: {docs[0].original_filename}")
             return [docs[0].id], "single_doc_type_match"
@@ -310,7 +343,7 @@ def identify_target_documents(chunks: list, query_analysis: dict, ta_id: str) ->
     if ps_match:
         ps_number = ps_match.group(1)
         # Search content_title for matching problem set number
-        docs = Document.query.filter_by(ta_id=ta_id).all()
+        docs = _docs_query(ta_id).all()
         for doc in docs:
             if doc.content_title:
                 title_lower = doc.content_title.lower()
@@ -329,7 +362,7 @@ def identify_target_documents(chunks: list, query_analysis: dict, ta_id: str) ->
         # them on 2026-09-14 flipped four passing "part 2" eval rows to the part 1
         # file. When several files share the year, fall through to normal retrieval,
         # where filename tokens and the reranker can tell the parts apart.
-        docs = Document.query.filter_by(ta_id=ta_id, doc_type="exam").order_by(Document.id).all()
+        docs = _docs_query(ta_id).filter(Document.doc_type == "exam").order_by(Document.id).all()
         year_docs = [d for d in docs
                      if (d.display_name or d.original_filename) and year_filter in (d.display_name or d.original_filename)]
         if len(year_docs) == 1:
@@ -341,7 +374,7 @@ def identify_target_documents(chunks: list, query_analysis: dict, ta_id: str) ->
     
     if exam_match:
         exam_year = exam_match.group(1) if exam_match.group(1) else None
-        docs = Document.query.filter_by(ta_id=ta_id, doc_type="exam").all()
+        docs = _docs_query(ta_id).filter(Document.doc_type == "exam").all()
         if exam_year and not year_filter:
             for doc in docs:
                 if doc.content_title and exam_year in doc.content_title:
@@ -364,15 +397,9 @@ def identify_target_documents(chunks: list, query_analysis: dict, ta_id: str) ->
     
     top_filename = max(doc_counts.keys(), key=lambda k: doc_counts[k])
     
-    doc = Document.query.filter_by(
-        ta_id=ta_id,
-        original_filename=top_filename
-    ).first()
+    doc = _docs_query(ta_id).filter_by(original_filename=top_filename).first()
     if not doc:
-        doc = Document.query.filter_by(
-            ta_id=ta_id,
-            display_name=top_filename
-        ).first()
+        doc = _docs_query(ta_id).filter_by(display_name=top_filename).first()
     
     if doc:
         logger.info(f"[{ta_id}] Target doc identified via chunk frequency: {doc.display_name or doc.original_filename}")
@@ -502,7 +529,7 @@ def find_matching_documents(query: str, ta_id: str, threshold: float = 0.4) -> l
     """
     from models import Document
     
-    documents = Document.query.filter_by(ta_id=ta_id).all()
+    documents = _docs_query(ta_id).all()
     if not documents:
         return []
     
@@ -1593,7 +1620,7 @@ def hybrid_doc_search(query: str, query_embedding: list, ta_id: str, top_k: int 
     try:
         query_tokens = _tokenize_number_aware(query)
         if query_tokens:
-            docs = Document.query.filter_by(ta_id=ta_id).all()
+            docs = _docs_query(ta_id).all()
             for doc in docs:
                 fn = doc.original_filename or doc.display_name or ""
                 fn_tokens = _tokenize_number_aware(fn)
@@ -1674,8 +1701,7 @@ def hybrid_doc_search(query: str, query_embedding: list, ta_id: str, top_k: int 
             number_clauses = [Document.assignment_number == qn_str]
             if qn_int is not None:
                 number_clauses.append(Document.instructional_unit_number == qn_int)
-            cat_matches = Document.query.filter(
-                Document.ta_id == ta_id,
+            cat_matches = _docs_query(ta_id).filter(
                 Document.doc_category == category_hint,
                 or_(*number_clauses),
             ).all()
@@ -1699,8 +1725,7 @@ def hybrid_doc_search(query: str, query_embedding: list, ta_id: str, top_k: int 
                 # like pset03 being categorized as "solutions" (because the file
                 # itself is the solutions doc), where the user asking about
                 # "problem set 3" still wants that doc returned.
-                num_only_matches = Document.query.filter(
-                    Document.ta_id == ta_id,
+                num_only_matches = _docs_query(ta_id).filter(
                     or_(*number_clauses),
                 ).all()
                 if len(num_only_matches) == 1:
@@ -2213,7 +2238,7 @@ def get_course_summary(ta_id: str) -> str:
     try:
         from models import Document, TeachingAssistant
         ta = TeachingAssistant.query.get(ta_id)
-        docs = Document.query.filter_by(ta_id=ta_id).all()
+        docs = _docs_query(ta_id).all()
         if ta and docs:
             lines = []
             for d in docs:
@@ -2273,7 +2298,7 @@ def _get_document_titles(ta_id: str, limit: int = 150) -> list:
     """Titles of the TA's documents, as the classifier should see them."""
     try:
         from models import Document
-        docs = Document.query.filter_by(ta_id=ta_id).order_by(Document.id).limit(limit).all()
+        docs = _docs_query(ta_id).order_by(Document.id).limit(limit).all()
         return [(d.display_name or d.original_filename) for d in docs if (d.display_name or d.original_filename)]
     except Exception as e:
         logger.warning(f"[{ta_id}] document titles unavailable: {type(e).__name__}: {e}")
@@ -2783,6 +2808,17 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         "paste_longest_run": 0,
     }
     
+    # Phase 2 stage timer: elapsed ms since the previous mark, keyed by stage. Every
+    # segment of the turn is covered so no time is unattributed (Phase 1 left ~2 s/turn
+    # unexplained). Read in the eval harness as latency_breakdown["stage_ms"].
+    import time as _t
+    _stage_t = [_t.time()]
+    diagnostics["stage_ms"] = {}
+    def _stage(name):
+        now = _t.time()
+        diagnostics["stage_ms"][name] = diagnostics["stage_ms"].get(name, 0) + int((now - _stage_t[0]) * 1000)
+        _stage_t[0] = now
+
     # SESSION CONTEXT CACHE: Check if we have cached context from previous successful retrieval
     # This avoids re-searching for the same document on follow-up questions
     session_context = None
@@ -2801,6 +2837,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         except Exception as e:
             logger.warning(f"[{ta_id}] Failed to load session context: {e}")
     
+    _stage('session_load')
     # MODERATION PRE-FILTER (free, ~50-100ms)
     # OpenAI's Moderation API catches the worst categories (hate, harassment,
     # sexual, violence) before we touch the contextualizer or retrieval. When it
@@ -2820,6 +2857,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
             diagnostics["redirect_message"] = redirect
             return [], diagnostics
 
+    _stage('moderation')
     # PRE-RETRIEVAL CONTEXTUALIZATION
     # One cheap LLM call that rewrites the query to be self-contained (coreference resolution)
     # and classifies intent (continuation | concept_lookup | pivot | clarification | new).
@@ -2827,6 +2865,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
     # Falls back silently to raw-query heuristic path if disabled or if the call fails.
     ctx_result = contextualize_query(query, conversation_history, session_context, ta_id, session_id=session_id)
     diagnostics["contextualizer_latency_ms"] = ctx_result["latency_ms"]
+    _stage('contextualizer')
     diagnostics["contextualizer_fallback"] = ctx_result["fallback"]
     diagnostics["rewritten_query"] = ctx_result["rewritten_query"]
     diagnostics["intent"] = ctx_result["intent"]
@@ -2920,6 +2959,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         else:
             logger.info(f"[{ta_id}] Follow-up detected but no useful context in history, skipping enrichment")
     
+    _stage('query_analysis')
     prior_doc_ids: list = []     # Phase 1: cached document(s) carried into the fresh search
     prior_chunk_ids: list = []   # Phase 1: chunks served last turn, merged into the pool
     # USE SESSION CACHE FOR CONVERSATIONAL CONTINUITY
@@ -2961,15 +3001,9 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
             elif len(distinct_query_numbers) == 1:
                 # Compare against the cached doc — look up its number + category from the DB.
                 from models import Document as _Doc
-                cached_doc = _Doc.query.filter_by(
-                    ta_id=ta_id,
-                    original_filename=session_context.get("document_filename") or "",
-                ).first()
+                cached_doc = _docs_query(ta_id).filter_by(original_filename=session_context.get("document_filename") or "").first()
                 if not cached_doc:
-                    cached_doc = _Doc.query.filter_by(
-                        ta_id=ta_id,
-                        display_name=session_context.get("document_filename") or "",
-                    ).first()
+                    cached_doc = _docs_query(ta_id).filter_by(display_name=session_context.get("document_filename") or "").first()
                 if cached_doc:
                     cached_doc_category = cached_doc.doc_category
                     cached_doc_num = None
@@ -3090,8 +3124,9 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                 # Same gate as before: the solutions document joins after the student has
                 # had one exchange to attempt the problem -- as a shortlist member, so the
                 # reranker decides which of its passages matter.
-                _sol_text, _sol_name, _ = find_solution_document(session_context.get("document_filename", ""), ta_id)
-                _sol_id = _doc_id_for_filename(ta_id, _sol_name) if _sol_name else None
+                _sol_row = find_solution_document_row(session_context.get("document_filename", ""), ta_id)
+                _sol_id = _sol_row.id if _sol_row else None
+                _sol_name = (_sol_row.display_name or _sol_row.original_filename) if _sol_row else None
                 if _sol_id and _sol_id not in prior_doc_ids:
                     prior_doc_ids.append(_sol_id)
                     diagnostics["solution_doc_added"] = True
@@ -3119,6 +3154,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                         except Exception as e:
                             logger.warning(f"[{ta_id}] Failed to save attempt count: {e}")
                     logger.info(f"[{ta_id}] Skip gate (clarification): returning {len(_served)} chunks served last turn, no search")
+                    _stage("skip_gate")
                     return _served, diagnostics
 
             diagnostics["cache_action"] = "prior_fresh_search"
@@ -3270,6 +3306,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                 except Exception as e:
                     logger.warning(f"[{ta_id}] Failed to clear session cache: {e}")
     
+    _stage('cache_block')
     total_chunks = DocumentChunk.query.filter_by(ta_id=ta_id).count()
     diagnostics["total_chunks_in_ta"] = total_chunks
     
@@ -3277,6 +3314,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         logger.warning(f"No indexed chunks found for TA: {ta_id}")
         return [], diagnostics
     
+    _stage('total_chunks_query')
     client = get_openai_client()
 
     # Use the enriched query for embedding to get better semantic search results
@@ -3287,6 +3325,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         input=effective_query
     )
     query_embedding = response.data[0].embedding
+    _stage('embedding')
     
     # EARLY HYBRID ROUTING: For specific problem references (e.g., "section 1 question a"),
     # skip the unreliable LLM reranker and go directly to full-document mode.
@@ -3444,6 +3483,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                 candidate_doc_ids = _missing + list(candidate_doc_ids or [])
                 diagnostics["cache_prior_added_to_shortlist"] = _missing
                 logger.info(f"[{ta_id}] Prior/hint: added docs {_missing} to shortlist -> {candidate_doc_ids}")
+        _stage('doc_search')
         if candidate_doc_ids:
             filtered_query = base_query.filter(DocumentChunk.document_id.in_(candidate_doc_ids))
             diagnostics["filters_applied"] = f"v2_hybrid_doc_ids={candidate_doc_ids}"
@@ -3592,6 +3632,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         else:
             diagnostics["retrieval_method"] = "unfiltered"
     
+    _stage('chunk_search')
     initial_chunks = []
     
     for i, row in enumerate(results):
@@ -3712,6 +3753,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
     # the union of grams across each document's chunks in the top-20, and if any
     # doc clears the threshold, promote its best-containing chunk so the rerank
     # confirms it as #1 and the cache labels with the correct source.
+    _stage('prior_merge_structural')
     paste_match = detect_pasted_question(query, initial_chunks)
     if paste_match:
         diagnostics["paste_detected"] = True
@@ -3739,6 +3781,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
     # ranking it did — same metadata the reranker actually sees. Without these,
     # operators reading the sheet can't tell "did the wrong doc category
     # surface?" without a follow-up DB query.
+    _stage('paste_detection')
     pre_rerank_candidates = []
     for i, chunk in enumerate(initial_chunks):
         text_preview = chunk["text"][:200].replace("\n", " ").replace("\t", " ").strip()
@@ -3766,6 +3809,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
     chunks, rerank_info = rerank(rerank_query, initial_chunks, top_k=final_k, session_id=session_id)
     diagnostics["rerank_applied"] = rerank_info.get("reranked", False)
     diagnostics["rerank_info"] = rerank_info
+    _stage('rerank')
 
     # Promote the reranker facts to top-level diagnostics so they reach qa_logs.
     # The sheet has a rerank_latency_ms column that was always blank because these
@@ -3823,6 +3867,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
     
     confidence = assess_retrieval_confidence(chunks, rerank_info)
 
+    _stage('validation_confidence')
     # WIDENING LADDER (experiment, LOW_CONFIDENCE_ACTION=widen). Only for low
     # confidence -- a failed reference validation keeps its existing behaviour.
     # Rung 1: wider shortlist + pool, raw query and rewrite, first pass kept, rerank.
@@ -4018,6 +4063,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                     except Exception as e:
                         logger.warning(f"[{ta_id}] Failed to cache session context in hybrid fallback: {e}")
 
+                _stage("collapse_fetch_supp_cache")
                 return hybrid_chunks, diagnostics
             elif token_estimate > Config.HYBRID_MAX_DOC_TOKENS:
                 logger.warning(f"[{ta_id}] Document too large for hybrid fallback: {token_estimate} tokens > {Config.HYBRID_MAX_DOC_TOKENS}")
@@ -4034,6 +4080,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
     # CACHE DOCUMENT CONTEXT for follow-up queries (standard chunk retrieval path)
     # Only cache when retrieval is confident (not low confidence) AND validation passed
     # This prevents caching wrong document context that would mislead follow-ups
+    _stage('collapse_path')
     should_cache_chunks = (
         session_id and 
         chunks and 
@@ -4052,6 +4099,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         diagnostics["supplementary_teaching_found"] = True
         diagnostics["supplementary_chunk_count"] = len(supp_chunks)
 
+    _stage('supplementary')
     if should_cache_chunks:
         try:
             top_doc = chunks[0].get("file_name", "")
@@ -4085,4 +4133,5 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         except Exception as e:
             logger.warning(f"[{ta_id}] Failed to cache session context in chunk retrieval: {e}")
 
+    _stage("cache_write")
     return chunks, diagnostics

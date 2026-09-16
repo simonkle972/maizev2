@@ -93,6 +93,7 @@ class RowResult:
                                                # vector search, rerank, supplementary, hybrid fetch, widen)
     cache_action: str = ""                     # diagnostics['cache_action'] -- which cache decision fired
     ctx_v2: dict = field(default_factory=dict)  # contextualizer v2 judgement: retrieve / document_hint / teaching
+    stage_ms: dict = field(default_factory=dict)  # Phase 2: elapsed ms per retriever stage, all segments covered
     retrieved_top5_document_ids: list = field(default_factory=list)  # Document ids of the top-5 chunks
     prior_doc_ids: list = field(default_factory=list)  # documents the session was already working in (cache prior)
                                                # The blended headline hid follow-up changes (137 of 250 rows).
@@ -609,6 +610,7 @@ def evaluate_row(row: dict, retrieve_context, warm_cache: bool = True,
         | ({'rerank_latency_ms': (diagnostics.get('rerank_info') or {}).get('rerank_latency_ms')}
            if (diagnostics.get('rerank_info') or {}).get('rerank_latency_ms') is not None else {}),
         cache_action=str(diagnostics.get('cache_action') or ''),
+        stage_ms=dict(diagnostics.get('stage_ms') or {}),
         retrieved_top5_document_ids=retrieved_top5_document_ids,
         prior_doc_ids=prior_doc_ids,
         ctx_v2={k[4:]: diagnostics.get(k) for k in ('ctx_retrieve', 'ctx_document_hint', 'ctx_document_hint_doc_id', 'ctx_wants_teaching_material') if k in diagnostics},
