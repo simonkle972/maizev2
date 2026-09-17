@@ -88,7 +88,7 @@ def main() -> int:
                       f"\n      file: {full.original_filename}  |  {card['reason'][:110]}  ({time.time() - t0:.1f}s)")
                 if args.apply:
                     changed = apply_card(full, card)
-                    if changed and full.summary and not full.summary_embedding:
+                    if full.summary and card.get('summary'):   # summary changed: refresh its embedding
                         try:
                             emb = get_openai_client().embeddings.create(model=Config.EMBEDDING_MODEL, input=full.summary)
                             full.summary_embedding = emb.data[0].embedding

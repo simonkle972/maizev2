@@ -266,6 +266,15 @@ class Config:
     # foreclosed. Same mechanism as the widen pass and the Phase 1 prior/hint slots.
     SHORT_CIRCUIT_AS_SLOT = os.getenv("SHORT_CIRCUIT_AS_SLOT", "false").lower() == "true"
 
+    # DOC_CARD_ENABLED (Phase 4 step 2, 2026-09-16): the retrieval consumers of the document
+    # card -- the reference resolver wins the short-circuit, filename overlap uses the card
+    # label + aliases, the contextualizer sees card labels, the reranker and the generator
+    # get the same label string, and the chunk-level lexical index feeds the candidate
+    # pool. Storage and the professor UI are not gated. Default off until measured.
+    DOC_CARD_ENABLED = os.getenv("DOC_CARD_ENABLED", "false").lower() == "true"
+    DOC_CARD_MODEL = os.getenv("DOC_CARD_MODEL", "gpt-5.6-terra")
+    LEXICAL_CHUNK_K = int(os.getenv("LEXICAL_CHUNK_K", "20"))
+
     # Phase 3 (2026-09-16): the generator sees the same conversation the classifier sees.
     # Today it gets six prior messages cut to 300 chars as prose; the end of the TA's last
     # answer -- the step the student did not follow, the question the TA asked -- is exactly

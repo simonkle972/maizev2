@@ -586,10 +586,9 @@ def test_chat_stream(ta_id):
             retrieval_latency_ms = int((time.time() - retrieval_start) * 1000)
             chunk_count = len(chunks)
 
-            context = "\n\n---\n\n".join([
-                f"[From: {c['file_name']}]\n{c['text']}" for c in chunks
-            ])
-            sources = [c['file_name'] for c in chunks[:3]]
+            from src.response_generator import build_context_block, chunk_display_name
+            context = build_context_block(chunks)
+            sources = list(dict.fromkeys(chunk_display_name(c) for c in chunks[:8]))[:3]
 
             hybrid_mode = retrieval_diagnostics.get("hybrid_fallback_triggered", False)
             hybrid_doc_filename = retrieval_diagnostics.get("hybrid_doc_filename")

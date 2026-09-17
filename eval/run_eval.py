@@ -153,13 +153,8 @@ def _generate_answer(row: dict, chunks: list, diagnostics: dict, session_id: str
 
         # Primary chunks first, teaching material tagged after — same ordering the
         # chat path uses, since ordering affects what the model leans on.
-        primary = [c for c in chunks if c.get('retrieval_role') != 'teaching_material']
-        teaching = [c for c in chunks if c.get('retrieval_role') == 'teaching_material']
-        parts = [f"[From: {c.get('file_name','')}]\n{c.get('text','')}" for c in primary]
-        if teaching:
-            parts.append("[RELEVANT TEACHING MATERIAL FROM COURSE LECTURES]")
-            parts.extend(f"[From: {c.get('file_name','')}]\n{c.get('text','')}" for c in teaching)
-        context = "\n\n---\n\n".join(parts)
+        from src.response_generator import build_context_block
+        context = build_context_block(chunks)
 
         history_parts = []
         for msg in (row.get("prior_turns") or [])[-6:]:
@@ -758,7 +753,8 @@ def format_scorecard(summary: dict, label: str = "Retrieval scorecard") -> str:
     lines.append(f"**Reranker:** `{_Cfg.RERANKER_VENDOR}` · **low-confidence action:** "
                  f"`{_Cfg.LOW_CONFIDENCE_ACTION}` · **cache reuse:** `{_Cfg.SESSION_CACHE_REUSE_ENABLED}` · **rerank query:** `{_Cfg.RERANK_QUERY_MODE}`"
                  f" · **cache as prior:** `{getattr(_Cfg, 'CACHE_AS_PRIOR_ENABLED', False)}`"
-                 f" · **contextualizer v2:** `{getattr(_Cfg, 'CONTEXTUALIZER_V2_ENABLED', False)}`")
+                 f" · **contextualizer v2:** `{getattr(_Cfg, 'CONTEXTUALIZER_V2_ENABLED', False)}`"
+                 f" · **doc card:** `{getattr(_Cfg, 'DOC_CARD_ENABLED', False)}`")
     if _CFG_OVERRIDES:
         lines.append("**Config overrides (--set):** " + ", ".join(f"`{k}={v!r}`" for k, v in _CFG_OVERRIDES.items()))
     distinct_tas = overall.get("distinct_tas") or []

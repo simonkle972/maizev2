@@ -349,6 +349,29 @@ def get_patience_instructions(attempt_count: int) -> str:
     else:
         return PATIENCE_INSTRUCTIONS["deep"]
 
+def chunk_display_name(c) -> str:
+    """The name a chunk's document is shown under -- the card label when the card is on and
+    the chunk carries one, else the stored file name. ONE place for every caller (chat,
+    professor test chat, eval harness), so the generator, the reranker and the student all
+    see the same identity string."""
+    if Config.DOC_CARD_ENABLED and c.get("doc_label"):
+        return c["doc_label"]
+    return c.get("file_name") or "unknown"
+
+
+def build_context_block(chunks) -> str:
+    """Retrieved material as the generator sees it: primary passages first, teaching
+    material tagged after. Shared by chat_streaming, professor.py and eval/run_eval.py,
+    which used to mirror each other by hand."""
+    primary = [c for c in chunks if c.get("retrieval_role") != "teaching_material"]
+    teaching = [c for c in chunks if c.get("retrieval_role") == "teaching_material"]
+    parts = [f"[From: {chunk_display_name(c)}]\n{c.get('text', '')}" for c in primary]
+    if teaching:
+        parts.append("[RELEVANT TEACHING MATERIAL FROM COURSE LECTURES]")
+        parts.extend(f"[From: {chunk_display_name(c)}]\n{c.get('text', '')}" for c in teaching)
+    return "\n\n---\n\n".join(parts)
+
+
 def build_history_messages(messages, max_tokens: int) -> list:
     """Phase 3: the conversation as structured messages, whole, under a token budget.
 

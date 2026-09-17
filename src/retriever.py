@@ -50,6 +50,7 @@ def _doc_id_for_filename(ta_id: str, filename: str):
     from models import Document
     doc = (_docs_query(ta_id).filter(Document.original_filename == filename).first()
            or _docs_query(ta_id).filter(Document.display_name == filename).first()
+           or _docs_query(ta_id).filter(Document.card_title == filename).first()
            or _docs_query(ta_id).filter(Document.original_filename.like(f"{filename}.%")).first())
     return doc.id if doc else None
 
@@ -70,7 +71,7 @@ def _rematerialize_chunks(ta_id: str, chunk_ids: list, query_embedding=None) -> 
     if not chunk_ids:
         return []
     from models import db, DocumentChunk
-    cols = [DocumentChunk.id, DocumentChunk.document_id, DocumentChunk.chunk_text,
+    cols = [DocumentChunk.id, DocumentChunk.document_id, DocumentChunk.doc_label, DocumentChunk.chunk_text,
             DocumentChunk.chunk_context, DocumentChunk.section_path, DocumentChunk.file_name,
             DocumentChunk.doc_type, DocumentChunk.doc_category, DocumentChunk.assignment_number,
             DocumentChunk.instructional_unit_number, DocumentChunk.instructional_unit_label]
@@ -90,6 +91,7 @@ def _rematerialize_chunks(ta_id: str, chunk_ids: list, query_embedding=None) -> 
             "file_name": r.file_name or "unknown", "doc_type": r.doc_type or "other",
             "doc_category": r.doc_category, "chunk_context": r.chunk_context,
             "section_path": r.section_path, "chunk_id": r.id, "document_id": r.document_id,
+            "doc_label": r.doc_label,
             "metadata": {"assignment_number": r.assignment_number,
                          "instructional_unit_number": r.instructional_unit_number,
                          "instructional_unit_label": r.instructional_unit_label},
@@ -129,6 +131,9 @@ def get_full_document_text(document_id: int) -> tuple:
         return None, None, 0
 
     filename = doc.display_name or doc.original_filename
+    if Config.DOC_CARD_ENABLED and doc.card_title:
+        from src.doc_card import card_label as _cl
+        filename = _cl(doc)
 
     # Tier 1 — fast path
     if doc.full_text:
@@ -983,6 +988,14 @@ def cohere_rerank(query: str, chunks: list, top_k: int = FINAL_K) -> tuple:
         documents = []
         for c in chunks:
             cat = c.get("doc_category")
+            if Config.DOC_CARD_ENABLED and c.get("doc_label"):
+                # Phase 4: the same identity string the generator and the student see,
+                # plus the passage's place in the document.
+                sp = c.get("section_path")
+                where = " › ".join(sp) if isinstance(sp, list) and sp else ""
+                head = f"[{c['doc_label']}" + (f" · {cat}" if cat else "") + "]" + (f" {where}:" if where else ":")
+                documents.append(f"{head} {c.get('text', '')}".strip())
+                continue
             prefix = f"[category: {cat}] " if cat else ""
             name = c.get("file_name") or ""
             documents.append(f"{prefix}{name}: {c.get('text', '')}".strip())
@@ -1625,6 +1638,9 @@ def hybrid_doc_search(query: str, query_embedding: list, ta_id: str, top_k: int 
             docs = _docs_query(ta_id).all()
             for doc in docs:
                 fn = doc.original_filename or doc.display_name or ""
+                if Config.DOC_CARD_ENABLED and doc.card_title:
+                    from src.doc_card import card_label as _cl, card_aliases as _ca
+                    fn = " ".join([_cl(doc)] + _ca(doc) + [fn])
                 fn_tokens = _tokenize_number_aware(fn)
                 if not fn_tokens:
                     continue
@@ -1769,6 +1785,21 @@ def hybrid_doc_search(query: str, query_embedding: list, ta_id: str, top_k: int 
             if top_score >= threshold and margin >= Config.FILENAME_DIRECT_MATCH_MARGIN:
                 sc_doc_id = top_doc_id
                 sc_reason = "margin_only_no_number"
+
+        if Config.DOC_CARD_ENABLED:
+            # Phase 4: the card resolver (title / aliases / unique token overlap over the
+            # cards) is the precise signal; it overrides the regex paths when it resolves
+            # and leaves them in place when it does not.
+            try:
+                from src.doc_card import resolve_reference
+                _rid, _rlabel = resolve_reference(ta_id, query)
+                if _rid is not None:
+                    if sc_doc_id != _rid:
+                        logger.info(f"[{ta_id}] card reference '{_rlabel}' (doc {_rid}) "
+                                    f"{'overrides ' + str(sc_reason) if sc_doc_id is not None else 'resolved'}")
+                    sc_doc_id, sc_reason = _rid, "card_reference"
+            except Exception as _e:
+                logger.warning(f"[{ta_id}] card reference resolution failed: {_e}")
 
         if sc_doc_id is not None:
             diagnostics["short_circuit"] = {
@@ -2324,6 +2355,9 @@ def _get_document_titles(ta_id: str, limit: int = 150) -> list:
     try:
         from models import Document
         docs = _docs_query(ta_id).order_by(Document.id).limit(limit).all()
+        if Config.DOC_CARD_ENABLED:
+            from src.doc_card import card_label as _cl
+            return [_cl(d) for d in docs if _cl(d)]
         return [(d.display_name or d.original_filename) for d in docs if (d.display_name or d.original_filename)]
     except Exception as e:
         logger.warning(f"[{ta_id}] document titles unavailable: {type(e).__name__}: {e}")
@@ -2337,6 +2371,11 @@ def _resolve_document_hint(ta_id: str, hint: str, titles: list):
     if not hint:
         return None, None
     hint = hint.strip()
+    if Config.DOC_CARD_ENABLED:
+        from src.doc_card import resolve_reference
+        _rid, _rlabel = resolve_reference(ta_id, hint)
+        if _rid is not None:
+            return _rid, _rlabel
     doc_id = _doc_id_for_filename(ta_id, hint)
     if doc_id:
         return doc_id, hint
@@ -3435,6 +3474,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
     base_query = db.session.query(
         DocumentChunk.id,
         DocumentChunk.document_id,
+        DocumentChunk.doc_label,
         DocumentChunk.chunk_text,
         DocumentChunk.chunk_context,  # D12: surfaced to qa_logs for inspector parity
         DocumentChunk.section_path,   # eval plumbing: passage-level hit (2026-09-13)
@@ -3634,6 +3674,29 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
             ).limit(initial_k).all()
             used_fallback = True
 
+        if Config.DOC_CARD_ENABLED:
+            # Phase 4: chunk-level LEXICAL candidates (card label + aliases + section path +
+            # text, tenant-wide, OR of the query's tokens ranked by ts_rank) join the dense
+            # pool. This is where "problem set 3" meets a pset03 passage on exact tokens.
+            try:
+                _toks = []
+                for _src in (effective_query, query):
+                    for _w in re.findall(r"[a-z0-9]+", (_src or "").lower()):
+                        if len(_w) > 1 and _w not in _toks:
+                            _toks.append(_w)
+                if _toks:
+                    _tsq = func.to_tsquery('english', " | ".join(_toks[:40]))
+                    _lex_rows = (base_query.filter(DocumentChunk.search_tsvector.op('@@')(_tsq))
+                                 .order_by(func.ts_rank(DocumentChunk.search_tsvector, _tsq).desc())
+                                 .limit(Config.LEXICAL_CHUNK_K).all())
+                    _seen_ids = {r.id for r in results}
+                    _added = [r for r in _lex_rows if r.id not in _seen_ids]
+                    results = list(results) + _added
+                    diagnostics["lexical_chunks_added"] = len(_added)
+                    diagnostics["lexical_docs"] = sorted({r.file_name for r in _added})[:8]
+            except Exception as _le:
+                logger.warning(f"[{ta_id}] lexical chunk channel failed: {type(_le).__name__}: {_le}")
+
         diagnostics["vector_search_latency_ms"] = int((_t.time() - _vector_t0) * 1000)
 
         if has_filters and not used_fallback:
@@ -3659,6 +3722,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
             "section_path": row.section_path,
             "chunk_id": row.id,
             "document_id": row.document_id,
+            "doc_label": row.doc_label,
             "metadata": {
                 "assignment_number": row.assignment_number,
                 "instructional_unit_number": row.instructional_unit_number,
@@ -3697,6 +3761,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         structural_query = db.session.query(
             DocumentChunk.id,
             DocumentChunk.document_id,
+            DocumentChunk.doc_label,
             DocumentChunk.chunk_text,
             DocumentChunk.chunk_context,  # D12: surfaced to qa_logs
             DocumentChunk.section_path,
@@ -3746,6 +3811,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                         "section_path": row.section_path,
                         "chunk_id": row.id,
                         "document_id": row.document_id,
+                        "doc_label": row.doc_label,
                         "metadata": {
                             "assignment_number": row.assignment_number,
                             "instructional_unit_number": row.instructional_unit_number,
@@ -3919,6 +3985,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                 "section_path": row.section_path,
                 "chunk_id": row.id,
                 "document_id": row.document_id,
+                "doc_label": row.doc_label,
                 "metadata": {
                     "assignment_number": row.assignment_number,
                     "instructional_unit_number": row.instructional_unit_number,

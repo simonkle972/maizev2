@@ -349,15 +349,10 @@ def stream_chat_response(
             yield f"data: {json.dumps({'type': 'status', 'message': 'Analyzing relevant content...'})}\n\n"
 
             # CONTEXT ASSEMBLY: primary chunks first, teaching material clearly tagged after.
-            primary = [c for c in chunks if c.get('retrieval_role') != 'teaching_material']
-            teaching = [c for c in chunks if c.get('retrieval_role') == 'teaching_material']
-            parts = [f"[From: {c['file_name']}]\n{c['text']}" for c in primary]
-            if teaching:
-                parts.append("[RELEVANT TEACHING MATERIAL FROM COURSE LECTURES]")
-                parts.extend(f"[From: {c['file_name']}]\n{c['text']}" for c in teaching)
-            context = "\n\n---\n\n".join(parts)
+            from src.response_generator import build_context_block, chunk_display_name
+            context = build_context_block(chunks)
 
-            sources = list(dict.fromkeys(c['file_name'] for c in chunks[:8]))[:3]
+            sources = list(dict.fromkeys(chunk_display_name(c) for c in chunks[:8]))[:3]
             yield f"data: {json.dumps({'type': 'sources', 'sources': sources})}\n\n"
             yield f"data: {json.dumps({'type': 'status', 'message': 'Generating response...'})}\n\n"
 
