@@ -271,7 +271,9 @@ class Config:
     # label + aliases, the contextualizer sees card labels, the reranker and the generator
     # get the same label string, and the chunk-level lexical index feeds the candidate
     # pool. Storage and the professor UI are not gated. Default off until measured.
-    DOC_CARD_ENABLED = os.getenv("DOC_CARD_ENABLED", "false").lower() == "true"
+    # Default on since 2026-09-17: full set 203 -> 206, openers 94 -> 101, B (sibling documents)
+    # 15 -> 21/21, 6 of the 8 recall misses fixed, latency unchanged (eval/exp_2026-09-17_phase4b).
+    DOC_CARD_ENABLED = os.getenv("DOC_CARD_ENABLED", "true").lower() == "true"
     DOC_CARD_MODEL = os.getenv("DOC_CARD_MODEL", "gpt-5.6-terra")
     LEXICAL_CHUNK_K = int(os.getenv("LEXICAL_CHUNK_K", "20"))
     # TEACHING_MATERIAL_BY_JUDGEMENT (Phase 4 revision 1, 2026-09-16): no document type and
