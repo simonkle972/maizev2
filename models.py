@@ -236,6 +236,21 @@ class Document(db.Model):
     # indexed before this column existed and not yet backfilled).
     full_text = db.Column(db.Text, nullable=True)
 
+    # Phase 4 (2026-09-16): the DOCUMENT CARD -- one typed identity per document, decided
+    # once at indexing by a strong model that sees the sibling documents, shown to and
+    # editable by the professor, and served identically to every retrieval stage via
+    # src/doc_card.py::card_label. Replaces display_name (title), content_title,
+    # assignment_number / instructional_unit_* (number / part) and the filename-regex
+    # families over time. card_aliases and summary are background fields (never shown).
+    # card_source: 'llm' | 'professor' -- a professor's edit is never overwritten.
+    card_title = db.Column(db.String(512), nullable=True)
+    card_number = db.Column(db.String(32), nullable=True)
+    card_part = db.Column(db.String(32), nullable=True)
+    card_term = db.Column(db.String(64), nullable=True)
+    card_aliases = db.Column(db.JSON, nullable=True)
+    card_source = db.Column(db.String(16), nullable=True)
+    card_generated_at = db.Column(db.DateTime, nullable=True)
+
 
 class ChatSession(db.Model):
     __tablename__ = 'chat_sessions'
@@ -311,6 +326,14 @@ class DocumentChunk(db.Model):
     # without joining back to documents. Synced via the metadata-edit PATCH
     # routes and the indexing pipeline.
     doc_category = db.Column(db.String(64), nullable=True)
+    # Phase 4 (2026-09-16): the card label of the parent document, denormalised by
+    # src/doc_card.py::sync_chunk_identity (the ONE writer) so the reranker, the generator
+    # and the student see the same identity string. file_name stays as it is (eval labels
+    # and logs key on it).
+    doc_label = db.Column(db.String(256), nullable=True)
+    # Chunk-level lexical index: label + aliases + section path + chunk text, so a
+    # reference like "problem set 3" matches a pset03 passage on exact tokens.
+    search_tsvector = db.Column(TSVECTOR, nullable=True)
     embedding = db.Column(Vector(1536), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 

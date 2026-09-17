@@ -1719,63 +1719,91 @@ def process_and_index_documents_resumable(ta_id: str, progress_callback=None, re
         raw_text_length = len(text)
         logger.info(f"[{ta_id}] [{doc.id}] Extracted {raw_text_length} chars from {page_count} pages")
         
-        logger.info(f"[{ta_id}] [{doc.id}] Extracting metadata with LLM...")
-        metadata = extract_metadata_with_llm(text, doc.original_filename)
-        
-        if not doc.doc_type:
-            doc.doc_type = metadata.get("doc_type")
-        if not doc.assignment_number:
-            doc.assignment_number = metadata.get("assignment_number")
-        if doc.instructional_unit_number is None:
-            doc.instructional_unit_number = metadata.get("instructional_unit_number")
-        if not doc.instructional_unit_label:
-            doc.instructional_unit_label = metadata.get("instructional_unit_label")
-        if not doc.content_title:
-            doc.content_title = metadata.get("content_title")
-        
-        doc.extraction_metadata = metadata
-        doc.metadata_extracted = True
+        # Phase 4 (2026-09-16): the DOCUMENT CARD -- one model call that decides title, kind,
+        # number, part, term, aliases and summary with the sibling documents in view
+        # (src/doc_card.py). Replaces the three legacy calls below (metadata, category,
+        # summary), which remain only as the fallback when the card call fails.
+        card_ok = False
+        try:
+            from src.doc_card import generate_card, apply_card, sibling_lines, card_label as _card_label
+            _ta_cats = (ta.doc_categories if ta else None) or []
+            _course = ((ta.course_name or ta.name) if ta else "") or ""
+            _card = generate_card(text, doc.original_filename, sibling_lines(ta_id, exclude_doc_id=doc.id),
+                                  _ta_cats, course_name=_course)
+            apply_card(doc, _card)
+            if doc.summary:
+                try:
+                    _semb = client.embeddings.create(model=Config.EMBEDDING_MODEL, input=doc.summary)
+                    doc.summary_embedding = _semb.data[0].embedding
+                except Exception as _se:
+                    logger.warning(f"[{ta_id}] [{doc.id}] summary embedding failed: {_se}")
+            doc.metadata_extracted = True
+            card_ok = bool(doc.card_title)
+            logger.info(f"[{ta_id}] [{doc.id}] Card: '{_card_label(doc)}' kind={doc.doc_category} "
+                        f"number={doc.card_number!r} part={doc.card_part!r} term={doc.card_term!r} "
+                        f"aliases={len(doc.card_aliases or [])} | {_card.get('reason', '')[:120]}")
+        except Exception as card_err:
+            logger.warning(f"[{ta_id}] [{doc.id}] Card generation failed: {type(card_err).__name__}: {card_err}; "
+                           f"falling back to legacy metadata extraction")
 
-        # Phase A Stage 2B (research 2026-05-22): classify doc_category using
-        # the parent TA's per-tenant configurable list. PRIMARY axis for
-        # retrieval. Skip if already set (the UI/PATCH route is the only
-        # other writer and we treat its value as authoritative).
-        ta_categories = (ta.doc_categories if ta else None) or []
-        if not doc.doc_category and ta_categories:
-            logger.info(f"[{ta_id}] [{doc.id}] Classifying doc_category against {len(ta_categories)} TA categories...")
-            try:
-                slug, cat_conf, cat_rationale = classify_doc_category(
-                    text, doc.original_filename, ta_categories
-                )
-                doc.doc_category = slug
-                logger.info(f"[{ta_id}] [{doc.id}] doc_category={slug} (conf={cat_conf:.2f})")
-            except Exception as cat_err:
-                logger.warning(f"[{ta_id}] [{doc.id}] doc_category classification failed: {cat_err}; leaving unset")
-        elif not ta_categories:
-            logger.warning(f"[{ta_id}] [{doc.id}] TA has no doc_categories — skipping classify_doc_category")
+        if not card_ok:
+            logger.info(f"[{ta_id}] [{doc.id}] Extracting metadata with LLM...")
+            metadata = extract_metadata_with_llm(text, doc.original_filename)
+        
+            if not doc.doc_type:
+                doc.doc_type = metadata.get("doc_type")
+            if not doc.assignment_number:
+                doc.assignment_number = metadata.get("assignment_number")
+            if doc.instructional_unit_number is None:
+                doc.instructional_unit_number = metadata.get("instructional_unit_number")
+            if not doc.instructional_unit_label:
+                doc.instructional_unit_label = metadata.get("instructional_unit_label")
+            if not doc.content_title:
+                doc.content_title = metadata.get("content_title")
+        
+            doc.extraction_metadata = metadata
+            doc.metadata_extracted = True
 
-        # Phase B Stage B10: per-doc LLM-generated summary + summary embedding.
-        # Indexing-only today (no retrieval reads summary_embedding yet); sets up
-        # the future hybrid_doc_search refactor. Skips when summary is already
-        # populated AND not flagged stale (no stale flag today, so set-once
-        # semantics: rebuild a stale summary by manually clearing the column
-        # OR running backfill --force). See attached_assets/maize-architecture-review-2026-05-23.md.
-        if not doc.summary:
-            logger.info(f"[{ta_id}] [{doc.id}] Generating doc summary...")
-            try:
-                summary_text = summarize_doc(text, doc.original_filename, doc.content_title or "")
-                if summary_text:
-                    summary_emb_response = client.embeddings.create(
-                        model=Config.EMBEDDING_MODEL,
-                        input=summary_text,
+            # Phase A Stage 2B (research 2026-05-22): classify doc_category using
+            # the parent TA's per-tenant configurable list. PRIMARY axis for
+            # retrieval. Skip if already set (the UI/PATCH route is the only
+            # other writer and we treat its value as authoritative).
+            ta_categories = (ta.doc_categories if ta else None) or []
+            if not doc.doc_category and ta_categories:
+                logger.info(f"[{ta_id}] [{doc.id}] Classifying doc_category against {len(ta_categories)} TA categories...")
+                try:
+                    slug, cat_conf, cat_rationale = classify_doc_category(
+                        text, doc.original_filename, ta_categories
                     )
-                    doc.summary = summary_text
-                    doc.summary_embedding = summary_emb_response.data[0].embedding
-                    logger.info(f"[{ta_id}] [{doc.id}] Summary populated ({len(summary_text)} chars, ~{len(summary_text.split())} words)")
-                else:
-                    logger.warning(f"[{ta_id}] [{doc.id}] summarize_doc returned empty; leaving summary unset")
-            except Exception as summary_err:
-                logger.warning(f"[{ta_id}] [{doc.id}] Summary generation failed: {summary_err}; leaving unset")
+                    doc.doc_category = slug
+                    logger.info(f"[{ta_id}] [{doc.id}] doc_category={slug} (conf={cat_conf:.2f})")
+                except Exception as cat_err:
+                    logger.warning(f"[{ta_id}] [{doc.id}] doc_category classification failed: {cat_err}; leaving unset")
+            elif not ta_categories:
+                logger.warning(f"[{ta_id}] [{doc.id}] TA has no doc_categories — skipping classify_doc_category")
+
+            # Phase B Stage B10: per-doc LLM-generated summary + summary embedding.
+            # Indexing-only today (no retrieval reads summary_embedding yet); sets up
+            # the future hybrid_doc_search refactor. Skips when summary is already
+            # populated AND not flagged stale (no stale flag today, so set-once
+            # semantics: rebuild a stale summary by manually clearing the column
+            # OR running backfill --force). See attached_assets/maize-architecture-review-2026-05-23.md.
+            if not doc.summary:
+                logger.info(f"[{ta_id}] [{doc.id}] Generating doc summary...")
+                try:
+                    summary_text = summarize_doc(text, doc.original_filename, doc.content_title or "")
+                    if summary_text:
+                        summary_emb_response = client.embeddings.create(
+                            model=Config.EMBEDDING_MODEL,
+                            input=summary_text,
+                        )
+                        doc.summary = summary_text
+                        doc.summary_embedding = summary_emb_response.data[0].embedding
+                        logger.info(f"[{ta_id}] [{doc.id}] Summary populated ({len(summary_text)} chars, ~{len(summary_text.split())} words)")
+                    else:
+                        logger.warning(f"[{ta_id}] [{doc.id}] summarize_doc returned empty; leaving summary unset")
+                except Exception as summary_err:
+                    logger.warning(f"[{ta_id}] [{doc.id}] Summary generation failed: {summary_err}; leaving unset")
 
         # Phase B latency Phase 1 (2026-08-06). Cache the extracted full text
         # so the hybrid_full_doc fallback (src/retriever.py:get_full_document_text)
@@ -1799,7 +1827,11 @@ def process_and_index_documents_resumable(ta_id: str, progress_callback=None, re
         headers_summary = "; ".join([f"{h[1][:40]}" for h in headers_found[:5]])
         logger.info(f"[{ta_id}] [{doc.id}] Found {len(headers_found)} headers: {headers_summary}")
         
-        chunks = chunk_text_with_context(text, Config.CHUNK_SIZE, Config.CHUNK_OVERLAP, doc.original_filename)
+        # Phase 4: the card label, not the raw filename, is the identity prefix embedded
+        # into every chunk (falls back to the filename for documents without a card).
+        from src.doc_card import card_label as _card_label_fn
+        _doc_label = _card_label_fn(doc) if doc.card_title else doc.original_filename
+        chunks = chunk_text_with_context(text, Config.CHUNK_SIZE, Config.CHUNK_OVERLAP, _doc_label)
         num_chunks = len(chunks)
         
         doc_chunk_data = []
@@ -1818,6 +1850,7 @@ def process_and_index_documents_resumable(ta_id: str, progress_callback=None, re
                 "file_name": doc.display_name or doc.original_filename,
                 "doc_role": doc.doc_role,  # Phase A — populated above; may be None on legacy paths
                 "doc_category": doc.doc_category,  # Phase A Stage 2B — populated above; may be None on legacy paths
+                "doc_label": (_doc_label or "")[:256] if doc.card_title else None,  # Phase 4
             })
             
             doc_log_entries.append({
@@ -1869,12 +1902,19 @@ def process_and_index_documents_resumable(ta_id: str, progress_callback=None, re
                     file_name=chunk_item["file_name"],
                     doc_role=chunk_item.get("doc_role"),  # Phase A — None on legacy paths is OK
                     doc_category=chunk_item.get("doc_category"),  # Phase A Stage 2B
+                    doc_label=chunk_item.get("doc_label"),  # Phase 4
                     embedding=doc_embeddings[i]
                 )
                 db.session.add(chunk_obj)
             
             now = datetime.utcnow()
             doc.last_indexed_at = now
+            # Phase 4: doc_label + the chunk-level lexical index for the chunks just written.
+            try:
+                from src.doc_card import sync_chunk_identity
+                sync_chunk_identity(doc, db)
+            except Exception as _sync_err:
+                logger.warning(f"[{ta_id}] [{doc.id}] chunk identity sync failed: {_sync_err}")
             doc.updated_at = now
             db_commit_with_retry(db)
 

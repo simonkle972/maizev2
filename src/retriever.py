@@ -37,6 +37,8 @@ def _docs_query(ta_id: str):
         Document.doc_type, Document.doc_category, Document.assignment_number,
         Document.instructional_unit_number, Document.instructional_unit_label, Document.content_title,
         Document.summary, Document.last_indexed_at,
+        Document.card_title, Document.card_number, Document.card_part, Document.card_term,
+        Document.card_aliases, Document.card_source,
     )).filter(Document.ta_id == ta_id)
 
 
