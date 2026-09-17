@@ -704,28 +704,19 @@ def update_ta(ta_id):
     # Duplicate slugs are rejected. Note: renaming a category by editing its
     # label leaves all classified docs intact (they reference slug, not label).
     if "doc_categories" in data:
-        from src.document_processor import normalize_category_slug
-        raw = data["doc_categories"] or []
-        if not isinstance(raw, list):
-            return jsonify({"error": "doc_categories must be a list"}), 400
-        normalized = []
-        seen_slugs = set()
-        for entry in raw:
-            if not isinstance(entry, dict):
-                return jsonify({"error": "Each doc_categories entry must be an object with slug + label"}), 400
-            label = (entry.get("label") or "").strip()
-            if not label:
-                return jsonify({"error": "Category label cannot be empty"}), 400
-            # Trust client slug if provided + valid; otherwise derive from label.
-            client_slug = (entry.get("slug") or "").strip().lower()
-            slug = client_slug if client_slug else normalize_category_slug(label)
-            slug = normalize_category_slug(slug)  # idempotent re-normalize
-            if not slug:
-                return jsonify({"error": f"Category label {label!r} produced empty slug after normalization"}), 400
-            if slug in seen_slugs:
-                return jsonify({"error": f"Duplicate category slug {slug!r}"}), 400
-            seen_slugs.add(slug)
-            normalized.append({"slug": slug, "label": label})
+        # Phase 4: shared validation with the professor route; a category still used by
+        # documents cannot be removed (409 with the counts).
+        from sqlalchemy import func as _f
+        from src.doc_card import validate_categories
+        in_use = dict(db.session.query(Document.doc_category, _f.count(Document.id))
+                      .filter(Document.ta_id == ta_id, Document.doc_category.isnot(None))
+                      .group_by(Document.doc_category).all())
+        normalized, err, removed_in_use = validate_categories(data["doc_categories"], in_use)
+        if err:
+            return jsonify({"error": err}), 400
+        if removed_in_use:
+            return jsonify({"error": "Some categories are still assigned to documents; reassign those documents first.",
+                            "in_use": removed_in_use}), 409
         ta.doc_categories = normalized
 
     db.session.commit()
@@ -947,103 +938,55 @@ def get_document_metadata(ta_id, doc_id):
     doc = Document.query.filter_by(id=doc_id, ta_id=ta_id).first()
     if not doc:
         return jsonify({"error": "Document not found"}), 404
-    return jsonify({
-        "id": doc.id,
-        "display_name": doc.display_name,
-        "filename": doc.filename,
-        "doc_type": doc.doc_type,
-        "assignment_number": doc.assignment_number,
-        "instructional_unit_number": doc.instructional_unit_number,
-        "instructional_unit_label": doc.instructional_unit_label,
-        "content_title": doc.content_title,
-        "metadata_extracted": bool(doc.metadata_extracted),
-    })
+    from src.doc_card import document_card_json
+    card = document_card_json(doc, TeachingAssistant.query.get(ta_id))
+    return jsonify({**card, "display_name": card["card_title"], "filename": doc.filename})
 
 
 @app.route('/admin/api/tas/<ta_id>/documents/<int:doc_id>', methods=['PATCH'])
 @admin_api_required
 def update_document_metadata(ta_id, doc_id):
-    """Update document metadata (display_name, doc_type, unit_number).
-
-    Also propagates the change to the denormalized copies on DocumentChunk rows
-    so the retriever sees the new metadata immediately without a re-index.
-    Chunk embeddings stay valid because they're built from chunk_text, not
-    metadata. This mirrors the equivalent fix on the professor route
-    (professor.update_document_metadata).
-    """
+    """Edit a document's card (Phase 4). ONE contract shared with the professor route:
+    {card_title, doc_category, card_number, card_part, card_term}; display_name is accepted
+    as an alias for card_title. Chunk identity is recomputed in SQL, no re-index."""
+    from src.doc_card import apply_document_edit, sync_chunk_identity, document_card_json
     doc = Document.query.filter_by(id=doc_id, ta_id=ta_id).first()
     if not doc:
         return jsonify({"error": "Document not found"}), 404
-
-    data = request.json
-
-    if "display_name" in data:
-        doc.display_name = data["display_name"].strip() if data["display_name"] else doc.original_filename
-
-    if "doc_type" in data:
-        valid_doc_types = ["homework", "exam", "lecture", "reading", "syllabus", "other"]
-        if data["doc_type"] in valid_doc_types or data["doc_type"] is None:
-            doc.doc_type = data["doc_type"]
-
-    if "unit_number" in data:
-        if data["unit_number"] is None or data["unit_number"] == "":
-            doc.instructional_unit_number = None
-        else:
-            try:
-                doc.instructional_unit_number = int(data["unit_number"])
-            except (ValueError, TypeError):
-                pass
-
-    if "assignment_number" in data:
-        doc.assignment_number = data["assignment_number"] if data["assignment_number"] else None
-
-    # NOTE: a previous incarnation of this route accepted a "doc_role" field
-    # backed by the VALID_DOC_ROLES enum from the Stage 2 design. That field
-    # had zero readers in retrieval and was removed in Phase 1 cleanup
-    # (architecture audit, 2026-05-23). doc_category replaces it. Clients
-    # that still send doc_role will see it silently ignored.
-
-    # Phase A Stage 2B (research 2026-05-22). doc_category is the load-bearing
-    # retrieval axis. Slug must match one of the parent TA's configured
-    # doc_categories (or be cleared to None).
-    if "doc_category" in data:
-        new_cat = (data["doc_category"] or "").strip().lower() or None
-        if new_cat is not None:
-            ta_categories = (doc.ta.doc_categories if doc.ta else None) or []
-            valid_slugs = {c.get("slug") for c in ta_categories if isinstance(c, dict)}
-            if new_cat not in valid_slugs:
-                return jsonify({
-                    "error": f"Invalid doc_category {new_cat!r}; must be one of {sorted(valid_slugs)}"
-                }), 400
-        doc.doc_category = new_cat
-
+    ta = TeachingAssistant.query.get(ta_id)
+    changed, err = apply_document_edit(doc, request.get_json(silent=True) or {}, ta)
+    if err:
+        return jsonify({"error": err}), 400
     db.session.commit()
+    if changed:
+        sync_chunk_identity(doc, db)
+        db.session.commit()
+    card = document_card_json(doc, ta)
+    return jsonify({"success": True, "document": {**card, "display_name": card["card_title"]}})
 
-    # Propagate metadata change to the chunk rows so retrieval / chat keep
-    # working without forcing a re-index. (Previously this route flipped
-    # ta.is_indexed=False, which broke chat with a 400 until the user
-    # re-indexed — see app.py:1399 chat-stream gate.)
-    DocumentChunk.query.filter_by(ta_id=ta_id, document_id=doc.id).update({
-        "doc_type": doc.doc_type or "other",
-        "assignment_number": doc.assignment_number or "",
-        "instructional_unit_number": doc.instructional_unit_number or 0,
-        "instructional_unit_label": doc.instructional_unit_label or "",
-        "file_name": doc.display_name or doc.original_filename,
-        "doc_role": doc.doc_role,
-        "doc_category": doc.doc_category,
-    }, synchronize_session=False)
+
+@app.route('/admin/api/tas/<ta_id>/documents/<int:doc_id>/regenerate-card', methods=['POST'])
+@admin_api_required
+def regenerate_document_card(ta_id, doc_id):
+    from src.doc_card import generate_card, apply_card, sibling_lines, sync_chunk_identity, document_card_json
+    doc = Document.query.filter_by(id=doc_id, ta_id=ta_id).first()
+    if not doc:
+        return jsonify({"error": "Document not found"}), 404
+    ta = TeachingAssistant.query.get(ta_id)
+    text = doc.full_text or "\n\n".join(
+        r[0] for r in db.session.query(DocumentChunk.chunk_text).filter_by(document_id=doc.id).order_by(DocumentChunk.chunk_index).all())
+    if not text.strip():
+        return jsonify({"error": "Document has no indexed text yet"}), 409
+    try:
+        card = generate_card(text, doc.original_filename, sibling_lines(ta_id, exclude_doc_id=doc.id),
+                             ta.doc_categories or [], course_name=(ta.course_name or ta.name) or "")
+    except Exception as e:
+        return jsonify({"error": f"Card generation failed: {type(e).__name__}"}), 502
+    apply_card(doc, card, overwrite_professor=True)
     db.session.commit()
-    
-    return jsonify({
-        "success": True,
-        "document": {
-            "id": doc.id,
-            "display_name": doc.display_name,
-            "doc_type": doc.doc_type,
-            "unit_number": doc.instructional_unit_number,
-            "assignment_number": doc.assignment_number
-        }
-    })
+    sync_chunk_identity(doc, db)
+    db.session.commit()
+    return jsonify({"success": True, "document": document_card_json(doc, ta)})
 
 
 def update_indexing_progress(ta_id, progress, job_id=None, docs_processed=None, chunks_created=None):

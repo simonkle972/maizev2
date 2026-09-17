@@ -324,3 +324,101 @@ def apply_card(doc, card: dict, overwrite_professor: bool = False) -> bool:
         doc.summary = card["summary"]
     doc.card_generated_at = datetime.utcnow()
     return not professor_owned
+
+
+# --------------------------------------------------------------------------- UI contract
+
+CARD_EDIT_FIELDS = ("card_title", "doc_category", "card_number", "card_part", "card_term")
+
+
+def document_card_json(doc, ta=None) -> dict:
+    """The card as the UI reads it -- the same fields for the professor and admin pages."""
+    return {
+        "id": doc.id,
+        "card_title": doc.card_title or card_label(doc),
+        "label": card_label(doc),
+        "doc_category": doc.doc_category,
+        "kind_label": category_label(ta, doc.doc_category) if ta is not None else (doc.doc_category or ""),
+        "card_number": doc.card_number or "",
+        "card_part": doc.card_part or "",
+        "card_term": doc.card_term or "",
+        "card_source": doc.card_source,
+        "original_filename": doc.original_filename,
+        "has_card": bool(doc.card_title),
+        "last_indexed_at": doc.last_indexed_at.isoformat() if doc.last_indexed_at else None,
+        "metadata_extracted": bool(doc.metadata_extracted),
+    }
+
+
+def apply_document_edit(doc, data: dict, ta):
+    """The ONE edit contract for both the professor and admin routes.
+
+    Accepts {card_title, doc_category, card_number, card_part, card_term}; `display_name`
+    is still accepted as an alias for card_title for one release. Validates the kind
+    against the course's categories. Any card change marks the card professor-owned so
+    the indexer never overwrites it. Does NOT commit and does NOT sync chunks -- the
+    caller commits, then calls sync_chunk_identity(doc, db).
+
+    Returns (changed: bool, error: str | None).
+    """
+    if not isinstance(data, dict):
+        return False, "expected a JSON object"
+    changed = False
+    if "display_name" in data and "card_title" not in data:
+        data = dict(data); data["card_title"] = data["display_name"]
+    if "card_title" in data:
+        title = (data.get("card_title") or "").strip()[:512]
+        if title and title != (doc.card_title or ""):
+            doc.card_title = title
+            doc.display_name = title      # legacy readers (display_name) follow the title
+            changed = True
+    if "doc_category" in data:
+        new_cat = (data.get("doc_category") or "").strip().lower() or None
+        if new_cat is not None:
+            valid = {c.get("slug") for c in ((_get(ta, "doc_categories") or []) if ta is not None else []) if isinstance(c, dict)}
+            if new_cat not in valid:
+                return False, f"Invalid doc_category {new_cat!r}; must be one of {sorted(valid)}"
+        if new_cat != doc.doc_category:
+            doc.doc_category = new_cat
+            changed = True
+    for key, limit in (("card_number", 32), ("card_part", 32), ("card_term", 64)):
+        if key in data:
+            val = (str(data.get(key) or "")).strip()[:limit] or None
+            if key == "card_number" and val and val.isdigit():
+                val = val.lstrip("0") or "0"
+            if val != getattr(doc, key):
+                setattr(doc, key, val)
+                changed = True
+    for legacy in ("doc_type", "unit_number", "instructional_unit_number", "assignment_number", "doc_role"):
+        if legacy in data:
+            logger.info(f"document edit: ignoring legacy field {legacy!r} (not part of the card)")
+    if changed:
+        doc.card_source = "professor"
+    return changed, None
+
+
+def validate_categories(raw, in_use_counts: dict):
+    """Shared by the admin and professor category endpoints. `raw` is the client list of
+    {slug, label}; `in_use_counts` maps slug -> number of documents using it. Returns
+    (normalized_list, error_message, removed_in_use: dict). A slug that documents still use
+    cannot be removed (the caller answers 409 with the counts)."""
+    from src.document_processor import normalize_category_slug
+    if not isinstance(raw, list):
+        return None, "doc_categories must be a list", {}
+    normalized, seen = [], set()
+    for entry in raw:
+        if not isinstance(entry, dict):
+            return None, "Each doc_categories entry must be an object with slug + label", {}
+        label = (entry.get("label") or "").strip()
+        if not label:
+            return None, "Category label cannot be empty", {}
+        client_slug = (entry.get("slug") or "").strip().lower()
+        slug = normalize_category_slug(client_slug if client_slug else normalize_category_slug(label))
+        if not slug:
+            return None, f"Category label {label!r} produced an empty slug", {}
+        if slug in seen:
+            return None, f"Duplicate category slug {slug!r}", {}
+        seen.add(slug)
+        normalized.append({"slug": slug, "label": label})
+    removed_in_use = {s: n for s, n in (in_use_counts or {}).items() if s not in seen and n}
+    return normalized, None, removed_in_use

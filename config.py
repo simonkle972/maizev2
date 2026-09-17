@@ -282,7 +282,9 @@ class Config:
     # step-back concept search over ALL documents, and its passages join the pool BEFORE
     # the reranker, tagged teaching_material. The regex-gated, type-filtered, post-rerank
     # supplementary path is bypassed. Default off until measured.
-    TEACHING_MATERIAL_BY_JUDGEMENT = os.getenv("TEACHING_MATERIAL_BY_JUDGEMENT", "false").lower() == "true"
+    # Default on since 2026-09-17: 206 -> 209 on the full set, no bucket down, fires on ~30% of
+    # turns at ~0.6 s each (eval/exp_2026-09-17_phase4c). Replaces the type-gated path.
+    TEACHING_MATERIAL_BY_JUDGEMENT = os.getenv("TEACHING_MATERIAL_BY_JUDGEMENT", "true").lower() == "true"
     TEACHING_MATERIAL_K = int(os.getenv("TEACHING_MATERIAL_K", "6"))
 
     # Phase 3 (2026-09-16): the generator sees the same conversation the classifier sees.

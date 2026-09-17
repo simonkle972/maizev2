@@ -192,235 +192,46 @@ def get_full_document_text(document_id: int) -> tuple:
     return text, filename, len(text) // 4
 
 
-def find_solution_document_row(problem_doc_name: str, ta_id: str):
-    """The Document row (metadata only) of the solutions file for `problem_doc_name`, or
-    None. Same matching as find_solution_document without loading any text."""
-    if not problem_doc_name:
-        return None
-    problem_lower = problem_doc_name.lower()
-    number_match = re.search(r'(?:problem(?:s)?\s*set|homework|hw|ps|pset|practice\s*problems?\s*set?)\s*#?\s*(\d+)', problem_lower)
-    doc_number = number_match.group(1) if number_match else None
-    problem_name_clean = problem_lower.replace('.pdf', '').replace('.docx', '').strip()
-    for doc in _docs_query(ta_id).all():
-        doc_name = (doc.display_name or doc.original_filename or "").lower()
-        if 'solution' not in doc_name:
-            continue
-        if problem_name_clean in doc_name:
-            return doc
-        if doc_number:
-            m = re.search(r'(?:problem(?:s)?\s*set|homework|hw|ps|pset|practice\s*problems?\s*set?)\s*#?\s*(\d+)', doc_name)
-            if m and m.group(1) == doc_number:
-                return doc
-    return None
-
-
-def find_solution_document(problem_doc_name: str, ta_id: str) -> tuple:
-    """
-    Find the corresponding solution document for a problem document.
-    
-    Strategy: Look for a document with "Solution" + the problem document name/number.
-    For example:
-    - "Practice Problems Set 1" -> "Solution to Practice Problems Set 1"
-    - "Problem Set 2" -> "Solution to Problem Set 2"
-    - "Homework 3" -> "Homework 3 Solutions"
-    
-    Args:
-        problem_doc_name: The name of the problem document
-        ta_id: The TA ID
-        
-    Returns:
-        tuple: (full_text, filename, token_estimate) or (None, None, 0) if not found
-    """
-    from models import Document
-    
-    if not problem_doc_name:
-        return None, None, 0
-    
-    problem_lower = problem_doc_name.lower()
-    
-    # Extract the document number/identifier for flexible matching
-    # Match patterns like "Problem Set 1", "Practice Problems Set 2", "Homework 3", "PS1"
-    number_match = re.search(r'(?:problem(?:s)?\s*set|homework|hw|ps|pset|practice\s*problems?\s*set?)\s*#?\s*(\d+)', problem_lower)
-    doc_number = number_match.group(1) if number_match else None
-    
-    # Get all documents for this TA
-    docs = _docs_query(ta_id).all()
-    
-    solution_doc = None
-    
-    for doc in docs:
-        doc_name = (doc.display_name or doc.original_filename or "").lower()
-        
-        # Check if this is a solution document
-        is_solution = 'solution' in doc_name
-        
-        if is_solution:
-            # Check if it matches our problem document
-            # Method 1: Direct name containment
-            # "Solution to Practice Problems Set 1" contains "Practice Problems Set 1"
-            problem_name_clean = problem_lower.replace('.pdf', '').replace('.docx', '').strip()
-            if problem_name_clean in doc_name:
-                solution_doc = doc
-                logger.info(f"[{ta_id}] Found solution doc via name containment: {doc.display_name or doc.original_filename}")
-                break
-            
-            # Method 2: Matching document number
-            if doc_number:
-                sol_number_match = re.search(r'(?:problem(?:s)?\s*set|homework|hw|ps|pset|practice\s*problems?\s*set?)\s*#?\s*(\d+)', doc_name)
-                if sol_number_match and sol_number_match.group(1) == doc_number:
-                    solution_doc = doc
-                    logger.info(f"[{ta_id}] Found solution doc via number match ({doc_number}): {doc.display_name or doc.original_filename}")
-                    break
-    
-    if solution_doc:
-        full_text, filename, token_estimate = get_full_document_text(solution_doc.id)
-
-        # Size guard, mirroring both hybrid-fallback call sites. Skip rather than
-        # truncate: this document is fetched to verify a student's answer, and a
-        # truncated solutions doc may be missing the very answer it was fetched
-        # for — a silent failure. Skipping is observable in the logs.
-        # `'solution' in doc_name` also matches a textbook solutions manual, which
-        # is where an unbounded document realistically comes from.
-        if full_text and token_estimate > Config.HYBRID_MAX_DOC_TOKENS:
-            logger.warning(
-                f"[{ta_id}] Solution document '{filename}' too large for answer verification: "
-                f"{token_estimate} tokens > {Config.HYBRID_MAX_DOC_TOKENS} — skipping"
-            )
-            return None, None, 0
-
-        return full_text, filename, token_estimate
-
-    logger.info(f"[{ta_id}] No solution document found for: {problem_doc_name}")
-    return None, None, 0
-
-
 def identify_target_documents(chunks: list, query_analysis: dict, ta_id: str) -> tuple:
+    """Target document for the full-document collapse (Phase 4 step 4 rewrite).
+
+    The eight-branch legacy cascade (doc_type + assignment / unit filters, content_title
+    substrings, filename year matches) is retired. Order now: the student's own reference
+    resolved against the document cards (`resolve_reference`), else the document with the
+    most passages among the top 8, by document id (file name only for legacy chunk dicts
+    that carry no id).
     """
-    Identify which document(s) should be retrieved in full for fallback.
-    
-    Strategy:
-    1. If there's a filename filter from query analysis, use that document
-    2. If there's a doc_type and assignment_number, find matching document
-    3. Search by content_title (actual document title from content, not filename)
-    4. Otherwise, find the most frequently occurring document in top chunks
-    
-    Returns:
-        tuple: (list of document IDs, identification_method string)
-    """
-    from models import Document
-    import re
-    
-    if query_analysis.get("filename_filter"):
-        filter_value = query_analysis["filename_filter"]
-        doc = _docs_query(ta_id).filter_by(original_filename=filter_value).first()
-        if not doc:
-            doc = _docs_query(ta_id).filter_by(display_name=filter_value).first()
-        if doc:
-            logger.info(f"[{ta_id}] Target doc identified via filename_filter: {doc.display_name or doc.original_filename}")
-            return [doc.id], "filename_filter"
-    
-    if query_analysis.get("doc_type_filter") and query_analysis.get("assignment_filter"):
-        doc = Document.query.filter_by(
-            ta_id=ta_id,
-            doc_type=query_analysis["doc_type_filter"],
-            assignment_number=query_analysis["assignment_filter"]
-        ).first()
-        if doc:
-            logger.info(f"[{ta_id}] Target doc identified via metadata: {doc.original_filename}")
-            return [doc.id], "metadata_filter"
-    
-    if query_analysis.get("doc_type_filter") and query_analysis.get("unit_filter"):
-        doc = Document.query.filter_by(
-            ta_id=ta_id,
-            doc_type=query_analysis["doc_type_filter"],
-            instructional_unit_number=query_analysis["unit_filter"]
-        ).first()
-        if doc:
-            logger.info(f"[{ta_id}] Target doc identified via unit metadata: {doc.original_filename}")
-            return [doc.id], "unit_filter"
-    
-    if query_analysis.get("doc_type_filter"):
-        docs = _docs_query(ta_id).filter(Document.doc_type == query_analysis["doc_type_filter"]).all()
-        if len(docs) == 1:
-            logger.info(f"[{ta_id}] Target doc identified via single doc_type match: {docs[0].original_filename}")
-            return [docs[0].id], "single_doc_type_match"
-    
-    # Strategy: Search by content_title (handles misnamed files)
-    # Extract key terms from query that might match document titles
-    query_lower = query_analysis.get("original_query", "").lower() if query_analysis.get("original_query") else ""
-    if not query_lower and chunks:
-        query_lower = ""
-    
-    # Look for problem set/assignment number patterns in the query
-    ps_match = re.search(r'(?:problem\s*set|self[- ]?study(?:\s*problem\s*set)?)\s*#?\s*(\d+)', query_lower)
-    exam_match = re.search(r'(\d{4})?\s*(?:final|midterm|exam)', query_lower)
-    
-    if ps_match:
-        ps_number = ps_match.group(1)
-        # Search content_title for matching problem set number
-        docs = _docs_query(ta_id).all()
-        for doc in docs:
-            if doc.content_title:
-                title_lower = doc.content_title.lower()
-                # Check if content_title contains the same problem set number
-                title_match = re.search(r'(?:problem\s*set|self[- ]?study(?:\s*problem\s*set)?)\s*#?\s*(\d+)', title_lower)
-                if title_match and title_match.group(1) == ps_number:
-                    logger.info(f"[{ta_id}] Target doc identified via content_title match: '{doc.content_title}' (file: {doc.original_filename})")
-                    return [doc.id], "content_title_match"
-    
-    year_filter = query_analysis.get("year_filter")
-    if year_filter and query_analysis.get("doc_type_filter") == "exam":
-        # Route on the year only when it is unambiguous, like the single_doc_type_match
-        # branch above. This used to return the FIRST match of an unordered query, so
-        # with three "2024" exam files (part 1 solutions, part 2 solutions, without
-        # solutions) the winner depended on physical row order: re-indexing one of
-        # them on 2026-09-14 flipped four passing "part 2" eval rows to the part 1
-        # file. When several files share the year, fall through to normal retrieval,
-        # where filename tokens and the reranker can tell the parts apart.
-        docs = _docs_query(ta_id).filter(Document.doc_type == "exam").order_by(Document.id).all()
-        year_docs = [d for d in docs
-                     if (d.display_name or d.original_filename) and year_filter in (d.display_name or d.original_filename)]
-        if len(year_docs) == 1:
-            doc_name = year_docs[0].display_name or year_docs[0].original_filename
-            logger.info(f"[{ta_id}] Target doc identified via filename year match: '{doc_name}' (year={year_filter})")
-            return [year_docs[0].id], "filename_year_match"
-        elif year_docs:
-            logger.info(f"[{ta_id}] Year match ambiguous: {len(year_docs)} exam docs contain '{year_filter}'; not routing on year")
-    
-    if exam_match:
-        exam_year = exam_match.group(1) if exam_match.group(1) else None
-        docs = _docs_query(ta_id).filter(Document.doc_type == "exam").all()
-        if exam_year and not year_filter:
-            for doc in docs:
-                if doc.content_title and exam_year in doc.content_title:
-                    logger.info(f"[{ta_id}] Target doc identified via content_title exam match: '{doc.content_title}'")
-                    return [doc.id], "content_title_exam_match"
-    
+    q = (query_analysis or {}).get("original_query") or ""
+    if q:
+        try:
+            from src.doc_card import resolve_reference
+            rid, _label = resolve_reference(ta_id, q)
+            if rid is not None:
+                logger.info(f"[{ta_id}] Target doc via card reference: {_label}")
+                return [rid], "card_reference"
+        except Exception as e:
+            logger.warning(f"[{ta_id}] card reference for collapse target failed: {e}")
     if not chunks:
-        logger.warning(f"[{ta_id}] No chunks available for document identification")
         return [], "no_chunks"
-    
-    doc_counts = {}
-    for chunk in chunks[:8]:
-        filename = chunk.get("file_name", "")
-        if filename:
-            doc_counts[filename] = doc_counts.get(filename, 0) + 1
-    
-    if not doc_counts:
-        logger.warning(f"[{ta_id}] No document filenames found in chunks")
-        return [], "no_filenames_in_chunks"
-    
-    top_filename = max(doc_counts.keys(), key=lambda k: doc_counts[k])
-    
-    doc = _docs_query(ta_id).filter_by(original_filename=top_filename).first()
-    if not doc:
-        doc = _docs_query(ta_id).filter_by(display_name=top_filename).first()
-    
-    if doc:
-        logger.info(f"[{ta_id}] Target doc identified via chunk frequency: {doc.display_name or doc.original_filename}")
-        return [doc.id], "chunk_frequency"
-    
-    logger.warning(f"[{ta_id}] Could not find document for filename: {top_filename}")
+    counts = {}
+    for c in chunks[:8]:
+        d = c.get("document_id")
+        if d is not None:
+            counts[d] = counts.get(d, 0) + 1
+    if counts:
+        best = max(counts, key=counts.get)
+        logger.info(f"[{ta_id}] Target doc identified via chunk frequency: doc {best}")
+        return [best], "chunk_frequency"
+    names = {}
+    for c in chunks[:8]:
+        fn = c.get("file_name")
+        if fn:
+            names[fn] = names.get(fn, 0) + 1
+    if names:
+        top = max(names, key=names.get)
+        doc_id = _doc_id_for_filename(ta_id, top)
+        if doc_id:
+            return [doc_id], "chunk_frequency_by_name"
     return [], "document_not_found"
 
 
@@ -600,74 +411,6 @@ ASSIGNMENT_DOC_TYPES = {"homework", "exam"}
 # "quiz 3", "pset 2"), NOT sub-part references like "question 1" or "problem 2"
 # — those mean a chunk inside the doc, not the doc itself. Used by Stage 5
 # short-circuit (hybrid_doc_search) AND the cache-switch heuristic (B8).
-DOC_NUMBER_PATTERNS = [
-    (r'\b(?:interactive\s+|pre[- ]?recorded\s+)?lecture\s+(\d{1,3})\b', "lectures"),
-    (r'\blab\s+(\d{1,3})\b', "labs"),
-    (r'\bquiz\s+(\d{1,3})\b', "quizzes"),
-    (r'\bextra\s+(?:problem\s+set|problems?)\s+#?(\d{1,3})\b', "extra_problems"),
-    (r'\b(?:problem\s+set|pset)\s+#?(\d{1,3})\b', "problem_sets"),
-    (r'\b(?:homework|hw|assignment)\s+#?(\d{1,3})\b', "homeworks"),
-    (r'\b(20\d{2})\s+(?:final|midterm|exam)\b', "exams"),
-    (r'\b(?:final|midterm|exam)\s+(?:from|of)\s+(20\d{2})\b', "exams"),
-]
-
-
-def extract_doc_routing_hints(query: str) -> list:
-    """Extract all (doc_number, category_hint) pairs the query names.
-
-    Uses re.findall so multi-doc queries like "compare lecture 3 and lecture 4"
-    return BOTH numbers, not just the first. Used by:
-      - Stage 5 short-circuit (single-doc route when len==1)
-      - Cache-switch heuristic (force flush on multi-doc OR single-doc mismatch)
-
-    Returns a deduped list preserving first-occurrence order:
-      "what do lecture 3 and lecture 4 cover?" → [("3", "lectures"), ("4", "lectures")]
-      "now help me with quiz 3 and pset 2"     → [("3", "quizzes"), ("2", "problem_sets")]
-      "what is lecture 4 about?"               → [("4", "lectures")]
-      "is 3 a prime number?"                   → []  (no DOC pattern match — bare "3" doesn't count)
-      "explain question 2"                     → []  ("question N" is a sub-part, not a doc)
-    """
-    if not query:
-        return []
-    query_lower = query.lower()
-    seen = set()
-    hints = []
-    for pattern, category_hint in DOC_NUMBER_PATTERNS:
-        for m in re.finditer(pattern, query_lower):
-            number = m.group(1)
-            key = (number, category_hint)
-            if key not in seen:
-                seen.add(key)
-                hints.append(key)
-    return hints
-
-# Boilerplate phrases to strip from problem text before concept extraction
-_PROBLEM_BOILERPLATE = re.compile(
-    r'\b(?:true\s+or\s+false|explain\s+your\s+(?:response|answer)|'
-    r'short\s+paragraph|please\s+(?:explain|answer|provide|note)|'
-    r'in\s+a\s+(?:short|brief)\s+paragraph|figure\s+below|'
-    r'(?:less|more)\s+than\s+\d+\s+words|'
-    r'problem\s+set|as\s+of\s+\w+\s+\d+|subject\s+to\s+change)\b',
-    re.IGNORECASE
-)
-
-_STOP_WORDS = {
-    'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
-    'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
-    'should', 'may', 'might', 'shall', 'can', 'need', 'dare', 'ought',
-    'used', 'to', 'of', 'in', 'for', 'on', 'with', 'at', 'by', 'from',
-    'as', 'into', 'through', 'during', 'before', 'after', 'above', 'below',
-    'between', 'out', 'off', 'over', 'under', 'again', 'further', 'then',
-    'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all', 'each',
-    'every', 'both', 'few', 'more', 'most', 'other', 'some', 'such', 'no',
-    'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very',
-    'and', 'but', 'or', 'yet', 'if', 'that', 'which', 'who', 'whom',
-    'this', 'these', 'those', 'what', 'it', 'its', 'he', 'she', 'they',
-    'them', 'his', 'her', 'their', 'my', 'your', 'our', 'we', 'you', 'i',
-    'me', 'us', 'him', 'up', 'about', 'also', 'just', 'because', 'whether',
-}
-
-
 def _extract_concept_query(problem_text: str, max_tokens: int = 60) -> str:
     """
     Extract concept keywords from problem text for supplementary retrieval.
@@ -1685,85 +1428,19 @@ def hybrid_doc_search(query: str, query_embedding: list, ta_id: str, top_k: int 
     if filename_scored:
         threshold = Config.FILENAME_DIRECT_MATCH_THRESHOLD
 
-        # Extract all (doc_number, category_hint) pairs the query names.
-        # See extract_doc_routing_hints() docstring for semantics — uses the
-        # shared DOC_NUMBER_PATTERNS, also consumed by the cache-switch
-        # heuristic (B8) so multi-doc detection is consistent across both.
-        all_hints = extract_doc_routing_hints(query)
-
-        # MULTI-DOC QUERIES SUPPRESS THE SHORT-CIRCUIT.
-        # When the student names 2+ distinct docs ("compare lecture 3 and
-        # lecture 4"), the short-circuit MUST NOT route to one of them —
-        # we want the full RRF + chunk vector search so chunks from BOTH
-        # docs reach the reranker. Skip Path A/B/C; let RRF run.
-        distinct_numbers = {n for n, _ in all_hints}
-        if len(distinct_numbers) >= 2:
-            diagnostics["short_circuit"] = {
-                "fired": False,
-                "reason": "multi_doc_query_suppressed",
-                "hints": all_hints,
-            }
-            # Fall through to RRF below.
-            query_number = None
-            category_hint = None
-        else:
-            # Single-doc (or no doc) path — preserve existing behavior.
-            query_number = all_hints[0][0] if all_hints else None
-            category_hint = all_hints[0][1] if all_hints else None
-
-        # Fallback: year-only query
-        if query_number is None and query_analysis:
-            query_number = query_analysis.get("year_filter")
-
+        # Phase 4 step 4: the regex hint paths (DOC_NUMBER_PATTERNS -> category + number DB
+        # lookup, multi-document suppression) are retired. The card resolver below covers
+        # exact references for ANY category the professor defines and declines on a tie
+        # ("compare lab 1 and lab 2" resolves to nothing, so fusion runs).
+        query_number = None
+        category_hint = None
+        distinct_numbers = set()
         sc_doc_id = None
         sc_reason = None
-
-        # ---- Path A: category + number DB lookup (Stage 2B doc_category) ----
-        # When we know both the category hint AND the doc number, we can query
-        # the DB directly for (doc_category=X AND number=Y). This catches cases
-        # where filename token overlap can't reach the threshold because the
-        # filename mashes prefix+number together (e.g. "pset03" is one token).
-        if query_number is not None and category_hint is not None:
-            from sqlalchemy import or_
-            qn_str = str(query_number).lstrip("0") or "0"
-            # Match assignment_number stored as string, or unit_number stored as int.
-            try:
-                qn_int = int(qn_str)
-            except ValueError:
-                qn_int = None
-            number_clauses = [Document.assignment_number == qn_str]
-            if qn_int is not None:
-                number_clauses.append(Document.instructional_unit_number == qn_int)
-            cat_matches = _docs_query(ta_id).filter(
-                Document.doc_category == category_hint,
-                or_(*number_clauses),
-            ).all()
-            if len(cat_matches) == 1:
-                sc_doc_id = cat_matches[0].id
-                sc_reason = "category_plus_number_unique"
-            elif len(cat_matches) > 1:
-                # Multiple docs in this category share the number — disambiguate
-                # by filename overlap if one clearly leads (margin guard).
-                cat_ids = {d.id for d in cat_matches}
-                cat_filename_scores = [s for s in filename_scored if s[0] in cat_ids]
-                if cat_filename_scores:
-                    top = cat_filename_scores[0]
-                    runner_up = cat_filename_scores[1][1] if len(cat_filename_scores) > 1 else 0.0
-                    if top[1] - runner_up >= Config.FILENAME_DIRECT_MATCH_MARGIN:
-                        sc_doc_id = top[0]
-                        sc_reason = "category_plus_number_disambiguated_by_filename"
-            elif len(cat_matches) == 0:
-                # No doc in the hinted category with this number. Fall back to
-                # number-only search across ALL categories. This catches cases
-                # like pset03 being categorized as "solutions" (because the file
-                # itself is the solutions doc), where the user asking about
-                # "problem set 3" still wants that doc returned.
-                num_only_matches = _docs_query(ta_id).filter(
-                    or_(*number_clauses),
-                ).all()
-                if len(num_only_matches) == 1:
-                    sc_doc_id = num_only_matches[0].id
-                    sc_reason = "number_only_unique_fallback"
+        top_doc_id = filename_scored[0][0]
+        top_score = filename_scored[0][1]
+        second_score = filename_scored[1][1] if len(filename_scored) > 1 else 0.0
+        margin = top_score - second_score
 
         # ---- Path B: filename-overlap + number when Path A didn't fire (or category hint missing) ----
         if sc_doc_id is None and query_number is not None:
@@ -3053,39 +2730,8 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
         # cannot override the heuristic. The contextualizer can still flip from
         # non-switch to switch via "pivot" intent (override is one-directional once
         # force is on).
-        force_topic_switch = False
+        force_topic_switch = False   # Phase 4: the regex-hint force switch is retired
         force_topic_switch_reason = None
-        cached_doc_num = None
-        cached_doc_category = None
-        try:
-            query_hints = extract_doc_routing_hints(query)
-            distinct_query_numbers = {n for n, _ in query_hints}
-            if len(distinct_query_numbers) >= 2:
-                force_topic_switch = True
-                force_topic_switch_reason = f"multi_doc_query: {sorted(distinct_query_numbers)}"
-            elif len(distinct_query_numbers) == 1:
-                # Compare against the cached doc — look up its number + category from the DB.
-                from models import Document as _Doc
-                cached_doc = _docs_query(ta_id).filter_by(original_filename=session_context.get("document_filename") or "").first()
-                if not cached_doc:
-                    cached_doc = _docs_query(ta_id).filter_by(display_name=session_context.get("document_filename") or "").first()
-                if cached_doc:
-                    cached_doc_category = cached_doc.doc_category
-                    cached_doc_num = None
-                    if cached_doc.assignment_number is not None:
-                        cached_doc_num = str(cached_doc.assignment_number).lstrip("0") or "0"
-                    elif cached_doc.instructional_unit_number is not None:
-                        cached_doc_num = str(cached_doc.instructional_unit_number).lstrip("0") or "0"
-                    query_num = next(iter(distinct_query_numbers))
-                    query_num_normalized = str(query_num).lstrip("0") or "0"
-                    if cached_doc_num is not None and query_num_normalized != cached_doc_num:
-                        force_topic_switch = True
-                        force_topic_switch_reason = (
-                            f"single_doc_switch: query_number={query_num_normalized} "
-                            f"vs cached_number={cached_doc_num}"
-                        )
-        except Exception as e:
-            logger.warning(f"[{ta_id}] force_topic_switch detection failed: {e}; falling back to existing heuristic + contextualizer")
 
         query_doc_type = (query_analysis.get("doc_type_filter") or "").lower()
         query_filename = (query_analysis.get("filename_filter") or "").lower()
@@ -3185,17 +2831,8 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
             _n_student = len([m for m in conversation_history
                               if getattr(m, 'role', None) == "user" or (isinstance(m, dict) and m.get("role") == "user")])
             diagnostics["solution_doc_added"] = False
-            if _n_student >= 2 and session_context.get("document_filename"):
-                # Same gate as before: the solutions document joins after the student has
-                # had one exchange to attempt the problem -- as a shortlist member, so the
-                # reranker decides which of its passages matter.
-                _sol_row = find_solution_document_row(session_context.get("document_filename", ""), ta_id)
-                _sol_id = _sol_row.id if _sol_row else None
-                _sol_name = (_sol_row.display_name or _sol_row.original_filename) if _sol_row else None
-                if _sol_id and _sol_id not in prior_doc_ids:
-                    prior_doc_ids.append(_sol_id)
-                    diagnostics["solution_doc_added"] = True
-                    diagnostics["solution_doc_filename"] = _sol_name
+            # Phase 4 (user policy): no solutions gating -- problems and solutions are served
+            # interchangeably and the generator withholds answers by content.
             diagnostics["cache_prior_doc_ids"] = list(prior_doc_ids)
             diagnostics["cache_prior_chunk_count"] = len(prior_chunk_ids)
             diagnostics["cache_heuristic_switch"] = bool(is_topic_switch)
@@ -3278,7 +2915,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
             student_messages = [m for m in conversation_history if getattr(m, 'role', None) == "user" or (isinstance(m, dict) and m.get("role") == "user")]
             if len(student_messages) >= 2:
                 problem_doc_name = session_context.get("document_filename", "")
-                solution_text, solution_filename, solution_tokens = find_solution_document(problem_doc_name, ta_id)
+                solution_text, solution_filename, solution_tokens = None, None, 0   # Phase 4: solutions gating retired
 
                 if solution_text:
                     candidate = f"=== PROBLEM DOCUMENT: {problem_doc_name} ===\n\n{combined_content}\n\n=== SOLUTION DOCUMENT (for answer verification): {solution_filename} ===\n\n{solution_text}"
@@ -3395,98 +3032,11 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
     # EARLY HYBRID ROUTING: For specific problem references (e.g., "section 1 question a"),
     # skip the unreliable LLM reranker and go directly to full-document mode.
     # This is more reliable for pinpoint queries where we need to find exact content.
-    if (query_analysis.get("requires_early_hybrid") and Config.HYBRID_RETRIEVAL_ENABLED
-            and not (Config.CACHE_AS_PRIOR_ENABLED and prior_doc_ids)):
-        # Phase 1: on a follow-up with a prior, the legacy matcher must not bypass it --
-        # it routed "part 1 2b" to a Cournot lecture on 2026-09-15. The normal path with
-        # the prior in the shortlist handles pinpoint references from the cached document.
-        problem_ref = query_analysis.get("problem_reference", {})
-        logger.info(f"[{ta_id}] Early hybrid routing: skipping reranker for specific reference '{problem_ref.get('full_ref')}'")
-        
-        # Identify target document using query filters (year, doc_type, etc.)
-        target_doc_ids, id_method = identify_target_documents([], query_analysis, ta_id)
-        diagnostics["hybrid_doc_id_method"] = id_method
-        
-        if target_doc_ids:
-            doc_id = target_doc_ids[0]
-            _hybrid_t0 = _t.time()
-            full_text, filename, token_estimate = get_full_document_text(doc_id)
-            diagnostics["hybrid_fetch_latency_ms"] = int((_t.time() - _hybrid_t0) * 1000)
+    # Phase 4 step 4 (2026-09-17): the early full-document route is retired. It picked one
+    # document from regex metadata and skipped search and rerank; with the card resolver,
+    # the short-circuit, validation and widen in place it only cost rows ("lab 4 problem
+    # 4a" -> the 2024 final). Pinpoint references go through the same path as everything.
 
-            if full_text and token_estimate <= Config.HYBRID_MAX_DOC_TOKENS:
-                logger.info(f"[{ta_id}] Early hybrid: using full document '{filename}' ({token_estimate} tokens)")
-
-                # Vector-phase ended at the embedding call; record what we have so far.
-                diagnostics["vector_search_latency_ms"] = int((_t.time() - _vector_t0) * 1000)
-
-                diagnostics["hybrid_fallback_triggered"] = True
-                diagnostics["hybrid_fallback_reason"] = f"early_routing_specific_ref_{problem_ref.get('full_ref')}"
-                diagnostics["hybrid_doc_filename"] = filename
-                diagnostics["hybrid_doc_tokens"] = token_estimate
-                diagnostics["retrieval_method"] = "early_hybrid_full_doc"
-                diagnostics["validation_expected_ref"] = problem_ref.get("full_ref")
-
-                hybrid_chunks = [{
-                    "text": full_text,
-                    "score": 10.0,
-                    "file_name": filename,
-                    "doc_type": "exam",  # Will be from document metadata in practice
-                    "metadata": {},
-                    "document_id": doc_id,
-                    "doc_label": _doc_label_for_id(doc_id),
-                    "is_full_document": True,
-                    "llm_relevance_score": 10.0,
-                    "llm_reason": f"Early hybrid routing for specific reference '{problem_ref.get('full_ref')}'"
-                }]
-
-                logger.info(f"[{ta_id}] Early hybrid complete | doc={filename} | tokens={token_estimate}")
-
-                # Supplementary teaching material retrieval (before cache so we can store it)
-                _supp_t0 = _t.time()
-                supp_chunks, supp_triggered = retrieve_supplementary_teaching_material(
-                    ta_id, hybrid_chunks, query_analysis, diagnostics, original_chunks=[], force=_supp_force)
-                diagnostics["supplementary_latency_ms"] += int((_t.time() - _supp_t0) * 1000)
-                if supp_triggered:
-                    hybrid_chunks.extend(supp_chunks)
-                    diagnostics["supplementary_teaching_found"] = True
-                    diagnostics["supplementary_chunk_count"] = len(supp_chunks)
-
-                # CACHE TO SESSION: Save retrieval + supplementary content for follow-ups
-                if session_id:
-                    try:
-                        session = ChatSession.query.get(session_id)
-                        if session and session.ta_id == ta_id:
-                            existing_attempts = session_context.get("attempt_counts", {}) if session_context else {}
-                            supp_content = "\n\n---\n\n".join(
-                                f"[TEACHING MATERIAL — From: {c['file_name']}]\n{c['text']}" for c in supp_chunks
-                            ) if supp_triggered else ""
-                            session.active_context = {
-                                "ta_id": ta_id,
-                                "document_filename": filename,
-                                "document_content": "" if Config.CACHE_AS_PRIOR_ENABLED else full_text,
-                                "document_ids": [doc_id],
-                                "served_chunk_ids": [],
-                                "schema": 2,
-                                "problem_reference": problem_ref.get("full_ref") if problem_ref else None,
-                                "doc_type": "problem_set",
-                                "cached_at": datetime.utcnow().isoformat(),
-                                "attempt_counts": existing_attempts,
-                                "supplementary_content": "" if Config.CACHE_AS_PRIOR_ENABLED else supp_content,
-                                "supplementary_sources": [c['file_name'] for c in supp_chunks] if supp_triggered else [],
-                            }
-                            db.session.commit()
-                            logger.info(f"[{ta_id}] Cached document context for session: {filename}")
-                    except Exception as e:
-                        logger.warning(f"[{ta_id}] Failed to cache session context: {e}")
-
-                return hybrid_chunks, diagnostics
-            elif token_estimate > Config.HYBRID_MAX_DOC_TOKENS:
-                logger.warning(f"[{ta_id}] Document too large for early hybrid: {token_estimate} tokens, falling back to chunk retrieval")
-            elif not full_text:
-                logger.warning(f"[{ta_id}] Failed to extract text for early hybrid, falling back to chunk retrieval")
-        else:
-            logger.warning(f"[{ta_id}] Early hybrid: could not identify target document (method={id_method}), falling back to chunk retrieval")
-    
     base_query = db.session.query(
         DocumentChunk.id,
         DocumentChunk.document_id,
@@ -4147,7 +3697,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                     logger.info(f"[{ta_id}] Collapse target from cache prior: doc {d} (top1={d == _top1_doc}, count={_counts.get(d, 0)}/{_max})")
                     break
         if not target_doc_ids:
-            target_doc_ids, id_method = identify_target_documents(chunks, id_query_analysis, ta_id)
+            target_doc_ids, id_method = identify_target_documents(chunks, {"original_query": effective_query}, ta_id)
         diagnostics["hybrid_doc_id_method"] = id_method
         
         if target_doc_ids:
