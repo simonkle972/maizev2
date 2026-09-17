@@ -235,7 +235,7 @@ ALLOWED KINDS (use the slug):
 Decide this document's card. Return JSON with exactly these keys:
 - "title": the name a student would use for it, short and specific, e.g. "Problem Set 3", "Practice Problems 1", "Extra Problems II", "Final Exam, Fall 2019", "Lecture 7: Hypothesis Testing", "Quiz 3 Solutions". Include the number in the title when there is one. Never copy a raw filename with underscores or codes.
 - "kind": one slug from ALLOWED KINDS.
-- "number": the document's own sequence number as a string ("3", "11-20" for a range), or "" if it has none. Copy it from the document or the filename; never infer it from the siblings. An edition, a year, a page count or a version is NOT a number.
+- "number": the document's own sequence number as a string ("3", "11-20" for a range), or "" if it has none. Copy it from the document or the filename; never infer it from the siblings. An edition, a year, a page count, a version, or a trailing "-1" / "-2" / "(2)" on a filename (a duplicate-download suffix) is NOT a number. If the course has one midterm per term, the midterm has no number.
 - "part": "I", "II", "Part 2", "Section 2" etc. ONLY when the document is one part of a numbered or lettered series (Extra Problems I / II, Exam Part 1 / Part 2, Section 1 / Section 2). Otherwise "". Words like "Session", "Edition", "Version" are not parts.
 - "term": the term or year if stated ("2025B", "Fall 2019", "Spring 2026"), else "".
 - "aliases": every surface form a student might type for THIS document, lowercase: abbreviations ("ps3", "pset 3", "hw3"), the filename's stem, the title, number forms ("problem set 3", "problem set three"), roman/arabic variants ("part 2", "part ii"). 4 to 12 entries.
@@ -245,6 +245,20 @@ Decide this document's card. Return JSON with exactly these keys:
 Rules: the siblings are there so that numbers and parts are consistent across the series (if "Practice Problems 2" exists, this is not also "Practice Problems 2" unless the document says so) and so that two files with similar names get distinct, correct titles. If the document is an answer key or solutions, say so in the title ("... Solutions"). If it is a lecture, use its lecture number or its topic. Do not invent a number.
 
 JSON only."""
+
+
+# Only hyphen-joined digits ("midterm-1", "pset-1-1") and parenthesised ones ("Vertical (2)") are
+# duplicate-download suffixes; a space- or underscore-separated number ("Lecture 08", "Example 1",
+# "F500_Lecture_1") is the document's own number and stays.
+_DUP_SUFFIX = re.compile(r"(?:-\d{1,2}|[ _]\(\d{1,2}\))+(?=\.[A-Za-z0-9]{2,5}$)")
+
+
+def clean_filename_for_card(filename: str) -> str:
+    """Strip duplicate-download suffixes ("midterm-2.pdf", "pset1-1-1.pdf", "Vertical (2).pdf")
+    before the model sees the filename: on 2026-09-17 the model read "-2" as "Midterm Exam 2"
+    on a course with one midterm per term. A number the document itself states still
+    comes through the text."""
+    return _DUP_SUFFIX.sub("", filename or "")
 
 
 def generate_card(text: str, filename: str, siblings: list, categories: list, course_name: str = "",
@@ -258,7 +272,7 @@ def generate_card(text: str, filename: str, siblings: list, categories: list, co
     tail_src = (text or "")[6000:]
     tail = ("--- last part of the document ---\n" + tail_src[-1000:]) if len(tail_src) > 200 else ""
     prompt = _CARD_PROMPT.format(
-        course_name=course_name or "(unknown)", filename=filename, head=head, tail=tail,
+        course_name=course_name or "(unknown)", filename=clean_filename_for_card(filename), head=head, tail=tail,
         siblings="\n".join(f"- {s}" for s in siblings) if siblings else "- (none yet)",
         categories="\n".join(f'- "{c.get("slug")}" — {c.get("label")}' for c in (categories or [])) or "- other",
     )
