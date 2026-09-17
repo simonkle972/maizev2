@@ -271,7 +271,11 @@ class Config:
     # answer -- the step the student did not follow, the question the TA asked -- is exactly
     # what gets dropped. With the flag on, history is passed as structured messages, whole,
     # newest-first under a token budget; the last assistant turn is never cut.
-    HISTORY_FULL_TRANSCRIPT_ENABLED = os.getenv("HISTORY_FULL_TRANSCRIPT_ENABLED", "false").lower() == "true"
+    # Default on since 2026-09-16 (user decision): on 91 real follow-ups from the prod logs,
+    # judged both orders, transcript 18 / old 14 / ties 24 / disagreements 35; the wins cite
+    # the intended mechanism (dataset naming consistency, continuing the thread, reading a
+    # bare "yes" against the TA's question). Generation p50 5.1 -> 6.2 s. Rollback: false.
+    HISTORY_FULL_TRANSCRIPT_ENABLED = os.getenv("HISTORY_FULL_TRANSCRIPT_ENABLED", "true").lower() == "true"
     HISTORY_MAX_TOKENS = int(os.getenv("HISTORY_MAX_TOKENS", "8000"))
     # LOW_CONFIDENCE_ACTION=decline: when retrieval confidence is low, return no
     # material (so the answer says the course materials don't cover it) instead of
