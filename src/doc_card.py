@@ -24,7 +24,7 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 CARD_MODEL_DEFAULT = "gpt-5.6-terra"   # indexing latency is irrelevant; reasoning helps
-_STOP = {"the", "a", "an", "of", "and", "for", "to", "pdf", "docx", "pptx", "xlsx"}
+_STOP = {"the", "a", "an", "of", "and", "for", "to", "from", "in", "on", "pdf", "docx", "pptx", "xlsx"}
 
 
 # --------------------------------------------------------------------------- label
@@ -157,7 +157,7 @@ def resolve_reference(ta_id: str, text: str, docs=None):
             continue
         coverage = len(rt & dt) / len(rt)
         bonus = 0.25 if any(a and re.search(rf"(?<![a-z0-9]){re.escape(a)}(?![a-z0-9])", ref_l) for a in aliases) else 0.0
-        scored.append((round(coverage + bonus, 4), d.id, label, (d.doc_category or "").lower(), d.card_title or ""))
+        scored.append((round(coverage + bonus, 4), d.id, label, (d.doc_category or "").lower(), d.card_title or "", d.card_source == "professor"))
     if not scored:
         return None, None
     scored.sort(key=lambda x: (-x[0], x[1]))
@@ -167,6 +167,12 @@ def resolve_reference(ta_id: str, text: str, docs=None):
     tied = [x for x in scored if x[0] == best[0]]
     if len(tied) == 1:
         return best[1], best[2]
+    # tie-break: the professor's word beats the model's guess -- a card the professor
+    # edited wins over LLM-generated cards (aliases are never shown, so this is how a
+    # professor's rename becomes effective against a model alias on a sibling).
+    owned = [x for x in tied if x[5]]
+    if len(owned) == 1:
+        return owned[0][1], owned[0][2]
     # tie-break: a document vs its own solutions -> the problem document
     def _base(title):
         t = re.sub(r"\b(solutions?|answer key|answers|key|suggested)\b", " ", title.lower())

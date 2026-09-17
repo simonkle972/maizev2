@@ -403,40 +403,60 @@
                     </div>
                     <div id="upload-progress" class="upload-progress"></div>
 
+                    <details class="card" style="margin-top: 32px;" id="categories-panel">
+                        <summary style="cursor: pointer; font-weight: 600; user-select: none;">
+                            Document categories
+                            <span style="font-weight: 400; color: #8b7355; font-size: 0.85rem;">— the kinds of material in this course; students' references route by them</span>
+                        </summary>
+                        <div style="margin-top: 1rem;">
+                            <p style="font-size: 0.85rem; color: #8b7355; margin: 0 0 0.75rem;">
+                                Rename a label freely (documents stay attached). Add categories that match how this course is organised. A category still assigned to documents cannot be removed until those documents are reassigned.
+                            </p>
+                            <div id="cat-rows" style="display: flex; flex-direction: column; gap: 0.5rem;"></div>
+                            <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem; align-items: center;">
+                                <input type="text" id="cat-new-label" placeholder="New category label (e.g., Recitations)" style="flex: 1; padding: 0.4rem 0.6rem; border: 1px solid #d1c8bb; border-radius: 4px;">
+                                <button type="button" class="btn" onclick="addCategoryRow()">Add</button>
+                            </div>
+                            <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem; align-items: center;">
+                                <button type="button" class="btn btn-primary" onclick="saveCategories()">Save categories</button>
+                                <span id="cat-save-status" style="font-size: 0.85rem;"></span>
+                            </div>
+                        </div>
+                    </details>
+
                     <h3 style="margin-top: 32px;">Documents</h3>
                     <div id="documents-container">
                         {% if documents %}
                             <table class="doc-table">
-                                <colgroup>
-                                    <col class="col-name"><col class="col-type"><col class="col-unit">
-                                    <col class="col-status"><col class="col-file"><col class="col-actions">
-                                </colgroup>
                                 <thead>
                                     <tr>
-                                        <th>Display Name</th>
-                                        <th>Type</th>
-                                        <th>Unit #</th>
+                                        <th>Title</th>
+                                        <th>Kind</th>
+                                        <th>Number</th>
+                                        <th>Part</th>
+                                        <th>Term</th>
                                         <th>Status</th>
-                                        <th>Original File</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody id="doc-tbody">
                                     {% for doc in documents %}
                                         <tr data-doc-id="{{ doc.id }}" data-ta-id="{{ ta.id }}">
-                                            <td><input type="text" class="doc-display-name" value="{{ doc.display_name }}" data-original="{{ doc.display_name }}"></td>
                                             <td>
-                                                <select class="doc-type-select" data-original="{{ doc.doc_type or '' }}">
-                                                    <option value="">—</option>
-                                                    <option value="homework" {% if doc.doc_type == 'homework' %}selected{% endif %}>Homework</option>
-                                                    <option value="exam" {% if doc.doc_type == 'exam' %}selected{% endif %}>Exam</option>
-                                                    <option value="lecture" {% if doc.doc_type == 'lecture' %}selected{% endif %}>Lecture</option>
-                                                    <option value="reading" {% if doc.doc_type == 'reading' %}selected{% endif %}>Reading</option>
-                                                    <option value="syllabus" {% if doc.doc_type == 'syllabus' %}selected{% endif %}>Syllabus</option>
-                                                    <option value="other" {% if doc.doc_type == 'other' %}selected{% endif %}>Other</option>
+                                                <input type="text" class="doc-card-title" value="{{ doc.card_title or doc.display_name or doc.original_filename }}" data-original="{{ doc.card_title or doc.display_name or doc.original_filename }}" style="width: 100%;">
+                                                <div class="doc-original-file" title="{{ doc.original_filename }}" style="font-size: 0.75rem; color: #9a8f82; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ doc.original_filename }}</div>
+                                            </td>
+                                            <td>
+                                                <select class="doc-category-select" data-original="{{ doc.doc_category or '' }}">
+                                                    <option value="" {{ 'selected' if not doc.doc_category }}>—</option>
+                                                    {% for cat in ta.doc_categories or [] %}
+                                                    <option value="{{ cat.slug }}" {{ 'selected' if doc.doc_category == cat.slug }}>{{ cat.label }}</option>
+                                                    {% endfor %}
                                                 </select>
                                             </td>
-                                            <td><input type="number" class="doc-unit-number" value="{{ doc.instructional_unit_number or '' }}" data-original="{{ doc.instructional_unit_number or '' }}" min="1" max="99"></td>
+                                            <td><input type="text" class="doc-card-number" value="{{ doc.card_number or '' }}" data-original="{{ doc.card_number or '' }}" style="width: 56px;"></td>
+                                            <td><input type="text" class="doc-card-part" value="{{ doc.card_part or '' }}" data-original="{{ doc.card_part or '' }}" style="width: 70px;"></td>
+                                            <td><input type="text" class="doc-card-term" value="{{ doc.card_term or '' }}" data-original="{{ doc.card_term or '' }}" style="width: 90px;"></td>
                                             <td>
                                                 {% if doc.last_indexed_at %}
                                                     <span class="doc-status-badge indexed" title="Indexed at {{ doc.last_indexed_at.strftime('%Y-%m-%d %H:%M UTC') }}">&#10003; Indexed</span>
@@ -446,10 +466,10 @@
                                                     <span class="doc-status-badge pending" title="Not yet indexed — click Re-index to process this document">&#9711; Pending</span>
                                                 {% endif %}
                                             </td>
-                                            <td class="doc-original-file" title="{{ doc.original_filename }}">{{ doc.original_filename }}</td>
                                             <td>
                                                 <div class="doc-actions">
                                                     <span class="save-status"></span>
+                                                    <button type="button" class="btn" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;" onclick="regenerateCard({{ doc.id }})" title="Ask the model to redo this document's title, kind, number, part and term">Regenerate</button>
                                                     <button type="button" class="delete-btn" onclick="deleteDocument({{ doc.id }})">Delete</button>
                                                 </div>
                                             </td>
@@ -652,9 +672,110 @@
             }, 1500);
         }
 
+        // ---- Phase 4: document cards ----
+        window.TA_DOC_CATEGORIES = {{ (ta.doc_categories or []) | tojson }};
+        const TA_ID_FOR_CARDS = "{{ ta.id }}";
+        function escapeHtmlCard(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+        function normalizeSlug(label) { return String(label || '').toLowerCase().trim().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '').slice(0, 64); }
+        function renderCategoryRows() {
+            const container = document.getElementById('cat-rows');
+            if (!container) return;
+            container.innerHTML = (window.TA_DOC_CATEGORIES || []).map((c, idx) => `
+                <div class="cat-row" data-idx="${idx}" style="display: flex; gap: 0.5rem; align-items: center;">
+                    <input type="text" class="cat-label" value="${escapeHtmlCard(c.label)}" data-slug="${escapeHtmlCard(c.slug)}" style="flex: 1; padding: 0.4rem 0.6rem; border: 1px solid #d1c8bb; border-radius: 4px;">
+                    <code style="font-size: 0.75rem; color: #8b7355; min-width: 140px;">${escapeHtmlCard(c.slug)}</code>
+                    <button type="button" class="delete-btn" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;" onclick="removeCategoryRow(${idx})">Remove</button>
+                </div>`).join('');
+        }
+        function readCategoryRowsFromUI() {
+            const out = [], seen = new Set();
+            document.querySelectorAll('#cat-rows .cat-row').forEach(r => {
+                const label = (r.querySelector('.cat-label')?.value || '').trim();
+                if (!label) return;
+                const slug = r.querySelector('.cat-label')?.dataset.slug || normalizeSlug(label);
+                if (!slug || seen.has(slug)) return;
+                seen.add(slug); out.push({ slug, label });
+            });
+            return out;
+        }
+        function addCategoryRow() {
+            const input = document.getElementById('cat-new-label');
+            const label = (input.value || '').trim(); if (!label) return;
+            const slug = normalizeSlug(label); if (!slug) return;
+            const cats = window.TA_DOC_CATEGORIES || [];
+            if (cats.some(c => c.slug === slug)) { alert(`Category "${slug}" already exists`); return; }
+            cats.push({ slug, label }); window.TA_DOC_CATEGORIES = cats; input.value = ''; renderCategoryRows();
+        }
+        function removeCategoryRow(idx) {
+            const cats = window.TA_DOC_CATEGORIES || []; const removed = cats[idx]; if (!removed) return;
+            if (!confirm(`Remove category "${removed.label}"? If documents still use it, saving will be refused until they are reassigned.`)) return;
+            cats.splice(idx, 1); window.TA_DOC_CATEGORIES = cats; renderCategoryRows();
+        }
+        function refreshCategorySelects() {
+            document.querySelectorAll('.doc-category-select').forEach(sel => {
+                const current = sel.value;
+                sel.innerHTML = ['<option value=""' + (!current ? ' selected' : '') + '>—</option>']
+                    .concat((window.TA_DOC_CATEGORIES || []).map(c => `<option value="${escapeHtmlCard(c.slug)}"${current === c.slug ? ' selected' : ''}>${escapeHtmlCard(c.label)}</option>`)).join('');
+            });
+        }
+        async function saveCategories() {
+            const status = document.getElementById('cat-save-status');
+            status.textContent = 'Saving…'; status.style.color = '#2563eb';
+            try {
+                const res = await fetch(`/professor/ta/${TA_ID_FOR_CARDS}/categories`, {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    body: JSON.stringify({ doc_categories: readCategoryRowsFromUI() }) });
+                const data = await res.json();
+                if (!res.ok) {
+                    const inUse = data.in_use ? Object.entries(data.in_use).map(([k, v]) => `${k} (${v})`).join(', ') : '';
+                    status.textContent = (data.error || 'Failed') + (inUse ? ' — still in use: ' + inUse : ''); status.style.color = '#dc2626';
+                    window.TA_DOC_CATEGORIES = {{ (ta.doc_categories or []) | tojson }}; renderCategoryRows();
+                    return;
+                }
+                window.TA_DOC_CATEGORIES = data.doc_categories || []; renderCategoryRows(); refreshCategorySelects();
+                status.textContent = 'Saved'; status.style.color = '#16a34a'; setTimeout(() => { status.textContent = ''; }, 2000);
+            } catch (e) { status.textContent = 'Failed: ' + e.message; status.style.color = '#dc2626'; }
+        }
+        function fillCardRow(row, card) {
+            if (!row || !card || !card.has_card) return;
+            const set = (sel, v) => { const el = row.querySelector(sel); if (el && el.value !== v) { el.value = v; el.dataset.original = v; } };
+            set('.doc-card-title', card.card_title || ''); set('.doc-card-number', card.card_number || '');
+            set('.doc-card-part', card.card_part || ''); set('.doc-card-term', card.card_term || '');
+            const cat = row.querySelector('.doc-category-select'); if (cat && card.doc_category) cat.value = card.doc_category;
+        }
+        async function regenerateCard(docId) {
+            const row = document.querySelector(`tr[data-doc-id="${docId}"]`); const statusEl = row?.querySelector('.save-status');
+            if (statusEl) statusEl.textContent = 'Regenerating…';
+            try {
+                const res = await fetch(`/professor/ta/${TA_ID_FOR_CARDS}/documents/${docId}/regenerate-card`, { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                const data = await res.json();
+                if (!res.ok) { if (statusEl) statusEl.textContent = data.error || 'Failed'; return; }
+                fillCardRow(row, data.document); if (statusEl) { statusEl.textContent = '✓ Updated'; setTimeout(() => { statusEl.textContent = ''; }, 2000); }
+            } catch (e) { if (statusEl) statusEl.textContent = 'Failed'; }
+        }
+        function pollPendingCards() {
+            // Rows indexed but without a card yet (e.g. mid-indexing): fill the card when it lands.
+            document.querySelectorAll('#doc-tbody tr').forEach(row => {
+                const title = row.querySelector('.doc-card-title'); const badge = row.querySelector('.doc-status-badge.pending');
+                if (!badge && title) return;
+                let attempts = 0;
+                const tick = setInterval(async () => {
+                    attempts += 1;
+                    try {
+                        const res = await fetch(`/professor/ta/${TA_ID_FOR_CARDS}/documents/${row.dataset.docId}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                        if (!res.ok) { clearInterval(tick); return; }
+                        const card = await res.json();
+                        if (card.has_card) { fillCardRow(row, card); clearInterval(tick); }
+                        else if (attempts >= 40) clearInterval(tick);
+                    } catch (e) { clearInterval(tick); }
+                }, 3000);
+            });
+        }
+        document.addEventListener('DOMContentLoaded', () => { renderCategoryRows(); pollPendingCards(); });
+
         // Auto-save metadata
         function setupAutoSave() {
-            document.querySelectorAll('.doc-display-name, .doc-type-select, .doc-unit-number').forEach(input => {
+            document.querySelectorAll('.doc-card-title, .doc-category-select, .doc-card-number, .doc-card-part, .doc-card-term').forEach(input => {
                 input.addEventListener('blur', saveDocumentMetadata);
                 input.addEventListener('change', saveDocumentMetadata);
             });
@@ -666,10 +787,14 @@
 
             const docId = row.dataset.docId;
             const taId = row.dataset.taId;
-            const displayName = row.querySelector('.doc-display-name').value.trim();
-            const docType = row.querySelector('.doc-type-select').value || null;
-            const unitNumber = row.querySelector('.doc-unit-number').value || null;
             const statusEl = row.querySelector('.save-status');
+            const payload = {
+                card_title: row.querySelector('.doc-card-title').value.trim(),
+                doc_category: row.querySelector('.doc-category-select').value || null,
+                card_number: row.querySelector('.doc-card-number').value.trim(),
+                card_part: row.querySelector('.doc-card-part').value.trim(),
+                card_term: row.querySelector('.doc-card-term').value.trim()
+            };
 
             statusEl.textContent = 'Saving...';
 
@@ -680,11 +805,7 @@
                         'Content-Type': 'application/json',
                         'X-Requested-With': 'XMLHttpRequest'
                     },
-                    body: JSON.stringify({
-                        display_name: displayName,
-                        doc_type: docType,
-                        instructional_unit_number: unitNumber
-                    })
+                    body: JSON.stringify(payload)
                 });
                 const data = await res.json();
 
