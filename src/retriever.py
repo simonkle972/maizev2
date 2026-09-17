@@ -99,6 +99,17 @@ def _rematerialize_chunks(ta_id: str, chunk_ids: list, query_embedding=None) -> 
     return out
 
 
+def _doc_label_for_id(document_id: int):
+    """Card label for a document id, or None (Phase 4; file_name stays the stem)."""
+    try:
+        from models import Document
+        from src.doc_card import card_label
+        d = Document.query.options().get(document_id)
+        return card_label(d) if (d is not None and d.card_title) else None
+    except Exception:
+        return None
+
+
 def get_full_document_text(document_id: int) -> tuple:
     """
     Retrieve full text from a document. Three-tier priority (Phase B latency
@@ -131,9 +142,6 @@ def get_full_document_text(document_id: int) -> tuple:
         return None, None, 0
 
     filename = doc.display_name or doc.original_filename
-    if Config.DOC_CARD_ENABLED and doc.card_title:
-        from src.doc_card import card_label as _cl
-        filename = _cl(doc)
 
     # Tier 1 — fast path
     if doc.full_text:
@@ -3425,6 +3433,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                     "doc_type": "exam",  # Will be from document metadata in practice
                     "metadata": {},
                     "document_id": doc_id,
+                    "doc_label": _doc_label_for_id(doc_id),
                     "is_full_document": True,
                     "llm_relevance_score": 10.0,
                     "llm_reason": f"Early hybrid routing for specific reference '{problem_ref.get('full_ref')}'"
@@ -4163,6 +4172,7 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
                     "doc_type": chunks[0].get("doc_type", "other") if chunks else "other",
                     "metadata": chunks[0].get("metadata", {}) if chunks else {},
                     "document_id": doc_id,
+                    "doc_label": _doc_label_for_id(doc_id),
                     "is_full_document": True,
                     "llm_relevance_score": 10.0,
                     "llm_reason": "Full document fallback due to low chunk confidence"
