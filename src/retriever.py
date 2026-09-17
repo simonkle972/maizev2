@@ -755,7 +755,7 @@ def _extract_concepts_via_llm(problem_text, ta_id):
                     'Example: "marginal rate of substitution, indifference curves, budget constraint, utility maximization"'
                 )
             }],
-            max_tokens=100,
+            max_completion_tokens=100,
             temperature=0.0,
         )
         concepts = response.choices[0].message.content.strip()
