@@ -69,7 +69,8 @@ def main() -> int:
                 continue
             cats = ta.doc_categories or []
             course = (ta.course_name or ta.name) or ""
-            print(f"{'id':>4}  {'title':38} {'kind':16} {'no.':>5} {'part':8} {'term':14}  aliases / original file")
+            print(f"{'id':>4}  {'title':38} {'kind':16} {'no.':>5} {'part':8} {'term':14}  aliases / original file"
+                  f"\n      (a number marked with '?' rests on the filename alone — review those)")
             for d in todo:
                 full = Document.query.get(d.id)
                 text = _doc_text(full, db)
@@ -83,7 +84,8 @@ def main() -> int:
                 except Exception as e:
                     print(f"{d.id:>4}  FAILED {type(e).__name__}: {str(e)[:100]}  ({full.original_filename})")
                     continue
-                print(f"{d.id:>4}  {card['title'][:38]:38} {card['kind'][:16]:16} {card['number'][:5]:>5} "
+                no = card['number'][:4] + ("?" if card.get('number_source') == "filename" else "")
+                print(f"{d.id:>4}  {card['title'][:38]:38} {card['kind'][:16]:16} {no:>5} "
                       f"{card['part'][:8]:8} {card['term'][:14]:14}  {', '.join(card['aliases'][:6])[:60]}"
                       f"\n      file: {full.original_filename}  |  {card['reason'][:110]}  ({time.time() - t0:.1f}s)")
                 if args.apply:
