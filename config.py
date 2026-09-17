@@ -274,6 +274,14 @@ class Config:
     DOC_CARD_ENABLED = os.getenv("DOC_CARD_ENABLED", "false").lower() == "true"
     DOC_CARD_MODEL = os.getenv("DOC_CARD_MODEL", "gpt-5.6-terra")
     LEXICAL_CHUNK_K = int(os.getenv("LEXICAL_CHUNK_K", "20"))
+    # TEACHING_MATERIAL_BY_JUDGEMENT (Phase 4 revision 1, 2026-09-16): no document type and
+    # no category role anywhere. The contextualizer's wants_teaching_material ("would a
+    # human TA bring in the lecture that teaches what this problem uses?") triggers the
+    # step-back concept search over ALL documents, and its passages join the pool BEFORE
+    # the reranker, tagged teaching_material. The regex-gated, type-filtered, post-rerank
+    # supplementary path is bypassed. Default off until measured.
+    TEACHING_MATERIAL_BY_JUDGEMENT = os.getenv("TEACHING_MATERIAL_BY_JUDGEMENT", "false").lower() == "true"
+    TEACHING_MATERIAL_K = int(os.getenv("TEACHING_MATERIAL_K", "6"))
 
     # Phase 3 (2026-09-16): the generator sees the same conversation the classifier sees.
     # Today it gets six prior messages cut to 300 chars as prose; the end of the TA's last

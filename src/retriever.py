@@ -743,7 +743,7 @@ def _extract_concepts_via_llm(problem_text, ta_id):
             # State retention. Abuse-monitoring logs (up to 30 days) are separate and
             # unaffected; only org-level Zero Data Retention removes those.
             store=False,
-            model="gpt-4o-mini",
+            model=Config.CONTEXTUALIZER_MODEL,
             messages=[{
                 "role": "user",
                 "content": (
@@ -784,6 +784,13 @@ def retrieve_supplementary_teaching_material(ta_id, primary_chunks, query_analys
     """
     from models import db, DocumentChunk
     from sqlalchemy import not_, or_
+
+    if Config.TEACHING_MATERIAL_BY_JUDGEMENT:
+        # Phase 4 revision 1: teaching material is chosen by the classifier's judgement and
+        # merged into the pool BEFORE rerank (see _teaching_material_candidates); nothing
+        # is appended after the fact.
+        diagnostics["supplementary_skip_reason"] = "by_judgement_pre_rerank"
+        return [], False
 
     # Guard 1: Don't trigger for conceptual queries (already search broadly)
     # `force` (contextualizer v2 said the student wants teaching material) bypasses
@@ -3830,6 +3837,52 @@ def retrieve_context(ta_id: str, query: str, top_k: int = 8, conversation_histor
     # the union of grams across each document's chunks in the top-20, and if any
     # doc clears the threshold, promote its best-containing chunk so the rerank
     # confirms it as #1 and the cache labels with the correct source.
+    if Config.TEACHING_MATERIAL_BY_JUDGEMENT and _supp_force and initial_chunks:
+        # Phase 4 revision 1: the classifier judged that a human TA would bring in the
+        # material that teaches what this problem uses. Step back from the top passages
+        # to the concepts they need, search ALL documents (no type filter) except the
+        # ones already on top, and let the reranker decide what actually touches the
+        # question. Tagged so the generator shows it as teaching material.
+        _tm_t0 = _t.time()
+        try:
+            _primary_text = "\n".join(c.get("text", "")[:500] for c in initial_chunks[:3])
+            _concepts = _extract_concepts_via_llm(_primary_text, ta_id) or ""
+            if len(_concepts.split()) >= 2:
+                _cemb = client.embeddings.create(model=Config.EMBEDDING_MODEL, input=_concepts).data[0].embedding
+                _top_docs = {c.get("document_id") for c in initial_chunks[:3] if c.get("document_id") is not None}
+                _tq = db.session.query(
+                    DocumentChunk.id, DocumentChunk.document_id, DocumentChunk.doc_label, DocumentChunk.chunk_text,
+                    DocumentChunk.chunk_context, DocumentChunk.section_path, DocumentChunk.file_name,
+                    DocumentChunk.doc_type, DocumentChunk.doc_category, DocumentChunk.assignment_number,
+                    DocumentChunk.instructional_unit_number, DocumentChunk.instructional_unit_label,
+                    (1 - DocumentChunk.embedding.cosine_distance(_cemb)).label("score"),
+                ).filter(DocumentChunk.ta_id == ta_id)
+                if _top_docs:
+                    _tq = _tq.filter(~DocumentChunk.document_id.in_(list(_top_docs)))
+                _seen_tm = {c["text"] for c in initial_chunks}
+                _added_tm = 0
+                for r in _tq.order_by(DocumentChunk.embedding.cosine_distance(_cemb)).limit(Config.TEACHING_MATERIAL_K).all():
+                    if r.chunk_text in _seen_tm:
+                        continue
+                    _seen_tm.add(r.chunk_text)
+                    initial_chunks.append({
+                        "text": r.chunk_text, "score": float(r.score) if r.score else 0.0,
+                        "file_name": r.file_name or "unknown", "doc_type": r.doc_type or "other",
+                        "doc_category": r.doc_category, "chunk_context": r.chunk_context,
+                        "section_path": r.section_path, "chunk_id": r.id, "document_id": r.document_id,
+                        "doc_label": r.doc_label, "retrieval_role": "teaching_material",
+                        "metadata": {"assignment_number": r.assignment_number,
+                                     "instructional_unit_number": r.instructional_unit_number,
+                                     "instructional_unit_label": r.instructional_unit_label},
+                    })
+                    _added_tm += 1
+                diagnostics["teaching_material_concepts"] = _concepts[:200]
+                diagnostics["teaching_material_added"] = _added_tm
+                logger.info(f"[{ta_id}] Teaching material by judgement: concepts='{_concepts[:80]}' -> {_added_tm} passages into the pool")
+        except Exception as _tme:
+            logger.warning(f"[{ta_id}] teaching material by judgement failed: {type(_tme).__name__}: {_tme}")
+        diagnostics["supplementary_latency_ms"] += int((_t.time() - _tm_t0) * 1000)
+
     _stage('prior_merge_structural')
     paste_match = detect_pasted_question(query, initial_chunks)
     if paste_match:
