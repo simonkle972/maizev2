@@ -1091,11 +1091,14 @@ def update_document_metadata(ta_id, doc_id):
     {card_title, doc_category, card_number, card_part, card_term}; display_name is accepted
     as an alias for card_title. Chunk identity (doc_label, kind, lexical index) is recomputed
     in SQL so retrieval sees the edit immediately without a re-index."""
-    from src.doc_card import apply_document_edit, sync_chunk_identity, document_card_json
+    from src.doc_card import (apply_document_edit, sync_chunk_identity, document_card_json,
+                              card_locked, CARD_LOCKED_MESSAGE)
     doc = Document.query.filter_by(id=doc_id, ta_id=ta_id).first()
     if not doc:
         return jsonify({"error": "Document not found"}), 404
     ta = TeachingAssistant.query.get(ta_id)
+    if card_locked(doc, ta):
+        return jsonify({"error": CARD_LOCKED_MESSAGE, "locked": True}), 409
     changed, err = apply_document_edit(doc, request.get_json(silent=True) or {}, ta)
     if err:
         return jsonify({"error": err}), 400
@@ -1124,11 +1127,14 @@ def get_document_card(ta_id, doc_id):
 def regenerate_document_card(ta_id, doc_id):
     """Ask the model for the card again, with the sibling documents in view. Overwrites a
     professor-edited card only because the professor asked for it here."""
-    from src.doc_card import generate_card, apply_card, sibling_lines, sync_chunk_identity, document_card_json
+    from src.doc_card import (generate_card, apply_card, sibling_lines, sync_chunk_identity,
+                              document_card_json, card_locked, CARD_LOCKED_MESSAGE)
     doc = Document.query.filter_by(id=doc_id, ta_id=ta_id).first()
     if not doc:
         return jsonify({"error": "Document not found"}), 404
     ta = TeachingAssistant.query.get(ta_id)
+    if card_locked(doc, ta):
+        return jsonify({"error": CARD_LOCKED_MESSAGE, "locked": True}), 409
     text = doc.full_text or "\n\n".join(
         r[0] for r in db.session.query(DocumentChunk.chunk_text).filter_by(document_id=doc.id).order_by(DocumentChunk.chunk_index).all())
     if not text.strip():

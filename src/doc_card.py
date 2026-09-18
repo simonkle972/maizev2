@@ -347,9 +347,25 @@ def apply_card(doc, card: dict, overwrite_professor: bool = False) -> bool:
 CARD_EDIT_FIELDS = ("card_title", "doc_category", "card_number", "card_part", "card_term")
 
 
+CARD_LOCKED_MESSAGE = "Card fields unlock once the document is indexed"
+
+
+def card_locked(doc, ta=None) -> bool:
+    """A card is editable only after the document is indexed and while no indexing run is
+    in flight. Before that the row shows the filename and nothing else: an edit made before
+    the model's card exists would (a) mark the card professor-owned so the indexer never
+    applies the model's suggestion, and (b) pick conventions blind, without the sibling
+    cards in view. The predicate is the same on the server (PATCH / regenerate return 409)
+    and in the row markup (fields disabled)."""
+    if doc.last_indexed_at is None:
+        return True
+    return bool(ta is not None and getattr(ta, "indexing_status", None) == "running")
+
+
 def document_card_json(doc, ta=None) -> dict:
     """The card as the UI reads it -- the same fields for the professor and admin pages."""
     return {
+        "locked": card_locked(doc, ta),
         "id": doc.id,
         "card_title": doc.card_title or card_label(doc),
         "label": card_label(doc),

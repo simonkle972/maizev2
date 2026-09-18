@@ -114,6 +114,14 @@
             font-size: 0.8rem;
         }
         .doc-table input[type="number"] { width: 60px; }
+        /* Card fields are locked until the document is indexed (the model writes the card
+           during indexing; an earlier edit would pre-empt it). Values still show. */
+        .doc-row-locked input:disabled, .doc-row-locked select:disabled {
+            color: #9ca3af;
+            background: transparent;
+            border-color: #f0ebe5;
+            cursor: not-allowed;
+        }
         .doc-table .delete-btn {
             background: none; border: none; color: #ef4444; cursor: pointer;
             font-size: 0.8rem; font-weight: 500;
@@ -364,22 +372,25 @@
                     </thead>
                     <tbody id="doc-tbody">
                         {% for doc in documents %}
-                        <tr data-doc-id="{{ doc.id }}">
+                        {# Locked until indexed: same predicate as src/doc_card.card_locked (PATCH/regenerate return 409). #}
+                        {% set locked = (not doc.last_indexed_at) or ta.indexing_status == 'running' %}
+                        {% set lock_attrs = 'disabled title="Unlocks once the document is indexed"' if locked else '' %}
+                        <tr data-doc-id="{{ doc.id }}" class="{{ 'doc-row-locked' if locked }}">
                             <td>
-                                <input type="text" class="doc-card-title" value="{{ doc.card_title or doc.display_name or doc.original_filename }}" data-original="{{ doc.card_title or doc.display_name or doc.original_filename }}" style="width: 100%;">
+                                <input type="text" class="doc-card-title" value="{{ doc.card_title or doc.display_name or doc.original_filename }}" data-original="{{ doc.card_title or doc.display_name or doc.original_filename }}" style="width: 100%;" {{ lock_attrs|safe }}>
                                 <div title="{{ doc.original_filename }}" style="font-size: 0.75rem; color: #9a8f82; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ doc.original_filename }}</div>
                             </td>
                             <td>
-                                <select class="doc-category-select" data-original="{{ doc.doc_category or '' }}">
+                                <select class="doc-category-select" data-original="{{ doc.doc_category or '' }}" {{ lock_attrs|safe }}>
                                     <option value="" {{ 'selected' if not doc.doc_category }}>--</option>
                                     {% for cat in ta.doc_categories or [] %}
                                     <option value="{{ cat.slug }}" {{ 'selected' if doc.doc_category == cat.slug }}>{{ cat.label }}</option>
                                     {% endfor %}
                                 </select>
                             </td>
-                            <td><input type="text" class="doc-card-number" value="{{ doc.card_number or '' }}" style="width:56px;"></td>
-                            <td><input type="text" class="doc-card-part" value="{{ doc.card_part or '' }}" style="width:70px;"></td>
-                            <td><input type="text" class="doc-card-term" value="{{ doc.card_term or '' }}" style="width:90px;"></td>
+                            <td><input type="text" class="doc-card-number" value="{{ doc.card_number or '' }}" data-original="{{ doc.card_number or '' }}" style="width:56px;" {{ lock_attrs|safe }}></td>
+                            <td><input type="text" class="doc-card-part" value="{{ doc.card_part or '' }}" data-original="{{ doc.card_part or '' }}" style="width:70px;" {{ lock_attrs|safe }}></td>
+                            <td><input type="text" class="doc-card-term" value="{{ doc.card_term or '' }}" data-original="{{ doc.card_term or '' }}" style="width:90px;" {{ lock_attrs|safe }}></td>
                             <td>
                                 {% if doc.last_indexed_at %}
                                     <span class="doc-status-badge indexed" title="Indexed at {{ doc.last_indexed_at.strftime('%Y-%m-%d %H:%M UTC') }}">&#10003; Indexed</span>
@@ -392,7 +403,7 @@
                             <td>
                                 <div class="doc-actions">
                                     <span class="save-status"></span>
-                                    <button class="btn" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;" onclick="regenerateCard({{ doc.id }})" title="Ask the model to redo this document's card">Regenerate</button>
+                                    <button class="btn doc-regenerate-btn" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;" onclick="regenerateCard({{ doc.id }})" title="{{ 'Unlocks once the document is indexed' if locked else 'Ask the model to redo the card' }}" {{ 'disabled' if locked }}>Regenerate</button>
                                     <button class="delete-btn" onclick="deleteDocument({{ doc.id }})">Delete</button>
                                 </div>
                             </td>
@@ -400,7 +411,7 @@
                         {% endfor %}
                     </tbody>
                 </table>
-                <p class="metadata-hint">Changes auto-save when you click out of a field.</p>
+                <p class="metadata-hint">Changes auto-save when you click out of a field. Card fields unlock once the document is indexed.</p>
                 {% else %}
                 <p style="color: #8b7355;">No documents uploaded yet.</p>
                 {% endif %}
@@ -632,6 +643,8 @@
     function appendDocRow(tbody, doc) {
         const tr = document.createElement('tr');
         tr.dataset.docId = doc.document_id;
+        tr.className = 'doc-row-locked';   // a fresh upload is never indexed yet
+        const lock = 'disabled title="Unlocks once the document is indexed"';
         const docCategory = doc.doc_category || '';
         const displayName = (doc.card_title || doc.display_name || doc.original_filename || doc.filename || '').replace(/"/g, '&quot;');
         const filename = (doc.original_filename || doc.filename || '').replace(/</g, '&lt;');
@@ -639,22 +652,22 @@
             `<option value="${c.slug}"${docCategory === c.slug ? ' selected' : ''}>${(c.label || '').replace(/</g, '&lt;')}</option>`
         ).join('');
         tr.innerHTML = `
-            <td><input type="text" class="doc-card-title" value="${displayName}" data-original="${displayName}" style="width:100%;"><div style="font-size: 0.75rem; color: #9a8f82; margin-top: 2px;">${filename}</div></td>
+            <td><input type="text" class="doc-card-title" value="${displayName}" data-original="${displayName}" style="width:100%;" ${lock}><div style="font-size: 0.75rem; color: #9a8f82; margin-top: 2px;">${filename}</div></td>
             <td>
-                <select class="doc-category-select" data-original="${docCategory}">
+                <select class="doc-category-select" data-original="${docCategory}" ${lock}>
                     <option value=""${!docCategory ? ' selected' : ''}>--</option>
                     ${categoryOptions}
                 </select>
             </td>
-            <td><input type="text" class="doc-card-number" value="" style="width:56px;"></td>
-            <td><input type="text" class="doc-card-part" value="" style="width:70px;"></td>
-            <td><input type="text" class="doc-card-term" value="" style="width:90px;"></td>
+            <td><input type="text" class="doc-card-number" value="" data-original="" style="width:56px;" ${lock}></td>
+            <td><input type="text" class="doc-card-part" value="" data-original="" style="width:70px;" ${lock}></td>
+            <td><input type="text" class="doc-card-term" value="" data-original="" style="width:90px;" ${lock}></td>
             <td><span class="doc-status-badge pending" title="Not yet indexed — click Re-index to process this document">&#9711; Pending</span></td>
             <td>
                 <div class="doc-actions">
-                    <span class="metadata-status" style="font-size: 0.7rem; color: #2563eb; margin-right: 4px;">${doc.metadata_extracted ? '' : 'Reading metadata…'}</span>
+                    <span class="metadata-status" style="font-size: 0.7rem; color: #2563eb; margin-right: 4px;"></span>
                     <span class="save-status"></span>
-                    <button class="btn" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;" onclick="regenerateCard(${doc.document_id})">Regenerate</button>
+                    <button class="btn doc-regenerate-btn" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;" onclick="regenerateCard(${doc.document_id})" ${lock}>Regenerate</button>
                     <button class="delete-btn" onclick="deleteDocument(${doc.document_id})">Delete</button>
                 </div>
             </td>
@@ -667,40 +680,49 @@
         if (indexBtn) indexBtn.disabled = false;
     }
 
-    // --- Poll the metadata endpoint until the LLM extractor completes ---
+    // --- Card fields: fill from the server, unlock once the document is indexed ---
+    function fillCardRow(row, data) {
+        if (!row || !data || !data.has_card) return;
+        const set = (sel, v) => { const el = row.querySelector(sel); if (el && el.value !== (v || '')) { el.value = v || ''; el.dataset.original = v || ''; } };
+        set('.doc-card-title', data.card_title); set('.doc-card-number', data.card_number);
+        set('.doc-card-part', data.card_part); set('.doc-card-term', data.card_term);
+        const catSelect = row.querySelector('.doc-category-select');
+        if (catSelect && data.doc_category && catSelect.value !== data.doc_category) { catSelect.value = data.doc_category; catSelect.dataset.original = data.doc_category; }
+    }
+    function unlockCardRow(row, data) {
+        if (!row) return;
+        row.classList.remove('doc-row-locked');
+        row.querySelectorAll('.doc-card-title, .doc-category-select, .doc-card-number, .doc-card-part, .doc-card-term').forEach(el => {
+            el.disabled = false; el.removeAttribute('title');
+        });
+        const regen = row.querySelector('.doc-regenerate-btn');
+        if (regen) { regen.disabled = false; regen.title = 'Ask the model to redo the card'; }
+        const badge = row.querySelector('.doc-status-badge');
+        if (badge && !badge.classList.contains('indexed')) {
+            badge.className = 'doc-status-badge indexed'; badge.innerHTML = '&#10003; Indexed';
+            badge.title = data && data.last_indexed_at ? 'Indexed at ' + data.last_indexed_at : 'Indexed';
+        }
+    }
+    // Poll a locked row: the card lands during indexing (fill it), the lock lifts when the
+    // document is indexed and no run is in flight (server-side `locked`).
     function pollDocMetadata(docId) {
         if (!docId) return;
         let attempts = 0;
-        const maxAttempts = 30;  // ~60 s at 2 s interval
+        const maxAttempts = 40;  // ~2 min at 3 s interval
         const tick = setInterval(async () => {
             attempts += 1;
             try {
                 const data = await apiCall(`/admin/api/tas/${TA_ID}/documents/${docId}`);
-                if (data.has_card || data.metadata_extracted) {
-                    const row = document.querySelector(`tr[data-doc-id="${docId}"]`);
-                    if (row) {
-                        const set = (sel, v) => { const el = row.querySelector(sel); if (el && v) el.value = v; };
-                        set('.doc-card-title', data.card_title); set('.doc-card-number', data.card_number);
-                        set('.doc-card-part', data.card_part); set('.doc-card-term', data.card_term);
-                        const catSelect = row.querySelector('.doc-category-select');
-                        if (catSelect && data.doc_category && catSelect.value !== data.doc_category) catSelect.value = data.doc_category;
-                        const metaStatus = row.querySelector('.metadata-status');
-                        if (metaStatus) metaStatus.textContent = '';
-                    }
-                    clearInterval(tick);
-                } else if (attempts >= maxAttempts) {
-                    const row = document.querySelector(`tr[data-doc-id="${docId}"]`);
-                    if (row) {
-                        const metaStatus = row.querySelector('.metadata-status');
-                        if (metaStatus) metaStatus.textContent = '';
-                    }
-                    clearInterval(tick);
-                }
+                const row = document.querySelector(`tr[data-doc-id="${docId}"]`);
+                if (!row) { clearInterval(tick); return; }
+                if (data.has_card) fillCardRow(row, data);
+                if (data.locked === false) { unlockCardRow(row, data); clearInterval(tick); }
+                else if (attempts >= maxAttempts) clearInterval(tick);
             } catch (e) {
                 console.warn('[meta-poll] failed:', e);
                 clearInterval(tick);
             }
-        }, 2000);
+        }, 3000);
     }
 
     // --- Document auto-save listener (extracted so we can call it for new rows too) ---
@@ -708,26 +730,31 @@
         row.querySelectorAll('.doc-card-title, .doc-category-select, .doc-card-number, .doc-card-part, .doc-card-term').forEach(el => {
             el.addEventListener('change', async () => {
                 const r = el.closest('tr');
+                if (r.classList.contains('doc-row-locked')) return;   // fields unlock after indexing
                 const docId = r.dataset.docId;
                 const status = r.querySelector('.save-status');
+                const fields = ['.doc-card-title', '.doc-category-select', '.doc-card-number', '.doc-card-part', '.doc-card-term'].map(sel => r.querySelector(sel));
+                // Only a real change is saved (a no-op PATCH would still mark the card professor-owned).
+                if (fields.every(f => (f.value || '').trim() === (f.dataset.original || '').trim())) return;
                 status.textContent = 'Saving...';
                 status.style.color = '#2563eb';
                 try {
                     await apiCall(`/admin/api/tas/${TA_ID}/documents/${docId}`, {
                         method: 'PATCH',
                         body: JSON.stringify({
-                            card_title: r.querySelector('.doc-card-title').value.trim(),
-                            doc_category: r.querySelector('.doc-category-select').value || null,
-                            card_number: r.querySelector('.doc-card-number').value.trim(),
-                            card_part: r.querySelector('.doc-card-part').value.trim(),
-                            card_term: r.querySelector('.doc-card-term').value.trim()
+                            card_title: fields[0].value.trim(),
+                            doc_category: fields[1].value || null,
+                            card_number: fields[2].value.trim(),
+                            card_part: fields[3].value.trim(),
+                            card_term: fields[4].value.trim()
                         })
                     });
+                    fields.forEach(f => { f.dataset.original = (f.value || '').trim(); });
                     status.textContent = 'Saved';
                     status.style.color = '#15803d';
                     setTimeout(() => status.textContent = '', 2000);
                 } catch (e) {
-                    status.textContent = 'Error';
+                    status.textContent = 'Error: ' + e.message;
                     status.style.color = '#ef4444';
                 }
             });
@@ -747,8 +774,9 @@
         } catch (e) { if (status) { status.textContent = 'Error: ' + e.message; status.style.color = '#ef4444'; } }
     }
 
-    // Attach listeners to all existing doc rows (rendered server-side)
+    // Attach listeners to all existing doc rows (rendered server-side); poll the locked ones
     document.querySelectorAll('#doc-tbody tr').forEach(row => attachDocRowListeners(row));
+    document.querySelectorAll('#doc-tbody tr.doc-row-locked').forEach(row => pollDocMetadata(row.dataset.docId));
 
     // --- Delete document ---
     async function deleteDocument(docId) {

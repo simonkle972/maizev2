@@ -114,6 +114,14 @@
             border: 1px solid #d1d5db;
             border-radius: 4px;
         }
+        /* Card fields are locked until the document is indexed (the model writes the card
+           during indexing; an earlier edit would pre-empt it). Values still show. */
+        .doc-row-locked input:disabled, .doc-row-locked select:disabled {
+            color: #9ca3af;
+            background: transparent;
+            border-color: #e5e7eb;
+            cursor: not-allowed;
+        }
         .doc-actions {
             display: flex;
             align-items: center;
@@ -441,22 +449,25 @@
                                 </thead>
                                 <tbody id="doc-tbody">
                                     {% for doc in documents %}
-                                        <tr data-doc-id="{{ doc.id }}" data-ta-id="{{ ta.id }}">
+                                        {# Locked until indexed: same predicate as src/doc_card.card_locked (PATCH/regenerate return 409). #}
+                                        {% set locked = (not doc.last_indexed_at) or ta.indexing_status == 'running' %}
+                                        {% set lock_attrs = 'disabled title="Unlocks once the document is indexed"' if locked else '' %}
+                                        <tr data-doc-id="{{ doc.id }}" data-ta-id="{{ ta.id }}" class="{{ 'doc-row-locked' if locked }}">
                                             <td>
-                                                <input type="text" class="doc-card-title" value="{{ doc.card_title or doc.display_name or doc.original_filename }}" data-original="{{ doc.card_title or doc.display_name or doc.original_filename }}" style="width: 100%;">
+                                                <input type="text" class="doc-card-title" value="{{ doc.card_title or doc.display_name or doc.original_filename }}" data-original="{{ doc.card_title or doc.display_name or doc.original_filename }}" style="width: 100%;" {{ lock_attrs|safe }}>
                                                 <div class="doc-original-file" title="{{ doc.original_filename }}" style="font-size: 0.75rem; color: #9a8f82; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ doc.original_filename }}</div>
                                             </td>
                                             <td>
-                                                <select class="doc-category-select" data-original="{{ doc.doc_category or '' }}">
+                                                <select class="doc-category-select" data-original="{{ doc.doc_category or '' }}" {{ lock_attrs|safe }}>
                                                     <option value="" {{ 'selected' if not doc.doc_category }}>—</option>
                                                     {% for cat in ta.doc_categories or [] %}
                                                     <option value="{{ cat.slug }}" {{ 'selected' if doc.doc_category == cat.slug }}>{{ cat.label }}</option>
                                                     {% endfor %}
                                                 </select>
                                             </td>
-                                            <td><input type="text" class="doc-card-number" value="{{ doc.card_number or '' }}" data-original="{{ doc.card_number or '' }}" style="width: 56px;"></td>
-                                            <td><input type="text" class="doc-card-part" value="{{ doc.card_part or '' }}" data-original="{{ doc.card_part or '' }}" style="width: 70px;"></td>
-                                            <td><input type="text" class="doc-card-term" value="{{ doc.card_term or '' }}" data-original="{{ doc.card_term or '' }}" style="width: 90px;"></td>
+                                            <td><input type="text" class="doc-card-number" value="{{ doc.card_number or '' }}" data-original="{{ doc.card_number or '' }}" style="width: 56px;" {{ lock_attrs|safe }}></td>
+                                            <td><input type="text" class="doc-card-part" value="{{ doc.card_part or '' }}" data-original="{{ doc.card_part or '' }}" style="width: 70px;" {{ lock_attrs|safe }}></td>
+                                            <td><input type="text" class="doc-card-term" value="{{ doc.card_term or '' }}" data-original="{{ doc.card_term or '' }}" style="width: 90px;" {{ lock_attrs|safe }}></td>
                                             <td>
                                                 {% if doc.last_indexed_at %}
                                                     <span class="doc-status-badge indexed" title="Indexed at {{ doc.last_indexed_at.strftime('%Y-%m-%d %H:%M UTC') }}">&#10003; Indexed</span>
@@ -469,7 +480,7 @@
                                             <td>
                                                 <div class="doc-actions">
                                                     <span class="save-status"></span>
-                                                    <button type="button" class="btn" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;" onclick="regenerateCard({{ doc.id }})" title="Ask the model to redo this document's title, kind, number, part and term">Regenerate</button>
+                                                    <button type="button" class="btn doc-regenerate-btn" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;" onclick="regenerateCard({{ doc.id }})" title="{{ 'Unlocks once the document is indexed' if locked else 'Ask the model to redo the title, kind, number, part and term' }}" {{ 'disabled' if locked }}>Regenerate</button>
                                                     <button type="button" class="delete-btn" onclick="deleteDocument({{ doc.id }})">Delete</button>
                                                 </div>
                                             </td>
@@ -477,7 +488,7 @@
                                     {% endfor %}
                                 </tbody>
                             </table>
-                            <p class="metadata-hint">Changes auto-save when you click out of a field.</p>
+                            <p class="metadata-hint">Changes auto-save when you click out of a field. Card fields unlock once the document is indexed.</p>
                         {% else %}
                             <p style="color: #6b7280;">No documents uploaded yet.</p>
                         {% endif %}
@@ -753,11 +764,25 @@
                 fillCardRow(row, data.document); if (statusEl) { statusEl.textContent = '✓ Updated'; setTimeout(() => { statusEl.textContent = ''; }, 2000); }
             } catch (e) { if (statusEl) statusEl.textContent = 'Failed'; }
         }
+        function unlockCardRow(row, card) {
+            // The document is indexed and no run is in flight: fields become editable, badge flips.
+            if (!row) return;
+            row.classList.remove('doc-row-locked');
+            row.querySelectorAll('.doc-card-title, .doc-category-select, .doc-card-number, .doc-card-part, .doc-card-term').forEach(el => {
+                el.disabled = false; el.removeAttribute('title');
+            });
+            const regen = row.querySelector('.doc-regenerate-btn');
+            if (regen) { regen.disabled = false; regen.title = 'Ask the model to redo the title, kind, number, part and term'; }
+            const badge = row.querySelector('.doc-status-badge');
+            if (badge && !badge.classList.contains('indexed')) {
+                badge.className = 'doc-status-badge indexed'; badge.innerHTML = '&#10003; Indexed';
+                badge.title = card && card.last_indexed_at ? 'Indexed at ' + card.last_indexed_at : 'Indexed';
+            }
+        }
         function pollPendingCards() {
-            // Rows indexed but without a card yet (e.g. mid-indexing): fill the card when it lands.
-            document.querySelectorAll('#doc-tbody tr').forEach(row => {
-                const title = row.querySelector('.doc-card-title'); const badge = row.querySelector('.doc-status-badge.pending');
-                if (!badge && title) return;
+            // Locked rows (not yet indexed, or a run in flight): fill the card when it lands,
+            // unlock the fields when the server says the row is editable.
+            document.querySelectorAll('#doc-tbody tr.doc-row-locked').forEach(row => {
                 let attempts = 0;
                 const tick = setInterval(async () => {
                     attempts += 1;
@@ -765,7 +790,8 @@
                         const res = await fetch(`/professor/ta/${TA_ID_FOR_CARDS}/documents/${row.dataset.docId}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
                         if (!res.ok) { clearInterval(tick); return; }
                         const card = await res.json();
-                        if (card.has_card) { fillCardRow(row, card); clearInterval(tick); }
+                        if (card.has_card) fillCardRow(row, card);
+                        if (card.locked === false) { unlockCardRow(row, card); clearInterval(tick); }
                         else if (attempts >= 40) clearInterval(tick);
                     } catch (e) { clearInterval(tick); }
                 }, 3000);
@@ -788,12 +814,18 @@
             const docId = row.dataset.docId;
             const taId = row.dataset.taId;
             const statusEl = row.querySelector('.save-status');
+            if (row.classList.contains('doc-row-locked')) return;   // fields unlock after indexing
+            const fields = ['.doc-card-title', '.doc-category-select', '.doc-card-number', '.doc-card-part', '.doc-card-term'].map(sel => row.querySelector(sel));
+            // Only a real change is saved: a blur on an untouched row must not PATCH the current
+            // values back (that would mark the card professor-owned and the model's card would
+            // never be applied).
+            if (fields.every(el => (el.value || '').trim() === (el.dataset.original || '').trim())) return;
             const payload = {
-                card_title: row.querySelector('.doc-card-title').value.trim(),
-                doc_category: row.querySelector('.doc-category-select').value || null,
-                card_number: row.querySelector('.doc-card-number').value.trim(),
-                card_part: row.querySelector('.doc-card-part').value.trim(),
-                card_term: row.querySelector('.doc-card-term').value.trim()
+                card_title: fields[0].value.trim(),
+                doc_category: fields[1].value || null,
+                card_number: fields[2].value.trim(),
+                card_part: fields[3].value.trim(),
+                card_term: fields[4].value.trim()
             };
 
             statusEl.textContent = 'Saving...';
@@ -810,6 +842,7 @@
                 const data = await res.json();
 
                 if (data.success) {
+                    fields.forEach(el => { el.dataset.original = (el.value || '').trim(); });
                     statusEl.textContent = '✓ Saved';
                     setTimeout(() => { statusEl.textContent = ''; }, 2000);
                     // Refresh banner/button/badge state in-place. Metadata edits
@@ -819,7 +852,7 @@
                     // this surfaces it immediately, no manual reload required.
                     refreshUIState();
                 } else {
-                    statusEl.textContent = '✗ Error';
+                    statusEl.textContent = data.error ? '✗ ' + data.error : '✗ Error';
                 }
             } catch (err) {
                 statusEl.textContent = '✗ Error';
